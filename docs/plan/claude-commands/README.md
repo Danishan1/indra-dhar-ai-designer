@@ -8,6 +8,7 @@ These are the project's custom Claude Code commands. They live here because the 
 # macOS / Linux / Git Bash
 mkdir -p .claude/commands && cp docs/plan/claude-commands/*-*.md .claude/commands/
 ```
+
 ```powershell
 # Windows PowerShell
 New-Item -ItemType Directory -Force .claude\commands | Out-Null

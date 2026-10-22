@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "ai-designer-dev",
+      "credentials": [
+        { "accessKey": "aid-dev-access-key", "secretKey": "aid-dev-secret-key-change-me" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

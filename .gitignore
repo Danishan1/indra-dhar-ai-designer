@@ -43,3 +43,6 @@ Thumbs.db
 
 # Claude local settings (keep shared commands)
 .claude/settings.local.json
+
+# Generated code
+apps/api/src/generated/

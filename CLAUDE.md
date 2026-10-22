@@ -3,11 +3,13 @@
 You are building this entire product, iteration by iteration, across many sessions, machines and possibly accounts. **The repository is your memory.** Read this file first in every session.
 
 ## What this is
+
 A self-hosted, AI-powered garment design platform: users start from a sketch/photo/fabric, edit a **structured garment model** visually (components, properties, reusable artifacts), request AI generation deliberately, approve **immutable revisions**, and produce **validated, versioned tech packs**. AI usage is metered and billed (platform keys or customer keys).
 
 Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolith (api) · BullMQ worker · PostgreSQL + Prisma · Redis · S3-compatible storage · SVG/Konva 2D · React Three Fiber 3D viewer · Docker Compose.
 
 ## Where things are
+
 - `docs/init/` — original requirement specs (read-only baseline). `02-subsystem-breakdown.md` is a duplicate of `08-tech-pack.md`.
 - `docs/plan/` — **the implementation plan** (start at `docs/plan/README.md`).
   - `PROGRESS.md` — live tracker: current iteration, statuses, session log. **Read it now.**
@@ -18,6 +20,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - Code layout (as it gets created): `apps/web`, `apps/api`, `apps/worker`, `packages/*`, `infra/*`, `tests/*`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)
+
 1. `git pull`; check for uncommitted work.
 2. Read `docs/plan/PROGRESS.md` → pick the `in_progress` iteration, else the lowest `todo` whose dependencies are `done`.
 3. Read that iteration file fully + the spec sections it cites + relevant ADRs. Resolve any Open ADR (ask the human briefly, or apply the documented default and flag it).
@@ -25,6 +28,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 5. Before the session ends: update PROGRESS.md (session log, next step), commit, push. When the iteration is complete, run the finish protocol (playbook §4).
 
 ## Non-negotiable rules
+
 1. The structured garment model is the source of truth; images/SVG/3D are derived representations.
 2. Revisions, approvals, released specs/exports, finalized usage, invoices, audit events are **immutable** — corrections create new records.
 3. Never invent manufacturing facts. Values carry status `confirmed | inferred | proposed | missing | needs_review | not_applicable`; AI output is never auto-`confirmed`.
@@ -37,12 +41,13 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 10. Don't edit `docs/init/*`. Record deviations and decisions in `docs/plan`.
 
 ## Useful commands (available once the relevant iteration is done)
-| Command | Purpose | From |
-|---|---|---|
-| `pnpm install` | install workspace | I01 |
-| `pnpm dev` | run web + api + worker | I01 |
-| `pnpm verify` | lint + typecheck + unit tests | I01 |
-| `pnpm infra:up` / `infra:down` | start/stop Postgres, Redis, object store, Mailpit | I02 |
-| `pnpm db:migrate` / `db:seed` / `db:reset` | Prisma migrations & seeds | I02/I03 |
-| `pnpm test:integration` | integration tests against compose infra | I03 |
-| `pnpm e2e` | Playwright | I04 |
+
+| Command                                    | Purpose                                           | From    |
+| ------------------------------------------ | ------------------------------------------------- | ------- |
+| `pnpm install`                             | install workspace                                 | I01     |
+| `pnpm dev`                                 | run web + api + worker                            | I01     |
+| `pnpm verify`                              | lint + typecheck + unit tests                     | I01     |
+| `pnpm infra:up` / `infra:down`             | start/stop Postgres, Redis, object store, Mailpit | I02     |
+| `pnpm db:migrate` / `db:seed` / `db:reset` | Prisma migrations & seeds                         | I02/I03 |
+| `pnpm test:integration`                    | integration tests against compose infra           | I03     |
+| `pnpm e2e`                                 | Playwright                                        | I04     |

@@ -1,0 +1,107 @@
+# Local development & test infrastructure for AI Designer.
+# Usage (from repo root):  pnpm infra:up      (dev services)
+#                          pnpm infra:test:up (isolated services for integration tests)
+# All ports bind to 127.0.0.1 only (TECH-GDP-001 §8: never expose data services publicly).
+name: ai-designer
+
+x-healthcheck-defaults: &hc
+  interval: 5s
+  timeout: 3s
+  retries: 20
+
+services:
+  # # ---------------------------------------------------------------- dev profile (default)
+  # postgres:
+  #   image: postgres:17-alpine
+  #   environment:
+  #     POSTGRES_USER: aid
+  #     POSTGRES_PASSWORD: aid_dev_password
+  #     POSTGRES_DB: ai_designer
+  #   ports: ['127.0.0.1:5432:5432']
+  #   volumes: ['pgdata:/var/lib/postgresql/data']
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U aid -d ai_designer']
+  #     <<: *hc
+
+  redis:
+    image: redis:7.4-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['127.0.0.1:6379:6379']
+    volumes: ['redisdata:/data']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      <<: *hc
+
+  objectstore:
+    # ADR-021: SeaweedFS (Apache-2.0) single-node with S3 gateway. Any S3-compatible store works
+    # behind apps/api/src/platform/storage (ObjectStorage interface).
+    image: chrislusf/seaweedfs:3.80
+    command:
+      [
+        'server',
+        '-dir=/data',
+        '-s3',
+        '-s3.port=8333',
+        '-s3.config=/etc/seaweedfs/s3.json',
+        '-ip.bind=0.0.0.0',
+      ]
+    ports: ['127.0.0.1:8333:8333']
+    volumes:
+      - 'objectdata:/data'
+      - './seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1']
+      <<: *hc
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports: ['127.0.0.1:1025:1025', '127.0.0.1:8025:8025']
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      <<: *hc
+
+  # # ---------------------------------------------------------------- test profile (ephemeral, tmpfs)
+  # postgres-test:
+  #   profiles: ['test']
+  #   image: postgres:17-alpine
+  #   environment:
+  #     POSTGRES_USER: aid
+  #     POSTGRES_PASSWORD: aid_test_password
+  #     POSTGRES_DB: ai_designer_test
+  #   ports: ['127.0.0.1:55432:5432']
+  #   tmpfs: ['/var/lib/postgresql/data']
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U aid -d ai_designer_test']
+  #     <<: *hc
+
+  redis-test:
+    profiles: ['test']
+    image: redis:7.4-alpine
+    ports: ['127.0.0.1:56379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      <<: *hc
+
+  objectstore-test:
+    profiles: ['test']
+    image: chrislusf/seaweedfs:3.80
+    command:
+      [
+        'server',
+        '-dir=/data',
+        '-s3',
+        '-s3.port=8333',
+        '-s3.config=/etc/seaweedfs/s3.json',
+        '-ip.bind=0.0.0.0',
+      ]
+    ports: ['127.0.0.1:58333:8333']
+    tmpfs: ['/data']
+    volumes: ['./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro']
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1']
+      <<: *hc
+
+volumes:
+  pgdata:
+  redisdata:
+  objectdata:

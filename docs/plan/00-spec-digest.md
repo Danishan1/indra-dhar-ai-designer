@@ -6,19 +6,19 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 
 ## 1. Document map
 
-| File | Doc ID | Title | Purpose |
-|---|---|---|---|
-| `01-overview.md` | SRS-GDP-001 v0.1 | Software Requirements Specification (high level) | Product vision, scope, principal FRs, engine list, lifecycle stages, NFRs, delivery phases |
-| `02-subsystem-breakdown.md` | (labelled SPEC-GDP-008) | **Duplicate of Tech Pack spec** | See known issues — ARCH-GDP-002 is missing |
-| `03-artifact-schema.md` | SPEC-GDP-003 v0.1 | Garment Design Model & Artifact Schema | Canonical garment model, components, properties+provenance, relationships, artifacts, assets, representations, constraints, operations, revisions |
-| `04-ai-prompt.md` | SPEC-GDP-004 v0.1 | AI Execution, Prompt Compilation & Provider Integration | Operation contract, strategy routing, compiler, capability registry, adapters, jobs, normalization, validation, credentials, failures |
-| `05-ai-usage-metering.md` | SPEC-GDP-005 v0.1 | AI Usage Metering, Subscription & Billing | Usage events, ledger, reservations, plans, allowances, pricing, charges, invoices, payments, budgets, reconciliation |
-| `06-project-lifecycle.md` | SPEC-GDP-006 v0.1 | Project Lifecycle & Design Versioning | Projects, working copy, immutable revisions, review/approval, readiness, tech-pack versions, archive/delete |
-| `07-editor.md` | SPEC-GDP-007 v0.1 | Editor Interaction & Visualization | Workspace layout, viewport modes, selection, properties, drawing, artifacts, AI controls, undo/redo, autosave, comparison |
-| `08-tech-pack.md` | SPEC-GDP-008 v0.1 | Tech Pack & Production Specification | Spec lifecycle, BOM, materials, POM/measurements, grading, tolerances, construction, colorways, validation, release, export, supplier access |
-| `09-specification.md` | SPEC-GDP-009 v0.1 | Security, Identity & Organization Access | Accounts, auth, MFA, sessions, orgs, memberships, RBAC, grants, SoD, secrets, API tokens, audit, tenant isolation |
-| `10-visualization.md` | SPEC-GDP-010 v0.1 | Rendering, Visualization & 2D/3D Geometry Architecture | Representation layers, render requests/profiles/manifests, 2D/vector/raster, G0–G6 geometry, 3D scene, materials, cloth sim boundary, sync levels, render jobs, cache, export |
-| `11-tech-stack.md` | TECH-GDP-001 v1.0 | Finalized Technology Stack & Implementation Plan | **Approved** stack, monorepo layout, module boundaries, AI execution pipeline, deployment, optimization targets |
+| File                        | Doc ID                  | Title                                                   | Purpose                                                                                                                                                                       |
+| --------------------------- | ----------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-overview.md`            | SRS-GDP-001 v0.1        | Software Requirements Specification (high level)        | Product vision, scope, principal FRs, engine list, lifecycle stages, NFRs, delivery phases                                                                                    |
+| `02-subsystem-breakdown.md` | (labelled SPEC-GDP-008) | **Duplicate of Tech Pack spec**                         | See known issues — ARCH-GDP-002 is missing                                                                                                                                    |
+| `03-artifact-schema.md`     | SPEC-GDP-003 v0.1       | Garment Design Model & Artifact Schema                  | Canonical garment model, components, properties+provenance, relationships, artifacts, assets, representations, constraints, operations, revisions                             |
+| `04-ai-prompt.md`           | SPEC-GDP-004 v0.1       | AI Execution, Prompt Compilation & Provider Integration | Operation contract, strategy routing, compiler, capability registry, adapters, jobs, normalization, validation, credentials, failures                                         |
+| `05-ai-usage-metering.md`   | SPEC-GDP-005 v0.1       | AI Usage Metering, Subscription & Billing               | Usage events, ledger, reservations, plans, allowances, pricing, charges, invoices, payments, budgets, reconciliation                                                          |
+| `06-project-lifecycle.md`   | SPEC-GDP-006 v0.1       | Project Lifecycle & Design Versioning                   | Projects, working copy, immutable revisions, review/approval, readiness, tech-pack versions, archive/delete                                                                   |
+| `07-editor.md`              | SPEC-GDP-007 v0.1       | Editor Interaction & Visualization                      | Workspace layout, viewport modes, selection, properties, drawing, artifacts, AI controls, undo/redo, autosave, comparison                                                     |
+| `08-tech-pack.md`           | SPEC-GDP-008 v0.1       | Tech Pack & Production Specification                    | Spec lifecycle, BOM, materials, POM/measurements, grading, tolerances, construction, colorways, validation, release, export, supplier access                                  |
+| `09-specification.md`       | SPEC-GDP-009 v0.1       | Security, Identity & Organization Access                | Accounts, auth, MFA, sessions, orgs, memberships, RBAC, grants, SoD, secrets, API tokens, audit, tenant isolation                                                             |
+| `10-visualization.md`       | SPEC-GDP-010 v0.1       | Rendering, Visualization & 2D/3D Geometry Architecture  | Representation layers, render requests/profiles/manifests, 2D/vector/raster, G0–G6 geometry, 3D scene, materials, cloth sim boundary, sync levels, render jobs, cache, export |
+| `11-tech-stack.md`          | TECH-GDP-001 v1.0       | Finalized Technology Stack & Implementation Plan        | **Approved** stack, monorepo layout, module boundaries, AI execution pipeline, deployment, optimization targets                                                               |
 
 ## 2. Known issues in the source docs
 
@@ -38,11 +38,13 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Web app that feels like professional desktop design software for apparel users who are not CAD/prompt experts. Start from sketch, fabric, or reference garment → visual structured editing → reusable artifacts → deliberate AI generation → compare/approve → validated tech pack. AI usage metered/billed (platform-managed or customer-provided keys).
 
 **Key concepts.**
+
 - Three separate representations: **design definition** (structured), **visual outputs**, **production specification** (FR-003). An AI image is never proof of manufacturing accuracy.
 - Workspace regions: navigation, artifact library, central canvas, properties panel, view controls, generation/review controls, status/activity area (§2.2).
 - 17 engines (§6 table) — logical modules, not microservices (AR-007 modular monolith OK).
 
 **Key MUST rules.**
+
 - FR-002: visual interactions → machine-readable operations; no manual prompting for normal operations.
 - FR-010–015: auth, orgs/workspaces, RBAC, distinct ordinary/org-admin/billing-admin/platform-admin.
 - FR-020–024: project CRUD; lifecycle incl. approval; **design approval ≠ production readiness**; edits after approval create controlled revisions.
@@ -71,6 +73,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Canonical data contract for designs, components, artifacts, assets, representations, provenance and production-facing records.
 
 **Key concepts / vocabularies.**
+
 - Entities: Project, Garment Design, Design Revision (immutable), Design Component, Design Relationship, Artifact, Artifact Revision (immutable), Asset, Property Value, Constraint, Design Operation, Representation, Production Specification, Approval Record.
 - Illustrative IDs: `PRJ-000123`, `DSN-000456`, `DSN-000456-R003`, `CMP-…`, `SLV-0007-R004`, `AST-…`, `OPR-…`, `JOB-…` (UUIDs internally allowed).
 - **Value status:** `confirmed`, `inferred`, `proposed`, `missing`, `needs_review`, `not_applicable` (§9.2). Property envelope: value, unit, status, source_type, source_refs, confidence, review_required, last_confirmed_by/at.
@@ -85,6 +88,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Versioning layers (§19.1): schema, design revision, artifact revision, asset version, constraint-set version, export version — never conflated.
 
 **Key MUST rules.**
+
 - Structured state authoritative; generated image never the sole truth (§4.1).
 - DSN-008/014: revisions immutable; approvals refer to exact revision; post-approval changes never modify approved snapshot.
 - CMP-017/020/021: repeated components supported; component instance ≠ artifact; existence ≠ manufacturing-valid geometry.
@@ -115,6 +119,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Translate structured operations into provider requests, execute through adapters with durable jobs, normalize/validate results, apply to the canonical model under revision rules.
 
 **Key concepts.**
+
 - Pipeline stages (§6.1): capture → validate → strategy → task planning → provider/model selection → compilation → input prep → job execution → normalization → result validation → candidate → apply/review → usage & audit.
 - **Design Operation fields** (§7.2): operation_id, operation_type, design_id, base_revision_id, requested_by, target_entities, requested_changes, preservation_constraints, source_references, execution_policy, idempotency_key, created_at.
 - **Strategies** (§8.1): deterministic_model_update, vector_operation, rule_based_composition, render_only, image_interpretation, text_to_image, image_to_image, targeted_image_edit, multimodal_reasoning, geometry_generation, composite_pipeline.
@@ -129,6 +134,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Events (§21.1): `design.operation.accepted`, `ai.job.queued|started|progress_updated|output_received|validation_completed|awaiting_review|completed|failed|cancelled`, `ai.provider.submission_accepted|outcome_unknown`, `ai.usage.recorded`, `design.revision.created`.
 
 **Key MUST rules.**
+
 - Structured operation before any AI call (OPR-AI-001); no silent scope broadening (OPR-AI-007).
 - Deterministic first (STR-001); never pick a model lacking required capabilities (STR-003); report limitations instead of incompatible substitution (STR-004); record strategy rationale.
 - Compiler consumes validated operation, preserves confirmed/inferred distinction, records template/mapping/profile versions, never exposes credentials, minimal context (CMP-001…012).
@@ -136,7 +142,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Registry-driven selection; model IDs encapsulated; capability changes versioned/audited (REG-*).
 - Every external call through an adapter; adapters normalize errors, distinguish sync vs async acceptance, extract usage, treat responses as untrusted (ADP-*).
 - Routing filters ineligible first; fallback must preserve mandatory output requirements; no switching credential owner without authorization (ROUTE-*).
-- Durable job per accepted AI operation; restart recovery; acceptance ≠ success; **unknown outcomes never blindly resubmitted** (JOB-*, ERR-*).
+- Durable job per accepted AI operation; restart recovery; acceptance ≠ success; **unknown outcomes never blindly resubmitted** (JOB-_, ERR-_).
 - Results normalized, stored via asset subsystem, never infer geometry from raster (RES-*).
 - AI results validated before mutating canonical state; candidates ≠ committed; structured changes create new revision (APP-*).
 - Jobs retain base revision; stale results never overwrite newer changes; rebases explicit (CON-*).
@@ -164,6 +170,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Four distinct concepts (§4.1):** execution usage, provider cost, customer charge, payment status. Plus credential ownership mode in every record.
 
 **Key concepts.**
+
 - Usage categories (§6.1): AI image generation/editing, text inference, image interpretation, geometry generation, rendering, asset processing, storage, export generation, platform feature usage. Normalized units: `operation`, `image`, `input_token`, `output_token`, `compute_second`, `storage_byte_hour`, `credit`.
 - Usage event required fields (§7.1) incl. idempotency_key, credential_ownership_mode, measurement_source (provider-reported/internally measured/estimated/derived).
 - **Usage lifecycle** (§8.2): reserved → observed → pending_reconciliation → settled → adjusted/released/disputed (ledger entries preferred over mutable status).
@@ -176,6 +183,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Budgets by org/project/user/provider/model/period/ownership mode; reconciliation domains (§19.1); adjustment types (§20.1).
 
 **Key MUST rules.**
+
 - Finalized usage/financial records never rewritten — adjustments/reversals referencing originals (§4.3, USE-002/003, INV-004, CHG-009).
 - BYOK costs never counted as platform provider expense nor billed twice (COST-003, CHG-005); platform fee only if explicitly defined.
 - Enforce quotas/budgets before platform-managed billable work; atomic against concurrency (PRE-005, ALL-003, BUD-005).
@@ -204,6 +212,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Manage projects, working copies, immutable revisions, review/approval, production readiness, tech-pack versions, archive/delete.
 
 **Key concepts.**
+
 - Six distinct things: project state, current editable design, immutable revisions, review/approval decisions, readiness status, versioned deliverables.
 - Entities: Project, Design (working_branch, head_revision), Working copy (base revision, state, monotonic version), Design revision (lineage, content hash, artifact/source refs, validation summary, schema version), Approval record, Production spec revision, Tech-pack version.
 - **Project states:** ACTIVE, ON_HOLD, COMPLETED, ARCHIVED, DELETED (transitions §7.5 incl. reopen/restore).
@@ -216,6 +225,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Events (§15): ProjectCreated … TechPackSuperseded.
 
 **Key MUST rules.**
+
 - Autosave ≠ revision; explicit commit policy (FR-PRJ-020/021); save acknowledged only after persistence (FR-PRJ-016).
 - Optimistic concurrency; conflicts never silently overwrite (FR-PRJ-024/025).
 - Revisions immutable, stable IDs, parent lineage, integrity hash verified on restore/export (FR-PRJ-023, 026–028).
@@ -243,6 +253,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Primary visual-first workspace; translates gestures into structured operations; never calls providers directly.
 
 **Key concepts.**
+
 - Layout (§5.1): app header, tool/action bar, component hierarchy, central viewport, contextual properties, asset/artifact browser, operation/history area, status area.
 - Viewport modes (§6.1): reference, 2D design, technical flat, 3D preview, split, comparison, annotation.
 - **3D capability levels** 3D-L0…L4 (§16.2).
@@ -251,6 +262,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Logical API (§24): GetEditorState, UpdateWorkingCopy, GetComponentProperties, GetArtifactLibrary, Attach/DetachArtifact, Create/UpdateAnnotation, RequestRender, SubmitDesignOperation, GetOperationStatus, GetCandidateResult, ApplyCandidate, Undo/Redo, CompareDesignStates, GetValidationFindings, CommitRevision.
 
 **Key MUST rules.**
+
 - No prompts required for routine tasks; property changes never trigger AI implicitly (FR-EDT-032).
 - Save states visible: saving/saved/unsaved/failed/conflict (FR-EDT-005, 086–092).
 - View changes never alter design (FR-EDT-013); stable component IDs, not names/coords (FR-EDT-025).
@@ -280,6 +292,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Turn an approved design revision into a structured, reviewable, versioned production specification and export — never inventing manufacturing facts.
 
 **Key concepts.**
+
 - Principles: tech pack is structured data (PDF is a rendering); approval ≠ readiness; no invented facts (exact measurements, composition, GSM, shrinkage, seam allowances, stitch types/density, grade rules, supplier identity, certifications, tests, tolerances, factory requirements); immutable releases; human accountability.
 - **Spec lifecycle:** not created, draft, in progress, needs review, changes requested, validated, approved, released, superseded, withdrawn.
 - Sections (§8.1): style ID, design reference & views, colorways, BOM, fabric/trim, measurements, grading/size tables, construction/finishing, artwork/embellishment, labels/packaging, quality/inspection, compliance/testing, sourcing notes, revision history, approval/release, validation summary.
@@ -292,6 +305,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Distribution: in-platform, time-limited links, downloads, API, PLM/ERP.
 
 **Key MUST rules (highlights).**
+
 - Every spec revision references exact design revision; no silent migration when design changes; divergence & impact assessment (FR-TP-002, 015–021, 149–151).
 - Release requires approval + validation; immutable, supersession preserves history; withdrawal recorded; reopening creates new revision (FR-TP-007–013).
 - AI-generated flats ≠ manufacturing-grade technical flats (FR-TP-026); annotations don't modify geometry.
@@ -326,6 +340,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Principles (§5):** deny by default; tenant isolation; server-side enforcement; least privilege; explicit business authority (edit ≠ approve ≠ release; view billing ≠ manage); credential isolation; traceability; prompt revocation (incl. queued work); separation of duties; **fail closed**.
 
 **Key concepts.**
+
 - Account states: pending_verification, active, suspended, locked, deletion_pending, deleted_or_anonymized. Membership states: invited, active, suspended, revoked, expired.
 - Permission naming `<resource>.<action>` (e.g. `organization.view`, `members.invite`, `members.manage_roles`, `project.create|view|edit`, `design.generate|approve`, `artifact.create|publish`, `techpack.release`, `billing.view|manage`, `credentials.manage`, `audit.view`).
 - Baseline roles: Organization Owner, Organization Admin, Design Lead, Designer, Merchandiser, Production/Technical User, Approver, Billing Admin, Credential Admin, Viewer, Supplier/External Collaborator, Platform Operator. Matrix in §23.
@@ -335,6 +350,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Logical data model (§21.1): User, IdentityCredential, Organization, Workspace, Membership, Role, Permission, RolePermission, MembershipRole, ResourceGrant, Session, ApiToken, ServiceIdentity, SecretReference, SecurityAuditEvent, SecurityPolicy.
 
 **Key MUST rules.**
+
 - Accounts: normalized email, no auto-merge, single-use short-lived tokens, rate limits, no enumeration (FR-SEC-001–015); argon2-class hashing, reset doesn't bypass MFA, secure recovery (016–027).
 - Auth: validated federated responses; IdP claims don't auto-grant membership (028–032); MFA for privileged roles, step-up for sensitive actions (033–040); abuse protection without trivial lockout DoS (041–045).
 - Sessions: unpredictable, HTTP-only Secure SameSite cookies, CSRF, idle/absolute timeouts, revocation, **revalidate before queued high-impact ops** (046–059).
@@ -364,6 +380,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **Purpose.** Render designs consistently across views/exports with explicit fidelity, revision traceability, and no conflation of appearance with geometry or manufacturing truth.
 
 **Key concepts.**
+
 - Representation layers **R0–R6**: canonical model, semantic component graph, editable 2D geometry, 3D scene, materials/textures, rendered images, production geometry/specs.
 - Logical subsystems (§7.1): Render Request API, Profile Manager, Design State Resolver, Geometry Builder, Material Resolver, 2D Renderer, 3D Scene Builder, 3D Renderer, AI Visual Adapter (via central orchestrator only), Render Job Manager, Validator, Cache, Preview Delivery, Export Service, Observability.
 - Render request fields (§8.1); render purposes (§8.2: interactive editor, technical flat, design review, component inspection, colorway preview, material inspection, 3D review, presentation, tech-pack illustration, production geometry export); **versioned render profiles**.
@@ -376,6 +393,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 - Operation routing table (§15.2): color/visibility/artifact swap/camera/transform = deterministic; style concept = AI image generation; local edit of flattened image = targeted AI edit; image→geometry = dedicated reconstruction pipeline.
 
 **Key MUST rules.**
+
 - Renders reference canonical revision (or explicit provisional state); never overwrite canonical properties from render inferences; failures never corrupt state; dependencies invalidate derived outputs (FR-RV-001–006).
 - 2D without 3D allowed; AI imagery stored as proposal (FR-RV-007–010).
 - Don't silently resolve to latest when a revision is specified; report unachievable fidelity (FR-RV-012/015); profile changes non-retroactive (FR-RV-018).
@@ -409,6 +427,7 @@ A condensed, faithful summary of every requirements document in [`../init/`](../
 **12 mandatory principles (§2):** TS everywhere; Postgres system of record; modular monolith; separate worker processes; files in object storage; canonical garment model independent of images; all AI through central backend orchestration; traceable operations/revisions/billing; deterministic over AI; minimal infrastructure; Docker Compose self-hosting; interfaces allow later service extraction.
 
 **Key rules.**
+
 - Redis never the only record; every important job has a persistent record (identity, type, status, source revision, config, results); idempotency keys + reconciliation; retries assume provider may have executed (§3.5).
 - Object storage private by default; signed URLs; validation; separation of originals vs derived (§3.6).
 - Editor maintains semantic data independent of SVG; SVG and canvas may coexist (§3.7).

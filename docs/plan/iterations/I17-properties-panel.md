@@ -1,19 +1,22 @@
 # I17 — Hierarchy, selection & contextual properties
 
-| Field | Value |
-|---|---|
-| Phase | 3 — Structured 2D editor |
-| Subsystems | SS-04 Editor Interaction, SS-03 Garment Design Model, SS-06 |
-| Depends on | I16 |
-| Estimated sessions | 2 |
-| Spec references | `docs/init/07-editor.md` §7 (hierarchy & selection FR-EDT-018…027), §8 (contextual properties FR-EDT-028…038); `docs/init/03-artifact-schema.md` §8 (components), §9 (property value, status, provenance PROP-001…007); `docs/init/01-overview.md` FR-032…034, FR-040…042 |
-| Open decisions to resolve first | none |
+| Field                           | Value                                                                                                                                                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase                           | 3 — Structured 2D editor                                                                                                                                                                                                                                                  |
+| Subsystems                      | SS-04 Editor Interaction, SS-03 Garment Design Model, SS-06                                                                                                                                                                                                               |
+| Depends on                      | I16                                                                                                                                                                                                                                                                       |
+| Estimated sessions              | 2                                                                                                                                                                                                                                                                         |
+| Spec references                 | `docs/init/07-editor.md` §7 (hierarchy & selection FR-EDT-018…027), §8 (contextual properties FR-EDT-028…038); `docs/init/03-artifact-schema.md` §8 (components), §9 (property value, status, provenance PROP-001…007); `docs/init/01-overview.md` FR-032…034, FR-040…042 |
+| Open decisions to resolve first | none                                                                                                                                                                                                                                                                      |
 
 ## 1. Goal
+
 Users can navigate the garment's **component hierarchy**, select components from the tree or canvas with synchronized highlighting, and edit their properties through **schema-driven controls** that respect data types, units, enums and constraints — with every value showing its status (confirmed / inferred / proposed / missing / needs review / n.a.) and provenance. All changes go through operations (I14); nothing calls AI.
 
 ## 2. Scope
+
 ### In scope
+
 - Hierarchy panel: tree from `components[].parentComponentId`, garment-type ordering, icons per component type, repeated components (left/right sleeves, multiple pockets), visibility eye, lock toggle, rename, context menu (add/remove component where template allows).
 - Selection sync tree ↔ canvas ↔ properties panel (FR-EDT-020); multi-select with Shift/Ctrl; components without canvas geometry are selectable from tree with an explanation (FR-EDT-026).
 - Properties panel generated from `garment-model` property definitions: control types — enum select / segmented, number with unit (display in user unit, stored mm), color (with color reference code field), boolean, text, artifact reference (read-only here; attach in I18).
@@ -25,26 +28,32 @@ Users can navigate the garment's **component hierarchy**, select components from
 - Render-refresh-pending indicator if re-render lags (FR-EDT-031).
 
 ### Out of scope (deferred to)
+
 - Artifact browser/attachment (→ I18); full validation summary panel (→ I20)
 - AI suggestion generation (→ I25/I26; this iteration only displays statuses)
 
 ## 3. Deliverables
+
 - `apps/web/src/features/editor/hierarchy/{HierarchyPanel.tsx, TreeNode.tsx, useHierarchy.ts}`
 - `apps/web/src/features/editor/properties/{PropertiesPanel.tsx, controls/*.tsx, PropertyRow.tsx, ProvenancePopover.tsx, BulkEditBar.tsx}`
 - `apps/web/src/components/ValueStatusBadge.tsx` (shared)
 - `garment-model` additions if missing: property definition metadata (label, group/namespace `appearance.*`, `dimension.*`…, control hint, visibility rules, min/max, unit, `productionCritical` flag)
 
 ## 4. Data model changes
+
 None in DB. Possible minor version bump of garment-model property-definition metadata.
 
 ## 5. API / contracts
+
 Uses `POST /v1/designs/{id}/operations` (I14) and `.../operations/validate`. No new endpoints.
 
 ## 6. UI
+
 - Left: hierarchy tree with eye/lock icons. Right: properties grouped by namespace (Appearance, Construction, Dimensions, Material, Placement) with collapsible sections; progressive disclosure for advanced fields (SPEC-007 §3.6).
 - Status badges are text+icon (not color-only) (FR-EDT-129).
 
 ## 7. Implementation tasks (ordered checklist)
+
 1. [ ] Extend garment-model property definitions metadata (coordinate version bump).
 2. [ ] Hierarchy tree with keyboard navigation (arrow keys, Enter to select) and ARIA tree roles.
 3. [ ] Selection sync through editor-core `SelectionModel`; canvas highlight from I16.
@@ -57,11 +66,13 @@ Uses `POST /v1/designs/{id}/operations` (I14) and `.../operations/validate`. No 
 10. [ ] Update PROGRESS.md.
 
 ## 8. Tests
+
 - Unit: control factory for each data type; unit conversions round-trip; dependency rules.
 - Component: invalid number shows error and is not submitted.
 - E2E: select left sleeve in tree → canvas highlights it → change length → flat updates → undo restores; confirm an `inferred` value → badge becomes `confirmed` and provenance shows user/time.
 
 ## 9. Acceptance criteria
+
 - [ ] AC1 — Hierarchy shows all components incl. repeated ones; selection syncs across tree, canvas and panel. (FR-EDT-018…020, CMP-017)
 - [ ] AC2 — Properties panel shows only properties valid for the selected component/garment type. (FR-EDT-028, FR-042)
 - [ ] AC3 — Invalid values are rejected before submission; server findings shown inline. (FR-EDT-030, PROP-002)
@@ -72,15 +83,18 @@ Uses `POST /v1/designs/{id}/operations` (I14) and `.../operations/validate`. No 
 - [ ] AC8 — Unsupported operation on a selection is explained, never applied to another component. (FR-EDT-027)
 
 ## 10. Risks & notes
+
 - Keep property definitions data-driven so new garment categories need no UI code (NFR-EDT-009).
 - Visibility/lock: decide whether stored in working copy (design presentation) or editor state; per SPEC-007 §20, lock/visibility for editing convenience are editor state — but I14 defined ops for them; store them in working copy `editorHints` namespace flagged non-design so they never appear in diffs as design changes.
 
 ## 11. Handoff
+
 - I18 adds artifact reference controls into this panel.
 - I20 consumes the inline finding slots.
 
 ## 12. Completion record
-- Completed on: 
-- Sessions used: 
-- Deviations from plan: 
-- Follow-ups added to backlog: 
+
+- Completed on:
+- Sessions used:
+- Deviations from plan:
+- Follow-ups added to backlog:

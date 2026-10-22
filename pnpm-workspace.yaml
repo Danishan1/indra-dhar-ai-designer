@@ -1,0 +1,18 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Only these dependencies may run install scripts (supply-chain hardening).
+onlyBuiltDependencies:
+  - '@swc/core'
+  - 'esbuild'
+  - 'sharp'
+  - '@nestjs/core'
+  - 'unrs-resolver'
+  - 'prisma'
+  - '@prisma/engines'
+  - 'msgpackr-extract'
+
+# Settings (kept here instead of .npmrc)
+autoInstallPeers: true
+engineStrict: false

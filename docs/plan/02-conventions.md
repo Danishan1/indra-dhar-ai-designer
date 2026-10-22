@@ -14,20 +14,20 @@ These conventions apply to every iteration. If an iteration needs to deviate, re
 
 ## 2. Naming
 
-| Thing | Convention | Example |
-|---|---|---|
-| Files | kebab-case | `design-revision.service.ts` |
-| Classes / types | PascalCase | `DesignRevision`, `CommitRevisionCommand` |
-| Variables / functions | camelCase | `commitRevision()` |
-| DB tables (Prisma `@@map`) | snake_case plural | `design_revisions` |
-| DB columns (Prisma `@map`) | snake_case | `organization_id` |
-| Prisma models | PascalCase singular | `DesignRevision` |
-| Enums (DB + TS) | SCREAMING_SNAKE values when lifecycle states from specs use them (`ACTIVE`), otherwise snake_case string unions mirroring the spec vocabulary (`confirmed`, `outcome_unknown`) — **use the exact spelling from the spec** |
-| Permissions | `<resource>.<action>` | `techpack.release` |
-| Events | `PastTense` domain names or dotted names from spec | `RevisionCommitted`, `ai.job.completed` |
-| Error codes | SCREAMING_SNAKE | `CONCURRENT_MODIFICATION` |
-| REST paths | plural nouns, kebab-case | `/v1/projects/{projectId}/designs` |
-| Env vars | SCREAMING_SNAKE, prefixed by app when app-specific | `API_DATABASE_URL`, `WORKER_CONCURRENCY_AI` |
+| Thing                      | Convention                                                                                                                                                                                                                | Example                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Files                      | kebab-case                                                                                                                                                                                                                | `design-revision.service.ts`                |
+| Classes / types            | PascalCase                                                                                                                                                                                                                | `DesignRevision`, `CommitRevisionCommand`   |
+| Variables / functions      | camelCase                                                                                                                                                                                                                 | `commitRevision()`                          |
+| DB tables (Prisma `@@map`) | snake_case plural                                                                                                                                                                                                         | `design_revisions`                          |
+| DB columns (Prisma `@map`) | snake_case                                                                                                                                                                                                                | `organization_id`                           |
+| Prisma models              | PascalCase singular                                                                                                                                                                                                       | `DesignRevision`                            |
+| Enums (DB + TS)            | SCREAMING_SNAKE values when lifecycle states from specs use them (`ACTIVE`), otherwise snake_case string unions mirroring the spec vocabulary (`confirmed`, `outcome_unknown`) — **use the exact spelling from the spec** |
+| Permissions                | `<resource>.<action>`                                                                                                                                                                                                     | `techpack.release`                          |
+| Events                     | `PastTense` domain names or dotted names from spec                                                                                                                                                                        | `RevisionCommitted`, `ai.job.completed`     |
+| Error codes                | SCREAMING_SNAKE                                                                                                                                                                                                           | `CONCURRENT_MODIFICATION`                   |
+| REST paths                 | plural nouns, kebab-case                                                                                                                                                                                                  | `/v1/projects/{projectId}/designs`          |
+| Env vars                   | SCREAMING_SNAKE, prefixed by app when app-specific                                                                                                                                                                        | `API_DATABASE_URL`, `WORKER_CONCURRENCY_AI` |
 
 ## 3. Identifiers (ADR-001)
 
@@ -71,22 +71,23 @@ These conventions apply to every iteration. If an iteration needs to deviate, re
 ## 7. Database & migrations
 
 - Prisma schema at `apps/api/prisma/schema.prisma` (may be split with `prismaSchemaFolder` per module).
-- Every migration is reviewed (read the SQL) before committing. Name: `YYYYMMDDHHMM_<iteration>_<summary>` e.g. `202611011200_i12_design_revisions`.
+- Every migration is reviewed (read the SQL) before committing. Use Prisma's default folder naming `YYYYMMDDHHMMSS_<iteration>_<summary>` (UTC), e.g. `20261022041649_i02_init` (`pnpm db:migrate -- --name i12_design_revisions`).
 - Tenant tables have `organization_id uuid not null` + index; composite uniques include it.
 - Immutability triggers for revision/ledger tables (raw SQL in migration).
 - Seed scripts (`prisma/seed/`) are idempotent and split: `platform` (permissions, roles, plans, built-in artifacts, templates) vs `dev` (demo org/users/projects).
 
 ## 8. Testing strategy
 
-| Level | Tooling | Must cover |
-|---|---|---|
-| Unit | Vitest | Pure packages (garment-model, operations, editor-core, techpack-model, pricing), services with mocked repos |
+| Level       | Tooling                                                            | Must cover                                                                                                                |
+| ----------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | Vitest                                                             | Pure packages (garment-model, operations, editor-core, techpack-model, pricing), services with mocked repos               |
 | Integration | Vitest + real Postgres/Redis/MinIO (docker compose `test` profile) | Repositories, transactions, outbox, idempotency, authorization, tenant isolation, job state machines, billing idempotency |
-| Contract | Vitest | AI provider adapters against fixtures; OpenAPI snapshot diff |
-| E2E | Playwright | Critical user journeys per milestone |
-| Security | Vitest integration | Cross-tenant ID fuzzing, privilege escalation, secret redaction in logs |
+| Contract    | Vitest                                                             | AI provider adapters against fixtures; OpenAPI snapshot diff                                                              |
+| E2E         | Playwright                                                         | Critical user journeys per milestone                                                                                      |
+| Security    | Vitest integration                                                 | Cross-tenant ID fuzzing, privilege escalation, secret redaction in logs                                                   |
 
 Rules:
+
 - Every iteration adds tests for its acceptance criteria. Bug fix ⇒ regression test.
 - Fake AI adapter (`packages/test-utils/fake-ai-adapter`) is used in all automated tests — **no real provider calls in CI**.
 - Tests must be runnable on any machine with `pnpm test` (unit) and `pnpm test:integration` (needs `pnpm infra:up`).

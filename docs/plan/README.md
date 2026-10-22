@@ -14,36 +14,36 @@ A self-hosted, web-based, AI-powered garment design and development platform. Ap
 
 ## 2. How this folder is organized
 
-| File | Purpose | When to read |
-|---|---|---|
-| [`PROGRESS.md`](PROGRESS.md) | **Live tracker**: current iteration, status of every iteration, handoff notes | Start and end of every session |
-| [`00-spec-digest.md`](00-spec-digest.md) | Condensed summary of all 11 spec documents + the non-negotiable invariants | First session on a new machine; whenever unsure about a rule |
-| [`01-architecture.md`](01-architecture.md) | System architecture, monorepo layout, module ↔ subsystem map, core patterns | Before any backend/frontend structural work |
-| [`02-conventions.md`](02-conventions.md) | Coding standards, IDs, API/error conventions, testing, git & commit rules, Definition of Done | Every session (skim) |
-| [`03-domain-model.md`](03-domain-model.md) | Consolidated entity catalog, status vocabularies, ownership per module | Before writing Prisma schema or contracts |
-| [`04-roadmap.md`](04-roadmap.md) | 10 phases, 49 iterations, dependencies, milestones | To understand sequencing |
-| [`05-decisions.md`](05-decisions.md) | Architecture Decision Records: decided + open (with recommended defaults and deadline iteration) | Before an iteration that has an open decision |
-| [`06-traceability.md`](06-traceability.md) | Spec requirement groups → iteration mapping | To check coverage / find where a requirement lands |
-| [`07-environment-setup.md`](07-environment-setup.md) | Setting up a new machine (Windows/macOS/Linux), Docker, Node, pnpm, env vars | New machine or new contributor |
-| [`08-session-playbook.md`](08-session-playbook.md) | Exact protocol a Claude session follows: start → plan → build → verify → hand off | Every session |
-| [`09-backlog.md`](09-backlog.md) | Post-launch / deferred capabilities (branching, co-editing, pattern-linked 3D, SSO …) | When planning beyond I49 |
-| [`claude-commands/`](claude-commands/) | Source for the Claude Code slash commands (`/next-iteration`, `/finish-iteration`, `/handoff`) — copy into `.claude/commands/` | Once per clone (I01 does it) |
-| [`iterations/`](iterations/) | One file per iteration: goal, scope, deliverables, tasks, tests, acceptance criteria | The iteration you are working on |
+| File                                                 | Purpose                                                                                                                        | When to read                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| [`PROGRESS.md`](PROGRESS.md)                         | **Live tracker**: current iteration, status of every iteration, handoff notes                                                  | Start and end of every session                               |
+| [`00-spec-digest.md`](00-spec-digest.md)             | Condensed summary of all 11 spec documents + the non-negotiable invariants                                                     | First session on a new machine; whenever unsure about a rule |
+| [`01-architecture.md`](01-architecture.md)           | System architecture, monorepo layout, module ↔ subsystem map, core patterns                                                    | Before any backend/frontend structural work                  |
+| [`02-conventions.md`](02-conventions.md)             | Coding standards, IDs, API/error conventions, testing, git & commit rules, Definition of Done                                  | Every session (skim)                                         |
+| [`03-domain-model.md`](03-domain-model.md)           | Consolidated entity catalog, status vocabularies, ownership per module                                                         | Before writing Prisma schema or contracts                    |
+| [`04-roadmap.md`](04-roadmap.md)                     | 10 phases, 49 iterations, dependencies, milestones                                                                             | To understand sequencing                                     |
+| [`05-decisions.md`](05-decisions.md)                 | Architecture Decision Records: decided + open (with recommended defaults and deadline iteration)                               | Before an iteration that has an open decision                |
+| [`06-traceability.md`](06-traceability.md)           | Spec requirement groups → iteration mapping                                                                                    | To check coverage / find where a requirement lands           |
+| [`07-environment-setup.md`](07-environment-setup.md) | Setting up a new machine (Windows/macOS/Linux), Docker, Node, pnpm, env vars                                                   | New machine or new contributor                               |
+| [`08-session-playbook.md`](08-session-playbook.md)   | Exact protocol a Claude session follows: start → plan → build → verify → hand off                                              | Every session                                                |
+| [`09-backlog.md`](09-backlog.md)                     | Post-launch / deferred capabilities (branching, co-editing, pattern-linked 3D, SSO …)                                          | When planning beyond I49                                     |
+| [`claude-commands/`](claude-commands/)               | Source for the Claude Code slash commands (`/next-iteration`, `/finish-iteration`, `/handoff`) — copy into `.claude/commands/` | Once per clone (I01 does it)                                 |
+| [`iterations/`](iterations/)                         | One file per iteration: goal, scope, deliverables, tasks, tests, acceptance criteria                                           | The iteration you are working on                             |
 
 ## 3. The plan at a glance
 
-| Phase | Name | Iterations | Milestone at end |
-|---|---|---|---|
-| 0 | Foundation & platform primitives | I01–I04 | **M1** Walking skeleton (web ↔ api ↔ worker ↔ db) |
-| 1 | Identity, organizations & access | I05–I08 | **M2** Secure multi-tenant base |
-| 2 | Core domain: assets, projects, garment model, revisions, artifacts | I09–I13 | — |
-| 3 | Structured 2D editor | I14–I20 | **M3** Structured design editor alpha (no AI) |
-| 4 | AI execution & metering foundation | I21–I27 | **M4** AI-assisted design alpha |
-| 5 | Review, approval & notifications | I28–I29 | **M5** Review workflow |
-| 6 | Subscription, billing & BYOK | I30–I34 | **M6** Commercial beta |
-| 7 | Advanced visualization (server render, 3D) | I35–I37 | **M7** 2D/3D visualization |
-| 8 | Tech pack & production specification | I38–I44 | **M8** Production-ready tech packs |
-| 9 | Administration, observability, hardening, launch | I45–I49 | **M9** Production launch |
+| Phase | Name                                                               | Iterations | Milestone at end                                  |
+| ----- | ------------------------------------------------------------------ | ---------- | ------------------------------------------------- |
+| 0     | Foundation & platform primitives                                   | I01–I04    | **M1** Walking skeleton (web ↔ api ↔ worker ↔ db) |
+| 1     | Identity, organizations & access                                   | I05–I08    | **M2** Secure multi-tenant base                   |
+| 2     | Core domain: assets, projects, garment model, revisions, artifacts | I09–I13    | —                                                 |
+| 3     | Structured 2D editor                                               | I14–I20    | **M3** Structured design editor alpha (no AI)     |
+| 4     | AI execution & metering foundation                                 | I21–I27    | **M4** AI-assisted design alpha                   |
+| 5     | Review, approval & notifications                                   | I28–I29    | **M5** Review workflow                            |
+| 6     | Subscription, billing & BYOK                                       | I30–I34    | **M6** Commercial beta                            |
+| 7     | Advanced visualization (server render, 3D)                         | I35–I37    | **M7** 2D/3D visualization                        |
+| 8     | Tech pack & production specification                               | I38–I44    | **M8** Production-ready tech packs                |
+| 9     | Administration, observability, hardening, launch                   | I45–I49    | **M9** Production launch                          |
 
 **Total: 49 iterations, estimated 85–115 Claude sessions** (most iterations take 1–3 sessions). See [`04-roadmap.md`](04-roadmap.md).
 

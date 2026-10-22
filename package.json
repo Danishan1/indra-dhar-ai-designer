@@ -1,0 +1,44 @@
+{
+  "name": "ai-designer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI-powered garment design and development platform",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10.34.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "verify": "turbo run lint typecheck test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "turbo run clean && rimraf node_modules .turbo",
+    "test:integration": "turbo run test:integration --concurrency=1",
+    "infra:up": "node infra/scripts/infra.mjs up",
+    "infra:down": "node infra/scripts/infra.mjs down",
+    "infra:reset": "node infra/scripts/infra.mjs reset",
+    "infra:init": "pnpm --filter @ai-designer/api storage:init",
+    "infra:test:up": "node infra/scripts/infra.mjs test-up",
+    "infra:test:down": "node infra/scripts/infra.mjs test-down",
+    "db:migrate": "pnpm --filter @ai-designer/api db:migrate",
+    "db:deploy": "pnpm --filter @ai-designer/api db:deploy",
+    "db:reset": "pnpm --filter @ai-designer/api db:reset",
+    "db:seed": "pnpm --filter @ai-designer/api db:seed",
+    "db:studio": "pnpm --filter @ai-designer/api db:studio",
+    "db:generate": "pnpm --filter @ai-designer/api prisma:generate",
+    "db:migrate:fallback": "node --no-warnings infra/scripts/prisma-wasm-fallback.mjs"
+  },
+  "devDependencies": {
+    "@ai-designer/config": "workspace:*",
+    "prettier": "3.9.10",
+    "rimraf": "6.1.3",
+    "turbo": "2.11.10",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "@ai-designer/config/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "prisma/**/*.ts",
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "prisma.config.ts"
+  ]
+}
