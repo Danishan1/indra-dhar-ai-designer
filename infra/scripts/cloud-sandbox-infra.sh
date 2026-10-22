@@ -18,6 +18,12 @@ redis-server --port 6379 --daemonize yes --save '' >/dev/null
 redis-server --port 56379 --daemonize yes --save '' >/dev/null
 curl -s -o /dev/null localhost:8333 || (nohup moto_server -H 127.0.0.1 -p 8333 >/tmp/moto-dev.log 2>&1 &)
 curl -s -o /dev/null localhost:58333 || (nohup moto_server -H 127.0.0.1 -p 58333 >/tmp/moto-test.log 2>&1 &)
+# Mailpit (dev 1025/8025, test 51025/58025) — binary from GitHub releases (Docker Hub is blocked).
+if ! command -v mailpit >/dev/null; then
+  curl -sSL https://github.com/axllent/mailpit/releases/download/v1.27.10/mailpit-linux-amd64.tar.gz | tar xz -C /usr/local/bin mailpit
+fi
+curl -s -o /dev/null localhost:8025 || (nohup mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 >/tmp/mailpit-dev.log 2>&1 &)
+curl -s -o /dev/null localhost:58025 || (nohup mailpit --smtp 127.0.0.1:51025 --listen 127.0.0.1:58025 >/tmp/mailpit-test.log 2>&1 &)
 sleep 2
 psql -h 127.0.0.1 -p 5432 -U postgres -tc "select 1 from pg_database where datname='aid_shadow'" | grep -q 1 || psql -h 127.0.0.1 -p 5432 -U postgres -c "create database aid_shadow owner aid" >/dev/null
-echo "sandbox infra up (dev: 5432/6379/8333, test: 55432/56379/58333)"
+echo "sandbox infra up (dev: 5432/6379/8333/1025+8025, test: 55432/56379/58333/51025+58025)"

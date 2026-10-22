@@ -19,6 +19,8 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/plan/claude-commands/` — source of the `/next-iteration`, `/finish-iteration`, `/handoff` slash commands (copy into `.claude/commands/`; I01 does this).
 - Code layout (as it gets created): `apps/web`, `apps/api`, `apps/worker`, `packages/*` (`contracts`, `db`, `logger`, `config`, …), `infra/*`, `tests/*`.
 - `docs/architecture/platform-primitives.md` — **how to use errors, validation, ids, audit, outbox, idempotency, durable jobs.** Read before writing any module.
+- `docs/architecture/identity.md` — **authentication design (Better Auth), sessions, CSRF, rate limits; `@RequireAuth()` / `currentUserId()`.**
+- `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)
 
@@ -53,4 +55,4 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 | `pnpm test:integration`                    | integration tests against compose infra              | I02     |
 | `pnpm logs` (`-f`, `--errors`, `api`)      | view local log files in `logs/` (git-ignored)        | ADR-036 |
 | `pnpm api:openapi`                         | regenerate `docs/api/openapi.json` after API changes | I03     |
-| `pnpm e2e`                                 | Playwright                                           | I04     |
+| `pnpm e2e` (`pnpm e2e:install` once)       | Playwright browser tests (`tests/e2e`)               | I04     |

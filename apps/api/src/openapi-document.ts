@@ -26,6 +26,7 @@ export function buildPublicOpenApiDocument(): Record<string, unknown> {
       S3_ENDPOINT: 'http://localhost:8333',
       S3_ACCESS_KEY_ID: 'openapi',
       S3_SECRET_ACCESS_KEY: 'openapi',
+      BETTER_AUTH_SECRET: 'openapi-generation-secret-not-used-0000',
     }),
   );
   return buildOpenApiDocument(collectControllers(AppModule.forRoot(config)), { version: 'v1' });

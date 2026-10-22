@@ -105,6 +105,14 @@ services:
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1']
       <<: *hc
 
+  mailpit-test:
+    profiles: ['test']
+    image: axllent/mailpit:v1.21
+    ports: ['127.0.0.1:51025:1025', '127.0.0.1:58025:8025']
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      <<: *hc
+
 volumes:
   pgdata:
   redisdata:

@@ -155,3 +155,89 @@ model JobAttempt {
   @@unique([jobId, attemptNumber])
   @@map("job_attempts")
 }
+
+// ---------------------------------------------------------------- identity (I05, ADR-006 Better Auth)
+// Table/field names follow our conventions; Better Auth's logical models are mapped onto them in
+// apps/api/src/modules/identity/auth.ts (user → User, session → Session, account →
+// IdentityCredential, verification → VerificationToken).
+
+model User {
+  id               String               @id @db.Uuid
+  email            String               @unique
+  displayName      String               @map("display_name")
+  emailVerified    Boolean              @default(false) @map("email_verified")
+  image            String?
+  /// pending_verification | active | suspended | locked | deletion_pending | deleted_or_anonymized (FR-SEC-004)
+  status           String               @default("pending_verification")
+  emailVerifiedAt  DateTime?            @map("email_verified_at") @db.Timestamptz(6)
+  lastLoginAt      DateTime?            @map("last_login_at") @db.Timestamptz(6)
+  failedLoginCount Int                  @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?            @map("locked_until") @db.Timestamptz(6)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sessions         Session[]
+  credentials      IdentityCredential[]
+
+  @@index([status])
+  @@map("users")
+}
+
+/// Browser session. `token` is the opaque session id; the cookie carries it HMAC-signed with
+/// BETTER_AUTH_SECRET, so a leaked table alone cannot be replayed (ADR-006).
+model Session {
+  id                String   @id @db.Uuid
+  token             String   @unique
+  userId            String   @map("user_id") @db.Uuid
+  /// Idle expiry (sliding, refreshed at most once per SESSION_TOUCH_INTERVAL).
+  expiresAt         DateTime @map("expires_at") @db.Timestamptz(6)
+  /// Absolute expiry; never extended.
+  absoluteExpiresAt DateTime @map("absolute_expires_at") @db.Timestamptz(6)
+  authAssurance     String   @default("password") @map("auth_assurance")
+  /// HMAC of the client IP (never the raw address).
+  ipAddress         String?  @map("ip_hash")
+  userAgent         String?  @map("user_agent_summary")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Login credentials. providerId 'credential' = password (argon2id hash in `password`); later
+/// 'totp', 'passkey', OIDC providers (I08, backlog).
+model IdentityCredential {
+  id                    String    @id @db.Uuid
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id") @db.Uuid
+  password              String?   @map("password_hash")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(6)
+  scope                 String?
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("identity_credentials")
+}
+
+/// Single-use tokens (email verification, password reset). `identifier` is stored as a SHA-256
+/// hash of "<purpose>:<token>" — the raw token exists only in the email (FR-SEC-012/015).
+model VerificationToken {
+  id         String   @id @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([identifier])
+  @@index([value])
+  @@map("verification_tokens")
+}

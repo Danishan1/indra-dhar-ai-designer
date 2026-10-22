@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common/constants.js';
 import { z } from 'zod';
 
+import { AUTH_METADATA } from '../auth/require-auth.js';
 import { IDEMPOTENT_METADATA } from '../idempotency/idempotent.decorator.js';
 import { ENDPOINT_METADATA, type EndpointSpec } from '../validation/endpoint.js';
 
@@ -121,6 +122,9 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
         (method === RequestMethod.POST ? 201 : 200);
       const idempotent =
         spec?.idempotent ?? Reflect.getMetadata(IDEMPOTENT_METADATA, handler) === true;
+      const requiresSession =
+        (Reflect.getMetadata(AUTH_METADATA, handler) ??
+          Reflect.getMetadata(AUTH_METADATA, controller)) === 'session';
 
       const parameters: JsonSchema[] = [
         ...objectParams(spec?.params, 'path'),
@@ -146,6 +150,7 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
         ...(spec?.errors ?? []),
       ]);
       if (idempotent) errorCodes.add('IDEMPOTENCY_CONFLICT');
+      if (requiresSession) errorCodes.add('UNAUTHENTICATED');
       const errorsByStatus = new Map<number, ErrorCode[]>();
       for (const code of errorCodes) {
         const status = ErrorHttpStatus[code];
@@ -185,6 +190,7 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
             }
           : {}),
         responses,
+        ...(requiresSession ? { security: [{ sessionCookie: [] }] } : {}),
         ...(spec ? {} : { 'x-undocumented': true }),
       };
       paths[path] = { ...(paths[path] ?? {}), [httpMethod]: operation };
@@ -206,6 +212,17 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
     servers: [{ url: 'http://localhost:4000' }],
     tags: [...tags].sort().map((name) => ({ name })),
     paths: sortedPaths,
-    components: { schemas: { ErrorEnvelope: toSchema(errorEnvelopeSchema, 'output') } },
+    components: {
+      schemas: { ErrorEnvelope: toSchema(errorEnvelopeSchema, 'output') },
+      securitySchemes: {
+        sessionCookie: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: '__Host-aid_session',
+          description:
+            'Opaque session cookie set by POST /v1/auth/login (aid_session when AUTH_COOKIE_SECURE=false).',
+        },
+      },
+    },
   };
 }

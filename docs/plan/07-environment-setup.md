@@ -12,7 +12,7 @@ Goal: a new machine (or a new Claude account on an existing machine) can go from
 | Node.js                    | Active LTS _(I01, see `.nvmrc`)_                                                              | Windows: install via **fnm** or **nvm-windows**; macOS/Linux: fnm/nvm   |
 | pnpm                       | pinned in `package.json#packageManager` _(I01)_                                               | Enable with `corepack enable` (ships with Node)                         |
 | Docker                     | Docker Desktop (Windows/macOS, WSL2 backend on Windows) or Docker Engine + Compose v2 (Linux) | Needed from I02 for Postgres, Redis, object storage, Mailpit            |
-| Playwright browsers        | installed by `pnpm exec playwright install chromium`                                          | From I04 (E2E)                                                          |
+| Playwright browsers        | installed by `pnpm e2e:install`                                                               | From I04 (E2E)                                                          |
 | (optional) Claude Code CLI | latest                                                                                        | Auto-loads `CLAUDE.md` and `.claude/commands/`                          |
 
 ### Windows specifics (owner's primary machine)
@@ -44,7 +44,9 @@ Dev URLs: web http://localhost:3000 · API liveness http://localhost:4000/v1/hea
 | PostgreSQL 17     | 5432 (`aid` / `aid_dev_password`, db `ai_designer`) | 55432 (db `ai_designer_test`, tmpfs)     |
 | Redis 7.4         | 6379                                                | 56379                                    |
 | SeaweedFS S3      | 8333                                                | 58333                                    |
-| Mailpit SMTP / UI | 1025 / 8025                                         | —                                        |
+| Mailpit SMTP / UI | 1025 / 8025                                         | 51025 / 58025                            |
+
+Web app: http://localhost:3000 (calls the API same-origin via `/v1/*`, proxied by Next.js to `API_BASE_URL`, default http://localhost:4000). Browser tests: `pnpm e2e` (first time: `pnpm e2e:install`).
 
 Useful commands: `pnpm infra:up` (also creates buckets) · `pnpm infra:down` · `pnpm infra:reset --yes` (deletes local data) · `pnpm infra:test:up` / `infra:test:down` · `pnpm test:integration` · `pnpm --filter @ai-designer/api dev:ping` (API→worker queue round trip).
 
@@ -66,21 +68,21 @@ All apps write to the git-ignored `logs/` folder in development (`logs/api`, `lo
 
 `.env.example` is the canonical list (each iteration appends what it introduces). Groups:
 
-| Group                           | Examples                                                                                                                    | Introduced |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Core                            | `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `API_PORT`, `WEB_PORT`                                                          | I01–I02    |
-| Database                        | `DATABASE_URL`, `INFRA_LOCAL_POSTGRES`                                                                                      | I02        |
-| API platform                    | `IDEMPOTENCY_TTL_HOURS`, `API_DEV_ROUTES`                                                                                   | I03        |
-| Worker                          | `WORKER_CONCURRENCY_*`, `OUTBOX_POLL_INTERVAL_MS`, `OUTBOX_BATCH_SIZE`, `OUTBOX_MAX_ATTEMPTS`, `JOB_*` (sweeper)            | I02–I03    |
-| Logging                         | `LOG_LEVEL`, `LOG_PRETTY`, `LOG_TO_FILE`, `LOG_DIR`, `LOG_FILE_MAX_SIZE`, `LOG_FILE_RETENTION`, `CLIENT_LOGS_ENABLED`       | ADR-036    |
-| Redis                           | `REDIS_URL`                                                                                                                 | I02        |
-| Object storage                  | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_ASSETS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`           | I02/I09    |
-| Auth                            | `SESSION_SECRET`, `SESSION_IDLE_TIMEOUT_MIN`, `SESSION_ABSOLUTE_TIMEOUT_H`, `CSRF_SECRET`                                   | I05        |
-| Email                           | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`                                                             | I05        |
-| Secrets                         | `SECRETS_MASTER_KEY` (base64 32 bytes), `SECRETS_MASTER_KEY_VERSION`                                                        | I08/I22    |
-| AI providers (platform-managed) | `AI_<PROVIDER>_API_KEY` — loaded into the encrypted secret store by a seed/admin step, never read directly by business code | I22        |
-| Payments                        | `PAYMENT_PROVIDER`, `PAYMENT_<PROVIDER>_KEY_ID`, `PAYMENT_<PROVIDER>_SECRET`, `PAYMENT_WEBHOOK_SECRET`                      | I32        |
-| Observability                   | `OTEL_EXPORTER_OTLP_ENDPOINT`                                                                                               | I46        |
+| Group                           | Examples                                                                                                                                                                                               | Introduced |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| Core                            | `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `API_PORT`, `WEB_PORT`                                                                                                                                     | I01–I02    |
+| Database                        | `DATABASE_URL`, `INFRA_LOCAL_POSTGRES`                                                                                                                                                                 | I02        |
+| API platform                    | `IDEMPOTENCY_TTL_HOURS`, `API_DEV_ROUTES`                                                                                                                                                              | I03        |
+| Worker                          | `WORKER_CONCURRENCY_*`, `OUTBOX_POLL_INTERVAL_MS`, `OUTBOX_BATCH_SIZE`, `OUTBOX_MAX_ATTEMPTS`, `JOB_*` (sweeper)                                                                                       | I02–I03    |
+| Logging                         | `LOG_LEVEL`, `LOG_PRETTY`, `LOG_TO_FILE`, `LOG_DIR`, `LOG_FILE_MAX_SIZE`, `LOG_FILE_RETENTION`, `CLIENT_LOGS_ENABLED`                                                                                  | ADR-036    |
+| Redis                           | `REDIS_URL`                                                                                                                                                                                            | I02        |
+| Object storage                  | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_ASSETS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`                                                                                      | I02/I09    |
+| Auth                            | `BETTER_AUTH_SECRET` (required), `AUTH_COOKIE_SECURE`, `SESSION_IDLE_TIMEOUT_MIN`, `SESSION_ABSOLUTE_TIMEOUT_H`, `SESSION_TOUCH_INTERVAL_MIN`, `AUTH_LOCKOUT_*`, `AUTH_TRUSTED_ORIGINS`, `TRUST_PROXY` | I05        |
+| Email                           | `SMTP_URL` (e.g. `smtp://user:pass@host:587`), `MAIL_FROM`                                                                                                                                             | I02/I05    |
+| Secrets                         | `SECRETS_MASTER_KEY` (base64 32 bytes), `SECRETS_MASTER_KEY_VERSION`                                                                                                                                   | I08/I22    |
+| AI providers (platform-managed) | `AI_<PROVIDER>_API_KEY` — loaded into the encrypted secret store by a seed/admin step, never read directly by business code                                                                            | I22        |
+| Payments                        | `PAYMENT_PROVIDER`, `PAYMENT_<PROVIDER>_KEY_ID`, `PAYMENT_<PROVIDER>_SECRET`, `PAYMENT_WEBHOOK_SECRET`                                                                                                 | I32        |
+| Observability                   | `OTEL_EXPORTER_OTLP_ENDPOINT`                                                                                                                                                                          | I46        |
 
 Rules: never commit `.env`; real provider keys only on machines that need them; tests use fakes and never need real keys.
 

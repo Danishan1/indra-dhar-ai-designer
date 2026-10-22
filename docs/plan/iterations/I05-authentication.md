@@ -88,18 +88,18 @@ Events (outbox): `UserRegistered`, `UserEmailVerified`, `UserPasswordChanged`, `
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Decide ADR-006; update `05-decisions.md` (Accepted + rationale).
-2. [ ] Prisma models + migration; review SQL.
-3. [ ] `PasswordService` (argon2id params documented; rehash-on-login if params change).
-4. [ ] `VerificationTokenService` (generate, hash, consume atomically with `UPDATE … WHERE consumed_at IS NULL AND expires_at > now()`).
-5. [ ] `SessionService` (create, validate+touch with throttled `last_seen_at`, revoke, revoke-all-for-user); middleware populates `RequestContext.principal`; rejects non-`active` accounts (FR-SEC-005).
-6. [ ] CSRF guard on all non-GET cookie-authenticated routes.
-7. [ ] Rate limiting service (Redis sliding window) + lockout policy with time-based unlock and reset-password escape hatch (FR-SEC-043/044).
-8. [ ] Controllers and DTOs; generic responses; constant-time-ish comparisons; dummy hash on unknown email to equalize timing.
-9. [ ] Mailer + templates; links use `APP_BASE_URL`.
-10. [ ] Audit + outbox events in the same transactions.
-11. [ ] Web pages, session provider (`/v1/me`), route guard, sign-out.
-12. [ ] Tests (below); update `PROGRESS.md`.
+1. [x] Decide ADR-006; update `05-decisions.md` (Accepted + rationale).
+2. [x] Prisma models + migration; review SQL.
+3. [x] `PasswordService` (argon2id params documented; rehash-on-login if params change).
+4. [x] `VerificationTokenService` (generate, hash, consume atomically with `UPDATE … WHERE consumed_at IS NULL AND expires_at > now()`).
+5. [x] `SessionService` (create, validate+touch with throttled `last_seen_at`, revoke, revoke-all-for-user); middleware populates `RequestContext.principal`; rejects non-`active` accounts (FR-SEC-005).
+6. [x] CSRF guard on all non-GET cookie-authenticated routes.
+7. [x] Rate limiting service (Redis sliding window) + lockout policy with time-based unlock and reset-password escape hatch (FR-SEC-043/044).
+8. [x] Controllers and DTOs; generic responses; constant-time-ish comparisons; dummy hash on unknown email to equalize timing.
+9. [x] Mailer + templates; links use `APP_BASE_URL`.
+10. [x] Audit + outbox events in the same transactions.
+11. [x] Web pages, session provider (`/v1/me`), route guard, sign-out.
+12. [x] Tests (below); update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -109,14 +109,14 @@ Events (outbox): `UserRegistered`, `UserEmailVerified`, `UserPasswordChanged`, `
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Registration, verification, login, logout, and recovery work end-to-end (TR-SEC-001; SRS FR-010).
-- [ ] AC2 — Passwords stored only as argon2id hashes; never logged (FR-SEC-016, 017).
-- [ ] AC3 — Verification/reset tokens are single-use, time-limited, hashed at rest (FR-SEC-012, 020).
-- [ ] AC4 — Responses do not reveal whether an email has an account (FR-SEC-014, 024).
-- [ ] AC5 — Sessions are opaque, HTTP-only, secure cookies with idle + absolute timeouts and server-side revocation (FR-SEC-047, 048, 053).
-- [ ] AC6 — Mutating cookie-authenticated requests require CSRF protection (FR-SEC-049).
-- [ ] AC7 — Auth endpoints are rate-limited with safe lockout recovery (FR-SEC-041…044).
-- [ ] AC8 — Authentication events are recorded in the audit log (§15.1).
+- [x] AC1 — Registration, verification, login, logout, and recovery work end-to-end (TR-SEC-001; SRS FR-010).
+- [x] AC2 — Passwords stored only as argon2id hashes; never logged (FR-SEC-016, 017).
+- [x] AC3 — Verification/reset tokens are single-use, time-limited, hashed at rest (FR-SEC-012, 020).
+- [x] AC4 — Responses do not reveal whether an email has an account (FR-SEC-014, 024).
+- [x] AC5 — Sessions are opaque, HTTP-only, secure cookies with idle + absolute timeouts and server-side revocation (FR-SEC-047, 048, 053).
+- [x] AC6 — Mutating cookie-authenticated requests require CSRF protection (FR-SEC-049).
+- [x] AC7 — Auth endpoints are rate-limited with safe lockout recovery (FR-SEC-041…044).
+- [x] AC8 — Authentication events are recorded in the audit log (§15.1).
 
 ## 10. Risks & notes
 
@@ -133,7 +133,21 @@ Events (outbox): `UserRegistered`, `UserEmailVerified`, `UserPasswordChanged`, `
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-22
+- Sessions used: 1
+- Deviations from plan (all recorded in `docs/architecture/identity.md` and ADR-006):
+  - Better Auth 1.7.7 embedded as a library; our controllers own the HTTP surface. File layout differs from §3: `better-auth.ts` (factory), `auth.service.ts` (flows), `identity-hooks.service.ts` (Better Auth callbacks → tokens/emails/audit/outbox), `account.service.ts`, `verification-token.service.ts`, `session.middleware.ts`, `identity-mail.service.ts`; no separate session/password services (Better Auth); platform `auth/` (CsrfMiddleware, `@RequireAuth`), `mail/`, `rate-limit/`.
+  - CSRF: Origin / `Sec-Fetch-Site` checks (plan allowed either); `GET /v1/auth/csrf` not needed, not built.
+  - Session tokens are not hashed at rest (Better Auth constraint); signed cookie mitigates. Revocation deletes rows (audit + `identity.session_revoked` event record it), so no `revoked_at`/`revoke_reason` columns.
+  - Audit/outbox for auth events are written right after Better Auth's own transaction, not atomically.
+  - Email verification uses our own single-use hashed tokens (Better Auth's are stateless JWTs).
+  - Password reset also activates a still-unverified account (the link proves mailbox control).
+  - New error codes: `EMAIL_NOT_VERIFIED`, `ACCOUNT_NOT_ACTIVE`, `TOKEN_INVALID_OR_EXPIRED`.
+  - Mailpit added to the compose `test` profile (SMTP 51025 / API 58025) and to the cloud-sandbox script (binary from GitHub releases).
+  - `TRUST_PROXY` (default loopback) + shared `configureHttpApp()` so rate limits see the real client IP behind the Next.js proxy.
+  - Compromised-password check (FR-SEC-019, SHOULD) not implemented → backlog.
+- Verification:
+  - `pnpm verify` 26/26; unit: api 56 (incl. CSRF rules, argon2id + rehash detection, token/IP hashing, state transitions, auth config), contracts 10 (email normalization, password policy), web 37 (incl. returnTo validation).
+  - `pnpm test:integration`: api 33 (identity 13: full register→Mailpit→verify→login→/me→logout with server-side revocation; argon2id + hashed tokens; verification replay + expiry; non-enumeration of register/forgot/resend/login; unverified login; lockout after 5 + reset escape hatch revoking sessions; change password; suspended account; absolute timeout; CSRF; 429 + Retry-After; /me requires auth; **log files contain no passwords, tokens or session cookies**), worker 11.
+  - `pnpm e2e` 14/14 (setup creates a verified user via API + Mailpit; sign-up/verify/sign-in/sign-out, returnTo incl. external-URL rejection, forgot/reset; existing shell/editor/status specs now run signed in).
+- Follow-ups (09-backlog): compromised-password check (HIBP k-anonymity, FR-SEC-019); periodic cleanup of expired `verification_tokens`/sessions (worker sweeper); revisit hashed session storage when Better Auth supports it.

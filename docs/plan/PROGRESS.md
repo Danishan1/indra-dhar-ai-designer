@@ -4,13 +4,13 @@
 
 ## Current pointer
 
-| Field                 | Value                                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I04 — Web app shell & design system** (next)                                                                                              |
-| Status                | `todo`                                                                                                                                      |
-| Branch                | `main`                                                                                                                                      |
-| Last updated          | 2026-10-22 (I03 finished)                                                                                                                   |
-| Blockers              | None. Owner input welcome on ADR-006 (auth library, needed at I05), ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
+| Field                 | Value                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Current iteration** | **I06 — Organizations, memberships & invitations** (next)                                            |
+| Status                | `todo`                                                                                               |
+| Branch                | `main`                                                                                               |
+| Last updated          | 2026-10-22 (I05 finished)                                                                            |
+| Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
 
@@ -23,8 +23,8 @@
 | I01 | Monorepo bootstrap & tooling                          | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | Toolchain pinned (ADR-022)                            |
 | I02 | Local infrastructure & backend base                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | SeaweedFS (ADR-021); AC1 needs owner check on Windows |
 | I03 | Platform primitives                                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | ADR-038 packages/db, ADR-039                          |
-| I04 | Web app shell & design system                         | 0     | todo   |            |            |          | → M1                                                  |
-| I05 | Accounts & authentication                             | 1     | todo   |            |            |          | Decide ADR-006                                        |
+| I04 | Web app shell & design system                         | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | → M1 reached; ADR-040                                 |
+| I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                |
 | I06 | Organizations, memberships & invitations              | 1     | todo   |            |            |          |                                                       |
 | I07 | Authorization engine & tenant isolation               | 1     | todo   |            |            |          |                                                       |
 | I08 | MFA, step-up, sessions & security audit               | 1     | todo   |            |            |          | → M2                                                  |
@@ -72,17 +72,17 @@
 
 ## Milestones
 
-| Milestone                   | Status | Date | Tag                   |
-| --------------------------- | ------ | ---- | --------------------- |
-| M1 Walking skeleton         | todo   |      | `m1-walking-skeleton` |
-| M2 Secure multi-tenant base | todo   |      | `m2-secure-base`      |
-| M3 Structured editor alpha  | todo   |      | `m3-editor-alpha`     |
-| M4 AI-assisted design alpha | todo   |      | `m4-ai-alpha`         |
-| M5 Review workflow          | todo   |      | `m5-review`           |
-| M6 Commercial beta          | todo   |      | `m6-commercial-beta`  |
-| M7 Visualization            | todo   |      | `m7-visualization`    |
-| M8 Production tech packs    | todo   |      | `m8-techpacks`        |
-| M9 Launch                   | todo   |      | `m9-launch`           |
+| Milestone                   | Status | Date       | Tag                   |
+| --------------------------- | ------ | ---------- | --------------------- |
+| M1 Walking skeleton         | done   | 2026-10-22 | `m1-walking-skeleton` |
+| M2 Secure multi-tenant base | todo   |            | `m2-secure-base`      |
+| M3 Structured editor alpha  | todo   |            | `m3-editor-alpha`     |
+| M4 AI-assisted design alpha | todo   |            | `m4-ai-alpha`         |
+| M5 Review workflow          | todo   |            | `m5-review`           |
+| M6 Commercial beta          | todo   |            | `m6-commercial-beta`  |
+| M7 Visualization            | todo   |            | `m7-visualization`    |
+| M8 Production tech packs    | todo   |            | `m8-techpacks`        |
+| M9 Launch                   | todo   |            | `m9-launch`           |
 
 ## Environment facts (fill in as decided)
 
@@ -92,7 +92,7 @@
 | pnpm             | 10.34.7                                                                                                   |
 | Ports            | web 3000 · api 4000 · postgres 5432 · redis 6379 · object store 9000/9001 · mailpit 8025 (confirm in I02) |
 | Object store     | SeaweedFS S3 :8333 (ADR-021)                                                                              |
-| Auth library     | _ADR-006, set in I05_                                                                                     |
+| Auth library     | Better Auth 1.7.7 (ADR-006)                                                                               |
 | AI providers     | _ADR-009, set in I22_                                                                                     |
 | Payment provider | _ADR-010, set in I32_                                                                                     |
 
@@ -107,11 +107,34 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 _(date — iteration — what changed — why — ADR link)_
 
 - 2026-10-22 — between I02/I03 — local log files (`logs/`, `pnpm logs`) and local PostgreSQL option, at owner's request — ADR-036, ADR-037
+- 2026-10-22 — I05 — Better Auth embedded behind our controllers; Origin-based CSRF; accepted gaps (unhashed session tokens, non-atomic audit) — ADR-006, docs/architecture/identity.md
+- 2026-10-22 — I04 — shadcn components hand-written (registry blocked), Playwright as `tests/e2e` package — ADR-040
 - 2026-10-22 — I03 — Prisma moved to `packages/db`; primitive mechanics — ADR-038, ADR-039 (details in the I03 completion record)
 
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-22 — I05 Accounts & authentication (session 1) — DONE
+
+- ADR-006 evaluated (npm metadata + source; web search disabled for the org): Better Auth 1.7.7, MIT, Prisma 7 supported → used as an in-process library behind our `/v1/auth/*` (details + accepted gaps: `docs/architecture/identity.md`).
+- Built: `users`/`sessions`/`identity_credentials`/`verification_tokens` (migration `…_i05_identity`, status CHECK), argon2id, our single-use email-verification tokens, register/verify/resend/login/logout/forgot/reset/change, `/v1/me`, lockout, Redis rate limits, Origin CSRF, session middleware (absolute timeout, active-only), audit + outbox events, Mailpit emails; web sign-in/up/verify/forgot/reset pages, `proxy.ts` + RouteGuard, user menu.
+- Tests: api unit 56, integration 33 (identity 13 + log secrecy), web 37, e2e 14.
+- **Owner actions (Windows):**
+  1. Add to your `.env` (the API refuses to start without it): `BETTER_AUTH_SECRET=` + a random value (`openssl rand -base64 32`, or any 32+ random characters). Optional keys are in `.env.example` (section "Authentication").
+  2. `pnpm install`, `pnpm db:migrate` (adds the identity tables), `pnpm dev`. Mailpit must be running (`pnpm infra:up`) — open http://localhost:8025 to see the confirmation emails.
+  3. Try it: http://localhost:3000 → redirected to sign-in → "Create an account" → confirm via the Mailpit email → sign in.
+  4. Integration tests now also need the test Mailpit (`pnpm infra:test:up`; your compose file got the `mailpit-test` service).
+- **Next step:** I06 — organizations, memberships & invitations (uses `currentUserId()`, the mailer and `RequestContext.organizationId`).
+
+### 2026-10-22 — I04 Web app shell & design system (session 1) — DONE, **M1 reached**
+
+- Tailwind 4 tokens (dark default, light/system), owned shadcn-style components, app shell (collapsible sidebar, top bar with org/user placeholders, Ctrl/⌘+K palette), placeholder pages, `(public)/sign-in` placeholder, `(editor)` full-viewport layout with six resizable/collapsible regions (`/editor/demo`, dev only).
+- Typed API client (`ApiError`, friendly messages, toast with copyable reference), TanStack Query provider + key factory, shortcut registry (ignores inputs), `/system` status page (web → `/v1` proxy → API).
+- Tests: web unit 27; Playwright 10 (`pnpm e2e`). `docs/architecture/frontend-guidelines.md` written.
+- Owner's own edits kept: `.gitignore` comment; **`infra/compose/docker-compose.dev.yml` with PostgreSQL services commented out is left as the owner has it on the Windows machine** (cloud copy keeps the profile-based version; do not overwrite the owner's file when syncing).
+- **Owner actions (Windows):** `pnpm install`, `pnpm e2e:install` (once, downloads Chromium), `pnpm dev`, open http://localhost:3000 (try Ctrl+K, the theme menu, /system, /editor/demo); `pnpm e2e` runs the browser tests (API + infra must be reachable).
+- **Next step:** I05 — accounts & authentication with **Better Auth** (ADR-006, owner decision). First verify version/licence/Prisma 7 + NestJS integration.
 
 ### 2026-10-22 — I03 Platform primitives (session 1) — DONE
 

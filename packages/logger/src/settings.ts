@@ -43,7 +43,8 @@ export interface LogSettings {
 
 /** Walks up from `startDir` to the monorepo root (folder containing pnpm-workspace.yaml). */
 export function findRepoRoot(startDir: string = process.cwd()): string | null {
-  let dir = resolve(startDir);
+  // Runtime-only lookup; tell Next.js file tracing not to include the whole repo.
+  let dir = resolve(/*turbopackIgnore: true*/ startDir);
   for (;;) {
     if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir;
     const parent = dirname(dir);
@@ -61,8 +62,8 @@ export function resolveLogSettings(
   const dir = parsed.LOG_DIR
     ? isAbsolute(parsed.LOG_DIR)
       ? parsed.LOG_DIR
-      : resolve(root, parsed.LOG_DIR)
-    : join(root, 'logs');
+      : resolve(/*turbopackIgnore: true*/ root, parsed.LOG_DIR)
+    : join(/*turbopackIgnore: true*/ root, 'logs');
   return {
     level: parsed.LOG_LEVEL,
     pretty: parsed.LOG_PRETTY,

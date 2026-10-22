@@ -32,3 +32,9 @@ Items deliberately left out of the 49 iterations, with the spec references that 
 _(Append: date — source iteration — item — reason)_
 
 - none yet
+
+## From I05 (2026-10-22)
+
+- Compromised-password check on register/reset/change (FR-SEC-019, SHOULD): HIBP range API (k-anonymity) behind a pluggable `PasswordBreachChecker`, fail-open with audit. → I08 or I47.
+- Worker sweep for expired `verification_tokens` and expired `sessions` rows. → I08 (session management).
+- Hashed session tokens at rest once Better Auth supports it (ADR-006 gap 1). → watch per Better Auth upgrade.

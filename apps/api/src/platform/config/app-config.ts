@@ -33,6 +33,21 @@ export class AppConfig {
     return this.env.API_DEV_ROUTES ?? !this.isProduction;
   }
 
+  /** Origins accepted for cookie-authenticated state-changing requests (CSRF, FR-SEC-049). */
+  get trustedOrigins(): string[] {
+    const extra = (this.env.AUTH_TRUSTED_ORIGINS ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+    return [
+      ...new Set([new URL(this.env.APP_BASE_URL).origin, ...extra.map((o) => new URL(o).origin)]),
+    ];
+  }
+
+  get sessionCookieName(): string {
+    return this.env.AUTH_COOKIE_SECURE ? '__Host-aid_session' : 'aid_session';
+  }
+
   get storage() {
     return {
       endpoint: this.env.S3_ENDPOINT,

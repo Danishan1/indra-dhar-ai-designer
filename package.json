@@ -34,7 +34,9 @@
     "db:generate": "pnpm --filter @ai-designer/db prisma:generate",
     "db:migrate:fallback": "node --no-warnings infra/scripts/prisma-wasm-fallback.mjs",
     "logs": "node infra/scripts/logs.mjs",
-    "api:openapi": "pnpm --filter @ai-designer/api openapi:generate"
+    "api:openapi": "pnpm --filter @ai-designer/api openapi:generate",
+    "e2e": "pnpm --filter @ai-designer/e2e e2e",
+    "e2e:install": "pnpm --filter @ai-designer/e2e exec playwright install chromium"
   },
   "devDependencies": {
     "@ai-designer/config": "workspace:*",

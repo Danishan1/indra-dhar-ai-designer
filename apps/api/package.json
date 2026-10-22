@@ -19,21 +19,24 @@
   },
   "dependencies": {
     "@ai-designer/contracts": "workspace:*",
+    "@ai-designer/db": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@aws-sdk/client-s3": "3.1155.0",
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-express": "12.2.0",
+    "@node-rs/argon2": "2.2.2",
+    "@prisma/adapter-pg": "7.10.1",
+    "better-auth": "1.7.7",
     "bullmq": "6.4.0",
     "ioredis": "6.0.0",
     "nestjs-pino": "5.3.1",
+    "nodemailer": "10.0.16",
     "pino": "10.4.0",
     "pino-http": "11.0.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "zod": "4.6.7",
-    "@ai-designer/db": "workspace:*",
-    "@prisma/adapter-pg": "7.10.1"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@ai-designer/config": "workspace:*",

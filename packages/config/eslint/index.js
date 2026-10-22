@@ -42,6 +42,9 @@ export const base = tseslint.config(
         'warn',
         {
           groups: ['builtin', 'external', 'internal', 'parent', ['sibling', 'index']],
+          // App-local alias (`@/…` in apps/web) is internal, not an external scoped package.
+          pathGroups: [{ pattern: '@/**', group: 'internal' }],
+          pathGroupsExcludedImportTypes: ['builtin'],
           'newlines-between': 'always',
           alphabetize: { order: 'asc', caseInsensitive: true },
         },

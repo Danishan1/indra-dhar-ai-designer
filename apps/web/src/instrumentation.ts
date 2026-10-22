@@ -5,7 +5,7 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   const { getWebLogger } = await import('./lib/logging/server-logger');
   const logger = await getWebLogger('server');
-  logger.info({ pid: process.pid }, 'web server started');
+  logger.info('web server started');
 }
 
 /** Captures server-side request errors (RSC render, route handlers, server actions). */

@@ -2,6 +2,8 @@ import { Global, type MiddlewareConsumer, Module, type NestModule } from '@nestj
 import { APP_FILTER } from '@nestjs/core';
 
 import { AuditService } from './audit/audit.service.js';
+import { CsrfMiddleware } from './auth/csrf.middleware.js';
+import { AuthenticatedGuard } from './auth/require-auth.js';
 import { RequestContextMiddleware } from './context/request-context.middleware.js';
 import { AllExceptionsFilter } from './errors/all-exceptions.filter.js';
 import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor.js';
@@ -22,11 +24,19 @@ import { OutboxService } from './outbox/outbox.service.js';
     OutboxService,
     JobService,
     IdempotencyInterceptor,
+    AuthenticatedGuard,
   ],
-  exports: [IdSequenceService, AuditService, OutboxService, JobService, IdempotencyInterceptor],
+  exports: [
+    IdSequenceService,
+    AuditService,
+    OutboxService,
+    JobService,
+    IdempotencyInterceptor,
+    AuthenticatedGuard,
+  ],
 })
 export class PlatformModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestContextMiddleware).forRoutes('*path');
+    consumer.apply(RequestContextMiddleware, CsrfMiddleware).forRoutes('*path');
   }
 }

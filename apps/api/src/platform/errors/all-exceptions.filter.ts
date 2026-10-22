@@ -27,6 +27,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
     if (res.headersSent) return;
+    const retryAfter = mapped.body.error.details?.['retryAfterSeconds'];
+    if (mapped.status === 429 && typeof retryAfter === 'number')
+      res.setHeader('Retry-After', String(retryAfter));
     res.status(mapped.status).json(mapped.body);
   }
 }

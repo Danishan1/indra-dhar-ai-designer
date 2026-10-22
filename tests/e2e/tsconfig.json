@@ -1,0 +1,9 @@
+{
+  "extends": "@ai-designer/config/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["playwright.config.ts", "specs/**/*.ts"]
+}

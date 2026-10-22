@@ -1,25 +1,153 @@
-/* Temporary styles; Tailwind + shadcn/ui arrive in I04. */
-:root {
-  color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Design tokens (docs/architecture/frontend-guidelines.md). The theme is chosen by the
+ * `data-theme` attribute on <html> (set before first paint by the inline script in app/layout.tsx).
+ * Dense, neutral "design software" look: subtle borders, compact spacing, visible focus rings.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --background: oklch(0.985 0.002 260);
+  --foreground: oklch(0.21 0.01 260);
+  --panel: oklch(1 0 0);
+  --panel-foreground: oklch(0.21 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.01 260);
+  --primary: oklch(0.52 0.16 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.004 260);
+  --secondary-foreground: oklch(0.25 0.01 260);
+  --muted: oklch(0.955 0.004 260);
+  --muted-foreground: oklch(0.5 0.012 260);
+  --accent: oklch(0.94 0.008 255);
+  --accent-foreground: oklch(0.22 0.02 260);
+  --destructive: oklch(0.56 0.21 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.88 0.006 260);
+  --ring: oklch(0.55 0.17 255);
+  --sidebar: oklch(0.97 0.003 260);
+  --sidebar-foreground: oklch(0.3 0.01 260);
+  --sidebar-accent: oklch(0.93 0.006 260);
+  --viewport: oklch(0.93 0.004 260);
+
+  /* Value status colors — always paired with an icon + label (FR-EDT-129). */
+  --status-confirmed: oklch(0.55 0.14 150);
+  --status-inferred: oklch(0.55 0.13 290);
+  --status-proposed: oklch(0.55 0.14 245);
+  --status-missing: oklch(0.56 0.19 25);
+  --status-needs-review: oklch(0.62 0.15 70);
+  --status-not-applicable: oklch(0.55 0.01 260);
+  --status-ok: oklch(0.55 0.14 150);
+  --status-down: oklch(0.56 0.19 25);
 }
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: #111316;
-  color: #e8eaed;
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --background: oklch(0.17 0.006 260);
+  --foreground: oklch(0.93 0.005 260);
+  --panel: oklch(0.205 0.007 260);
+  --panel-foreground: oklch(0.92 0.005 260);
+  --card: oklch(0.215 0.007 260);
+  --card-foreground: oklch(0.93 0.005 260);
+  --popover: oklch(0.23 0.008 260);
+  --popover-foreground: oklch(0.93 0.005 260);
+  --primary: oklch(0.66 0.15 255);
+  --primary-foreground: oklch(0.16 0.01 260);
+  --secondary: oklch(0.26 0.008 260);
+  --secondary-foreground: oklch(0.92 0.005 260);
+  --muted: oklch(0.25 0.007 260);
+  --muted-foreground: oklch(0.68 0.01 260);
+  --accent: oklch(0.29 0.012 255);
+  --accent-foreground: oklch(0.95 0.005 260);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.3 0.008 260);
+  --input: oklch(0.33 0.009 260);
+  --ring: oklch(0.68 0.15 255);
+  --sidebar: oklch(0.19 0.007 260);
+  --sidebar-foreground: oklch(0.85 0.006 260);
+  --sidebar-accent: oklch(0.27 0.01 260);
+  --viewport: oklch(0.14 0.005 260);
+
+  --status-confirmed: oklch(0.72 0.15 150);
+  --status-inferred: oklch(0.72 0.13 290);
+  --status-proposed: oklch(0.72 0.13 245);
+  --status-missing: oklch(0.7 0.17 25);
+  --status-needs-review: oklch(0.8 0.14 75);
+  --status-not-applicable: oklch(0.68 0.01 260);
+  --status-ok: oklch(0.72 0.15 150);
+  --status-down: oklch(0.7 0.17 25);
 }
-.placeholder {
-  text-align: center;
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-viewport: var(--viewport);
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-inferred: var(--status-inferred);
+  --color-status-proposed: var(--status-proposed);
+  --color-status-missing: var(--status-missing);
+  --color-status-needs-review: var(--status-needs-review);
+  --color-status-not-applicable: var(--status-not-applicable);
+  --color-status-ok: var(--status-ok);
+  --color-status-down: var(--status-down);
+
+  --font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
-.muted {
-  color: #9aa0a6;
-  font-size: 0.9rem;
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  /* Focus is always visible for keyboard users (SPEC-007 §18). */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  ::selection {
+    @apply bg-primary/30;
+  }
 }

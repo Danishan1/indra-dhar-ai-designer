@@ -8,6 +8,7 @@ const valid = {
   S3_ENDPOINT: 'http://localhost:8333',
   S3_ACCESS_KEY_ID: 'key',
   S3_SECRET_ACCESS_KEY: 'secret',
+  BETTER_AUTH_SECRET: 'unit-test-secret-unit-test-secret-1234',
 };
 
 describe('parseApiEnv', () => {
@@ -51,5 +52,17 @@ describe('parseApiEnv', () => {
     } catch (err) {
       expect((err as Error).message).not.toContain('s3cr3t');
     }
+  });
+});
+
+describe('auth configuration', () => {
+  it('rejects a short BETTER_AUTH_SECRET and defaults session timeouts', () => {
+    expect(() => parseApiEnv({ ...valid, BETTER_AUTH_SECRET: 'short' })).toThrow(
+      /BETTER_AUTH_SECRET/,
+    );
+    const env = parseApiEnv(valid);
+    expect(env.SESSION_IDLE_TIMEOUT_MIN).toBe(7 * 24 * 60);
+    expect(env.SESSION_ABSOLUTE_TIMEOUT_H).toBe(720);
+    expect(env.AUTH_COOKIE_SECURE).toBe(true);
   });
 });

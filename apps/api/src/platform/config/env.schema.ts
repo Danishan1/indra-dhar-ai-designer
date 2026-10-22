@@ -31,6 +31,35 @@ export const apiEnvSchema = z
     S3_BUCKET_EXPORTS: z.string().min(3).default('aid-exports'),
 
     SMTP_URL: z.url({ protocol: /^smtps?$/ }).default('smtp://localhost:1025'),
+    MAIL_FROM: z.string().min(3).default('AI Designer <no-reply@ai-designer.local>'),
+
+    /** Authentication (I05, ADR-006). Signs session cookies and keys IP hashes — keep secret. */
+    BETTER_AUTH_SECRET: z
+      .string()
+      .min(32, { message: 'must be at least 32 characters (openssl rand -base64 32)' }),
+    /**
+     * Session cookie `Secure` flag. true → cookie `__Host-aid_session` (works on http://localhost in
+     * browsers). Set false only when testing over plain http on a non-localhost host.
+     */
+    AUTH_COOKIE_SECURE: booleanString.default(true),
+    SESSION_IDLE_TIMEOUT_MIN: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .default(7 * 24 * 60),
+    SESSION_ABSOLUTE_TIMEOUT_H: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .default(30 * 24),
+    /** How often an active session's idle expiry is extended (throttles writes). */
+    SESSION_TOUCH_INTERVAL_MIN: z.coerce.number().int().min(1).default(60),
+    AUTH_LOCKOUT_THRESHOLD: z.coerce.number().int().min(3).default(5),
+    AUTH_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),
+    /** Browser origins allowed to send cookie-authenticated mutations (CSRF). Defaults to APP_BASE_URL. */
+    AUTH_TRUSTED_ORIGINS: z.string().optional(),
+    /** Express `trust proxy` (who may set X-Forwarded-For): 'loopback', a CIDR list, or a hop count. */
+    TRUST_PROXY: z.string().min(1).default('loopback'),
 
     /** How long a stored Idempotency-Key response is replayed (I03). */
     IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
