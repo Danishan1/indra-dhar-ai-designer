@@ -1,0 +1,88 @@
+# 05 — Decision Log (ADRs)
+
+Status values: **Accepted** (decided — follow it), **Proposed** (plan default — follow it unless the owner overrides), **Open** (must be decided at/before the listed iteration; use the recommended default if the owner is unavailable and record that you did).
+
+When you decide or change something: update the row, add a dated note in §4, and mention it in `PROGRESS.md`. Larger ADRs can get their own file in `docs/architecture/adr/NNN-title.md`.
+
+---
+
+## 1. Decisions inherited from TECH-GDP-001 (Accepted)
+
+| ID | Decision |
+|---|---|
+| T-01 | TypeScript throughout; Node.js LTS backend runtime |
+| T-02 | Frontend: Next.js, React, Tailwind CSS, shadcn/ui, Lucide, TanStack Query, React Hook Form, Zod |
+| T-03 | Backend: NestJS modular monolith, REST + OpenAPI/Swagger, SSE for progress; WebSockets only when justified |
+| T-04 | PostgreSQL system of record with Prisma ORM and reviewed migrations; JSONB for flexible data; **no MongoDB** |
+| T-05 | Redis + BullMQ + ioredis for cache/rate-limit/queues; Postgres holds durable job and billing records |
+| T-06 | S3-compatible private object storage; signed URLs or authenticated download service |
+| T-07 | 2D: SVG primary; Konva/React-Konva for canvas interactions where useful |
+| T-08 | 3D: Three.js + React Three Fiber + Drei, glTF/GLB; **viewer only** in first release |
+| T-09 | Image processing: Sharp in background workers; Python service only if justified later |
+| T-10 | Testing: Vitest, Playwright, ESLint, Prettier, TS strict, OpenAPI contract checks, DB integration tests |
+| T-11 | Structured JSON logging, OpenTelemetry-compatible tracing/metrics |
+| T-12 | pnpm + Turborepo monorepo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`, `infra/*`) |
+| T-13 | Self-hosted Docker Compose; Caddy or Nginx reverse proxy; only proxy public |
+| T-14 | Solo developer (+ Claude) initially; cloud provider undecided → avoid provider-specific dependencies |
+
+## 2. Plan-level decisions (Proposed unless marked)
+
+| ID | Topic | Decision | Status | Iteration |
+|---|---|---|---|---|
+| ADR-001 | IDs | UUIDv7 primary keys + per-org human-readable `display_id` (`PRJ-000123`, `DSN-…-R003`) from an `id_sequences` table | Proposed | I03 |
+| ADR-002 | Contracts & validation | Zod schemas in `packages/contracts` shared by web & api; NestJS validation via a zod pipe (e.g. `nestjs-zod`) and OpenAPI generated from zod; commit `docs/api/openapi.json` snapshot | Proposed | I03 |
+| ADR-003 | Revision storage | Immutable JSONB snapshot of the full canonical garment state per revision + sha256 of canonical (key-sorted) JSON; working copy as JSONB + integer version; DB trigger blocks updates to snapshot/hash | Proposed | I12 |
+| ADR-004 | Tenancy enforcement | `organization_id` on all tenant tables, enforced in repositories via `RequestContext`; automated cross-tenant tests; evaluate Postgres RLS as defence-in-depth in I47 | Proposed | I07 |
+| ADR-005 | Events | Transactional outbox table + worker dispatcher; at-least-once; idempotent consumers via `processed_events` | Proposed | I03 |
+| ADR-006 | Authentication implementation | **Open.** Recommended: evaluate **Better Auth** (self-hosted TS library; Postgres; email/password, passkeys, TOTP, organizations) mounted behind NestJS. Fallback default: minimal in-house implementation using vetted primitives (`@node-rs/argon2` argon2id, opaque random session tokens hashed in Postgres, `otplib` TOTP, `@simplewebauthn/server` for passkeys later). Spec OD-SEC-001 prefers a mature solution over hand-rolled primitives. Verify library maturity/licence at the time. | **Open** | Decide at start of I05 |
+| ADR-007 | Secret encryption | Envelope encryption (AES-256-GCM): per-secret data key wrapped by a master key loaded from a mounted secret file/env (`SECRETS_MASTER_KEY`, key versioning for rotation); `SecretsService` abstraction so Vault/KMS can replace it later. A minimal version is introduced in **I08** (TOTP secrets at rest) and generalized in **I22** (provider credentials) — one implementation, not two | Proposed | I08 → I22 |
+| ADR-008 | Initial garment categories | **Open.** Recommended: **woven shirt** and **knit T-shirt / top** (share body, sleeves, collar/neckline, cuffs, placket, pocket, hem; good for lace/embroidery demos). Add others via templates later. Owner should confirm (e.g. kurta, dress, trousers if business needs differ). | **Open** | Decide before I11 |
+| ADR-009 | Initial AI providers & models | **Open.** Build against the **fake adapter** first. Then pick ≥1 image generation/editing model (with masking or reference-image editing) and ≥1 multimodal model for interpretation. Candidates to evaluate *at that time* (verify current models, pricing, data-handling terms): OpenAI image + vision models, Google Gemini image/multimodal models, Black Forest Labs FLUX (Kontext-style editing), Stability AI. Choose by: masked/reference editing support, garment fidelity, cost per image, latency, data retention terms, usage reporting quality (for reconciliation). | **Open** | Decide in I22 |
+| ADR-010 | Payment provider | **Open.** Organization is India-based: evaluate **Razorpay** (INR, subscriptions, Indian tax/GST invoicing) vs **Stripe** (global, Billing). Payment integration sits behind `PaymentGateway` interface so either works. | **Open** | Decide before I32 |
+| ADR-011 | Commercial unit | **Open.** Recommended: **credit-based allowance** (versioned credit conversion per operation class) + optional pay-as-you-go overage, priced per pricing version (SPEC-005 §10). | **Open** | Default used in I24; confirm before I30 |
+| ADR-012 | PDF generation | Proposed: HTML templates rendered to PDF by headless Chromium (Playwright) in the worker (best layout fidelity for tables & drawings). Alternative: `@react-pdf/renderer`. First used for invoices (I31), generalized in I35, reused for tech packs (I42). Chromium makes the worker image heavy → optional separate `worker-render` process/queue (I48) | Proposed | I31 / I35 / I42 |
+| ADR-013 | Email | Nodemailer over SMTP; Mailpit container in dev/test; provider (SES/Postmark/etc.) chosen at deploy time | Proposed | I05 / I29 |
+| ADR-014 | Logging | `nestjs-pino` (JSON), redaction list; OpenTelemetry SDK added in I46 | Proposed | I02 |
+| ADR-015 | Editor local state | Add **Zustand** for editor interaction state (selection, tool, viewport, command stack). Small, framework-agnostic; not in TECH list → recorded here | Proposed | I15 |
+| ADR-016 | Real-time | SSE for job/candidate progress; no WebSockets in first release | Accepted (T-03) | I21 |
+| ADR-017 | Org hierarchy | Organization + optional Workspace scope (SPEC-009 OD-SEC-004); workspace UI may be deferred, but schema supports it | Proposed | I06 |
+| ADR-018 | Collaboration model | Single working copy per design, optimistic concurrency, no simultaneous co-editing; **branch/merge deferred** (SPEC-006 OD-PRJ-003) | Proposed | I12 |
+| ADR-019 | 3D scope | Interactive viewer for supplied GLB/glTF (3D-L1 / G3); component-name mapping for S2 sync; no AI mesh generation, no cloth simulation | Accepted (TECH §3.8) | I36 |
+| ADR-020 | Units | Canonical **millimetres** for physical dimensions; display in cm/inch per user/org preference; explicit unit on every stored value | Proposed | I11 |
+| ADR-021 | Object storage implementation | AWS SDK v3 S3 client behind `ObjectStorage` interface. Dev/prod server: **verify licensing & maintenance status** of MinIO community edition at the time; alternatives Garage or SeaweedFS. Any S3-compatible store must pass the storage integration test suite | **Open** | Decide in I02 |
+| ADR-022 | Node version | Current **Active LTS** at time of I01 (expected Node 24.x in late 2026; verify), pinned in `.nvmrc` + `engines` | Proposed | I01 |
+| ADR-023 | Generic job vs per-kind tables | One `jobs` + `job_attempts` table with `kind` discriminator (AI generation, interpretation, render, techpack_export, validation, reconciliation, org export, erasure, retention, AV scan, evidence-expiry sweep…); kind-specific data in JSONB. Tables created in **I03**, extended (full state machine, candidates) in **I21** | Proposed | I03 / I21 |
+| ADR-024 | 2D garment geometry | Parametric SVG templates in `packages/garment-render`: each component type has a geometry function `(properties, context) → paths` with stable component IDs as SVG `id`/`data-component-id`; fabric fills via SVG `<pattern>`; trims via path-following repeats | Proposed | I16 |
+| ADR-025 | Canvas overlays | Konva layer above SVG for freehand/lasso/brush/mask tools; masks exported as PNG in image space + polygon in design space with explicit coordinate space | Proposed | I27 |
+| ADR-026 | Usage ledger | Append-only `usage_ledger_entries` + rebuildable `allowance_balances` projection; reservations use `SELECT … FOR UPDATE` on the balance row (or advisory lock per org) for atomic preflight | Proposed | I24 |
+| ADR-027 | Spec revision storage | Spec revision content as structured JSONB sections validated by `packages/techpack-model` zod schemas (normalized tables only where cross-revision querying is needed, e.g. BOM search) | Proposed | I38 |
+| ADR-028 | Extra packages | Packages beyond TECH §4 list are allowed when the boundary is real: `garment-render`, `ai-contracts`, `techpack-model` | Proposed | I11/I16/I22/I38 |
+| ADR-029 | Upload scanning | ClamAV container (`clamd`) for malware scanning of uploads before processing; quarantine status on assets | Proposed | I09 (hook) / I47 (scanner) |
+| ADR-030 | Feature flags | Simple DB-backed flags with org overrides (admin UI in I45); no third-party flag service | Proposed | I45 |
+| ADR-031 | 3D component mapping | Naming convention linking GLB node/mesh names to garment `componentId`s (e.g. `cmp:<componentId>` node extras or name prefix) plus an explicit mapping table for uploaded models | **Open** | Decide at start of I37 |
+| ADR-032 | Supported browsers / GPU baseline | Minimum browser versions and WebGL2 requirement for the editor and 3D viewer; graceful fallback below baseline | **Open** | Decide in I36 |
+| ADR-033 | Permission catalog governance | Single catalog in `packages/contracts/src/permissions.ts`; planned master list in `03-domain-model.md` §4; every iteration that adds endpoints adds keys + role-seed mappings in the same change, with a test that every key is mapped to ≥1 role or explicitly platform-only | Proposed | I07 onward |
+
+## 3. Open product questions carried from the specs (owner input welcome; defaults shown)
+
+| Spec ref | Question | Default used by the plan |
+|---|---|---|
+| SRS §11.1, SPEC-003 OD-5, SPEC-008 OD-TP-001 | Initial garment categories | ADR-008 (shirt + T-shirt) |
+| SRS §11.2, SPEC-007 OD-EDT-010 | Required 3D level at launch | Viewer (3D-L1) |
+| SRS §11.6, SPEC-005 §26.1 | Billing unit | Credits (ADR-011) |
+| SPEC-005 §26.3–4 | Rollover / overage | Credits expire at period end; overage blocked unless plan enables PAYG with budget |
+| SPEC-005 §26.6–7 | Failed-generation & retry cost policy | Platform absorbs cost of platform-caused failures and automatic retries; provider-successful but user-rejected results are charged |
+| SPEC-005 §26.9 | Pricing effective time | Price fixed at reservation (operation confirmation) |
+| SPEC-006 OD-PRJ-005, SPEC-009 SoD | Self-approval | Design review: self-approval allowed by default (small orgs), configurable SoD policy (I28). **Tech-pack release: separation of duties enabled by default** (author ≠ releaser), org admins may relax it with an audited policy change (I43) |
+| SPEC-007 OD-EDT-007 | Auto-apply AI results | Never auto-apply; candidate review always |
+| SPEC-008 OD-TP-006 | Launch export formats | PDF + XLSX + JSON (CSV for measurement table) |
+| SPEC-008 OD-TP-005 | Costing in scope | Optional, permission-controlled, off by default |
+| SPEC-009 OD-SEC-010 | Supplier identity | Restricted guest accounts invited per release grant (email-verified), not anonymous links |
+| SPEC-004 §30.4 | Prompt retention | Store full compiled request for 30 days (configurable), redacted summary forever |
+
+## 4. Change log
+
+| Date | ID | Change | By |
+|---|---|---|---|
+| 2026-10-22 | — | Initial decision log created from specs during planning | Claude (planning session) |
+| 2026-10-22 | ADR-007/012/023/031/032/033 | Reconciled cross-iteration seams found while writing iteration files | Claude (planning session) |

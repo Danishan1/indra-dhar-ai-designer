@@ -1,0 +1,12 @@
+# Normalize line endings to LF for everything we author
+* text=auto eol=lf
+# Keep the original requirement documents byte-for-byte as delivered (CRLF)
+docs/init/** -text
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.glb binary
+*.pdf binary
+*.xlsx binary
