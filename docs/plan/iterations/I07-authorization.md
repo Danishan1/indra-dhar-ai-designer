@@ -45,7 +45,7 @@ Every protected operation is authorized server-side by one consistent engine: a 
 - `apps/api/src/modules/authorization/` (`authorization.service.ts` PDP, `roles.controller.ts`, `grants.service.ts`, `effective-permissions.service.ts`, `repository.ts`)
 - `apps/api/src/platform/authz/{require-permission.decorator.ts,public.decorator.ts,authorization.guard.ts,resource-resolvers.ts}`
 - `apps/api/src/platform/tenancy/tenant-repository.ts`
-- `apps/api/prisma/seed/platform/roles-permissions.ts` (idempotent)
+- `packages/db/prisma/seed/platform/roles-permissions.ts` (idempotent)
 - `packages/test-utils/src/{tenant-fixtures.ts,tenant-isolation.ts,route-inventory.ts}`
 - `apps/api/test/security/{route-declarations.spec.ts,tenant-isolation.spec.ts,privilege-escalation.spec.ts}`
 - `docs/architecture/authorization.md` (how to add a permission, protect a route, write the isolation test)

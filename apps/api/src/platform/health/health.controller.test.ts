@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { AppConfig } from '../config/app-config.js';
+
 import { HealthController } from './health.controller.js';
 import type { HealthService, ReadinessReport } from './health.service.js';
-import { AppConfig } from '../config/app-config.js';
 
 const config = new AppConfig({
   NODE_ENV: 'test',
   APP_VERSION: '1.2.3',
+  IDEMPOTENCY_TTL_HOURS: 24,
   API_PORT: 4000,
   APP_BASE_URL: 'http://localhost:3000',
   LOG_LEVEL: 'silent',
   LOG_PRETTY: false,
+  LOG_FILE_MAX_SIZE: '10m',
+  LOG_FILE_RETENTION: 14,
   DATABASE_URL: 'postgresql://x:y@localhost:5432/db',
   REDIS_URL: 'redis://localhost:6379',
   S3_ENDPOINT: 'http://localhost:8333',

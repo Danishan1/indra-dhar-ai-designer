@@ -1,32 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+import { baseLoggerOptions } from '@ai-designer/logger';
 import type { Options as PinoHttpOptions } from 'pino-http';
 
 import type { AppConfig } from '../config/app-config.js';
+import { RequestContext } from '../context/request-context.js';
 
-/**
- * Paths whose values must never appear in logs (TECH-GDP-001 §3.11, SPEC-009 FR-SEC-174/181).
- * pino wildcards match one level; list deeper variants explicitly where needed.
- */
-export const REDACT_PATHS = [
-  'req.headers.authorization',
-  'req.headers.cookie',
-  'req.headers["x-api-key"]',
-  'res.headers["set-cookie"]',
-  '*.password',
-  '*.newPassword',
-  '*.apiKey',
-  '*.secret',
-  '*.secretAccessKey',
-  '*.token',
-  '*.accessToken',
-  '*.refreshToken',
-  '*.*.password',
-  '*.*.apiKey',
-  '*.*.secret',
-  '*.*.token',
-];
+export { REDACT_PATHS } from '@ai-designer/logger';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -38,10 +19,14 @@ export function resolveRequestId(inbound: string | string[] | undefined): string
 
 export function buildPinoHttpOptions(config: AppConfig): PinoHttpOptions {
   return {
-    level: config.env.LOG_LEVEL,
-    redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+    ...baseLoggerOptions(config.logSettings, { service: 'api', version: config.env.APP_VERSION }),
+    // Adds correlationId/principal/organization from the RequestContext to every log line.
+    mixin: () => RequestContext.logFields(),
     genReqId(req: IncomingMessage, res: ServerResponse) {
-      const id = resolveRequestId(req.headers['x-request-id']);
+      // The RequestContext middleware may already have assigned the id (middleware order).
+      const existing = (req as IncomingMessage & { id?: unknown }).id;
+      const id =
+        typeof existing === 'string' ? existing : resolveRequestId(req.headers['x-request-id']);
       res.setHeader('X-Request-Id', id);
       return id;
     },
@@ -54,9 +39,5 @@ export function buildPinoHttpOptions(config: AppConfig): PinoHttpOptions {
       return 'info';
     },
     autoLogging: { ignore: (req) => (req.url ?? '').startsWith('/v1/health') },
-    base: { service: 'api', version: config.env.APP_VERSION },
-    ...(config.env.LOG_PRETTY
-      ? { transport: { target: 'pino-pretty', options: { singleLine: true, colorize: true } } }
-      : {}),
   };
 }

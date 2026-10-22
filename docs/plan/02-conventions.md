@@ -47,7 +47,7 @@ These conventions apply to every iteration. If an iteration needs to deviate, re
 - Money: integer minor units (`amountMinor`) + ISO 4217 `currency`; never floats. Rates with high precision use `Decimal` (Prisma `Decimal`) and documented rounding.
 - Physical dimensions: canonical **millimetres** (ADR-020) with explicit `unit` on every value; conversions in `garment-model/units`.
 - Logging: `nestjs-pino`, JSON, includes `requestId`, `organizationId`, `principalId`; redaction list for `authorization`, `cookie`, `password`, `apiKey`, `secret`, `token`.
-- Config: `@nestjs/config` + zod-validated env schema; app fails to boot on invalid config.
+- Config: zod-validated env schema per app (`AppConfig`, no `@nestjs/config` — ADR-035); app fails to boot on invalid config.
 
 ## 5. API conventions
 
@@ -70,7 +70,7 @@ These conventions apply to every iteration. If an iteration needs to deviate, re
 
 ## 7. Database & migrations
 
-- Prisma schema at `apps/api/prisma/schema.prisma` (may be split with `prismaSchemaFolder` per module).
+- Prisma schema at `packages/db/prisma/schema.prisma` (ADR-038; may be split with `prismaSchemaFolder` per module). Platform helpers (display ids, outbox, audit, durable jobs) are in `packages/db/src/platform` — see `docs/architecture/platform-primitives.md`.
 - Every migration is reviewed (read the SQL) before committing. Use Prisma's default folder naming `YYYYMMDDHHMMSS_<iteration>_<summary>` (UTC), e.g. `20261022041649_i02_init` (`pnpm db:migrate -- --name i12_design_revisions`).
 - Tenant tables have `organization_id uuid not null` + index; composite uniques include it.
 - Immutability triggers for revision/ledger tables (raw SQL in migration).

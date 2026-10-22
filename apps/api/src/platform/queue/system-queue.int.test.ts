@@ -1,8 +1,9 @@
 import { pingJobPayloadSchema, SystemJobNames } from '@ai-designer/contracts';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { SystemQueueService } from './system-queue.service.js';
 import { closeRedisClient, createRedisClient } from '../redis/redis.module.js';
+
+import { SystemQueueService } from './system-queue.service.js';
 
 describe('SystemQueueService (integration)', () => {
   const redis = createRedisClient(process.env.REDIS_URL ?? '', 'aid-api-test');

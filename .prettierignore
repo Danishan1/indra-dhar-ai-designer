@@ -4,3 +4,7 @@ pnpm-lock.yaml
 **/dist/
 **/coverage/
 .turbo/
+# generated (pnpm --filter @ai-designer/api openapi:generate)
+docs/api/openapi.json
+# contains verbatim code snippets matched against Prisma internals — do not reformat
+infra/scripts/prisma-wasm-fallback.mjs

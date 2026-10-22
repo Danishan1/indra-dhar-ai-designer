@@ -4,13 +4,13 @@
 
 ## Current pointer
 
-| Field                 | Value                                                                                                                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Current iteration** | **I01 — Monorepo bootstrap & tooling** (not started)                                                                                                                                                         |
-| Status                | `todo`                                                                                                                                                                                                       |
-| Branch                | `main`                                                                                                                                                                                                       |
-| Last updated          | 2026-10-22 (planning session)                                                                                                                                                                                |
-| Blockers              | None. Owner input welcome on ADR-006 (auth library), ADR-008 (initial garment categories), ADR-009 (AI providers), ADR-010 (payment provider), ADR-011 (credits), ADR-021 (object storage) — defaults exist. |
+| Field                 | Value                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Current iteration** | **I04 — Web app shell & design system** (next)                                                                                              |
+| Status                | `todo`                                                                                                                                      |
+| Branch                | `main`                                                                                                                                      |
+| Last updated          | 2026-10-22 (I03 finished)                                                                                                                   |
+| Blockers              | None. Owner input welcome on ADR-006 (auth library, needed at I05), ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
 
@@ -22,7 +22,7 @@
 | --- | ----------------------------------------------------- | ----- | ------ | ---------- | ---------- | -------- | ----------------------------------------------------- |
 | I01 | Monorepo bootstrap & tooling                          | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | Toolchain pinned (ADR-022)                            |
 | I02 | Local infrastructure & backend base                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | SeaweedFS (ADR-021); AC1 needs owner check on Windows |
-| I03 | Platform primitives                                   | 0     | todo   |            |            |          |                                                       |
+| I03 | Platform primitives                                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | ADR-038 packages/db, ADR-039                          |
 | I04 | Web app shell & design system                         | 0     | todo   |            |            |          | → M1                                                  |
 | I05 | Accounts & authentication                             | 1     | todo   |            |            |          | Decide ADR-006                                        |
 | I06 | Organizations, memberships & invitations              | 1     | todo   |            |            |          |                                                       |
@@ -88,10 +88,10 @@
 
 | Item             | Value                                                                                                     |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |
-| Node.js          | _set in I01_                                                                                              |
-| pnpm             | _set in I01_                                                                                              |
+| Node.js          | 24 LTS (engines >=22.12)                                                                                  |
+| pnpm             | 10.34.7                                                                                                   |
 | Ports            | web 3000 · api 4000 · postgres 5432 · redis 6379 · object store 9000/9001 · mailpit 8025 (confirm in I02) |
-| Object store     | _ADR-021, set in I02_                                                                                     |
+| Object store     | SeaweedFS S3 :8333 (ADR-021)                                                                              |
 | Auth library     | _ADR-006, set in I05_                                                                                     |
 | AI providers     | _ADR-009, set in I22_                                                                                     |
 | Payment provider | _ADR-010, set in I32_                                                                                     |
@@ -106,11 +106,23 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
-- none yet
+- 2026-10-22 — between I02/I03 — local log files (`logs/`, `pnpm logs`) and local PostgreSQL option, at owner's request — ADR-036, ADR-037
+- 2026-10-22 — I03 — Prisma moved to `packages/db`; primitive mechanics — ADR-038, ADR-039 (details in the I03 completion record)
 
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-22 — I03 Platform primitives (session 1) — DONE
+
+- Extra owner requests first: git-ignored `logs/` folder with rotating files for api/worker/web (+ browser errors via `POST /api/client-logs`), viewer `pnpm logs [api|worker|web] [-f] [--errors]` (ADR-036); `INFRA_LOCAL_POSTGRES=true` to use a locally installed PostgreSQL (ADR-037).
+- `packages/db` (ADR-038): Prisma schema, migrations (`…_i03_platform_primitives`: id_sequences, audit_events + append-only trigger, outbox_events, processed_events, idempotency_keys, jobs, job_attempts), client, platform helpers, `@ai-designer/db/testing`.
+- `packages/contracts`: error codes + envelope, display-id prefixes, event envelope/`defineEvent`, platform events, jobs, pagination cursors, health schemas.
+- API `platform/`: RequestContext (ALS, log mixin), `AppError` + global filter, `@Endpoint` (zod validation + OpenAPI), `@Idempotent()`, IdSequence/Audit/Outbox/Job services, `assertVersion`, OpenAPI (`/v1/openapi.json`, `pnpm api:openapi` → `docs/api/openapi.json`). Dev reference module `modules/dev-examples`.
+- Worker: outbox dispatcher → `events` queue → idempotent consumers; `jobs` queue → `runDurableJob`; maintenance sweeper.
+- How-to for later sessions: `docs/architecture/platform-primitives.md`.
+- **Owner actions (Windows):** `git pull` (or use the synced folder), `pnpm install`, then `pnpm db:migrate` (applies the I03 migration; with local PostgreSQL keep `INFRA_LOCAL_POSTGRES=true`), `pnpm dev`; try `curl -X POST http://localhost:4000/v1/_dev/echo-idempotent -H "content-type: application/json" -H "Idempotency-Key: k1" -d "{\"message\":\"hi\"}"` and open http://localhost:4000/v1/openapi.json. For `pnpm test:integration` with local PostgreSQL set `AID_IT_DATABASE_URL=postgresql://postgres:<password>@localhost:5432/ai_designer_test` in `.env` (Redis/object store test containers via `pnpm infra:test:up`).
+- **Next step:** I04 — web app shell & design system (read `apps/web/AGENTS.md` / `node_modules/next/dist/docs` first: Next.js 16).
 
 ### 2026-10-22 — I02 Local infrastructure (session 1) — DONE
 

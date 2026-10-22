@@ -16,12 +16,14 @@ pnpm dev                    # web http://localhost:3000 · api http://localhost:
 pnpm verify                 # lint + typecheck + unit tests
 ```
 
-| Script        | Purpose                                                                      |
-| ------------- | ---------------------------------------------------------------------------- |
-| `pnpm dev`    | Run web, api and worker in watch mode                                        |
-| `pnpm build`  | Build all apps                                                               |
-| `pnpm verify` | Lint (zero warnings) + typecheck + tests — must be green before every commit |
-| `pnpm format` | Prettier                                                                     |
+| Script          | Purpose                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm dev`      | Run web, api and worker in watch mode                                                               |
+| `pnpm build`    | Build all apps                                                                                      |
+| `pnpm verify`   | Lint (zero warnings) + typecheck + tests — must be green before every commit                        |
+| `pnpm format`   | Prettier                                                                                            |
+| `pnpm logs`     | View local log files (`logs/`, git-ignored) — `pnpm logs api -f`, `pnpm logs --errors`              |
+| `pnpm infra:up` | Start Postgres/Redis/S3/Mailpit containers (`INFRA_LOCAL_POSTGRES=true` to use your own PostgreSQL) |
 
 ## Repository layout
 

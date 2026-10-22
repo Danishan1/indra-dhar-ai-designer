@@ -41,7 +41,7 @@ Deliver a reusable-artifact registry: platform (built-in), organization and user
 
 - `apps/api/src/modules/artifacts/` (`artifacts.controller.ts`, `artifact-revisions.controller.ts`, `artifacts.service.ts`, `compatibility.service.ts`, `repository.ts`, `where-used.service.ts`)
 - `packages/garment-model/src/artifacts/{artifact-schema.ts,compatibility.ts}` (pure schemas + compatibility rules)
-- `apps/api/prisma/seed/platform/artifacts/` (definitions + preview generation/upload script, idempotent)
+- `packages/db/prisma/seed/platform/artifacts/` (definitions + preview generation/upload script, idempotent)
 - `packages/contracts/src/artifacts/*.ts`
 - `apps/web/src/features/library/{library-page,artifact-card,artifact-detail-drawer,artifact-form}.tsx`
 - Resolver + isolation tests

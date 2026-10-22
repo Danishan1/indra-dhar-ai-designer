@@ -74,14 +74,16 @@ ai-designer-v2/
 │   │       ├── components/ui/    # shadcn/ui
 │   │       └── lib/              # api client, query client, auth helpers
 │   ├── api/                      # NestJS
-│   │   ├── prisma/               # schema.prisma, migrations/, seed/
 │   │   └── src/
-│   │       ├── platform/         # config, prisma, logging, errors, outbox, idempotency, authz guard
-│   │       └── modules/          # one folder per module in §2
-│   └── worker/                   # BullMQ processors (ai, render, export, outbox-dispatch, email, reconciliation)
+│   │       ├── platform/         # config, prisma, logging, context, errors, validation (@Endpoint), ids, audit,
+│   │       │                     # outbox, idempotency, jobs, concurrency, openapi, authz guard (I07)
+│   │       └── modules/          # one folder per module in §2 (+ dev-examples: reference implementation)
+│   └── worker/                   # outbox dispatcher, events consumers, durable-job processor, sweeper; later ai, render, export, email…
 ├── packages/
 │   ├── config/                   # tsconfig bases, eslint, prettier, vitest presets
 │   ├── contracts/                # zod schemas for API DTOs, events, error codes, permission catalog
+│   ├── db/                       # Prisma schema, migrations, seeds, client + platform persistence helpers (ADR-038)
+│   ├── logger/                   # shared pino setup: redaction, console + rotating files in logs/ (ADR-036)
 │   ├── garment-model/            # canonical garment schema, component catalog, property defs, validation, diff, hash
 │   ├── design-operations/        # typed operation definitions + deterministic appliers (pure)
 │   ├── editor-core/              # command stack, selection, undo/redo, coordinate mapping (pure TS)

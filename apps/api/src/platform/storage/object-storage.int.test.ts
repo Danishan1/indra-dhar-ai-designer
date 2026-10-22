@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { S3ObjectStorage } from './object-storage.js';
 import { AppConfig } from '../config/app-config.js';
+
+import { S3ObjectStorage } from './object-storage.js';
 
 describe('S3ObjectStorage (integration)', () => {
   const config = AppConfig.fromProcessEnv();

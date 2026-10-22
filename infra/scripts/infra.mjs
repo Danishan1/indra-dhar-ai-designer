@@ -8,12 +8,29 @@
  *   node infra/scripts/infra.mjs test-down   stop and remove test services
  */
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const composeFile = join(root, 'infra/compose/docker-compose.dev.yml');
-const TEST_SERVICES = ['postgres-test', 'redis-test', 'objectstore-test'];
+if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
+
+// INFRA_LOCAL_POSTGRES=true → use a PostgreSQL installed on this machine instead of the container.
+const localPostgres = ['true', '1'].includes(
+  (process.env.INFRA_LOCAL_POSTGRES ?? '').toLowerCase(),
+);
+const devProfiles = localPostgres ? [] : ['--profile', 'docker-postgres'];
+const TEST_SERVICES = [
+  'redis-test',
+  'objectstore-test',
+  ...(localPostgres ? [] : ['postgres-test']),
+];
+const testProfiles = [
+  '--profile',
+  'test',
+  ...(localPostgres ? [] : ['--profile', 'test-docker-postgres']),
+];
 
 function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, {
@@ -34,13 +51,17 @@ const [command, ...rest] = process.argv.slice(2);
 
 switch (command) {
   case 'up':
-    compose('up', '-d', '--wait');
+    if (localPostgres)
+      console.log(
+        'INFRA_LOCAL_POSTGRES=true → skipping the PostgreSQL container (using DATABASE_URL).',
+      );
+    compose(...devProfiles, 'up', '-d', '--wait');
     run('pnpm', ['--filter', '@ai-designer/api', 'storage:init']);
     console.log('\nInfrastructure ready. Next: pnpm db:migrate && pnpm db:seed && pnpm dev');
     console.log('Mailpit UI: http://localhost:8025');
     break;
   case 'down':
-    compose('down');
+    compose('--profile', 'docker-postgres', 'down');
     break;
   case 'reset':
     if (!rest.includes('--yes')) {
@@ -49,13 +70,18 @@ switch (command) {
       );
       process.exit(1);
     }
-    compose('down', '-v');
+    compose('--profile', 'docker-postgres', 'down', '-v');
     break;
   case 'test-up':
-    compose('--profile', 'test', 'up', '-d', '--wait', ...TEST_SERVICES);
+    compose(...testProfiles, 'up', '-d', '--wait', ...TEST_SERVICES);
+    if (localPostgres) {
+      console.log(
+        'INFRA_LOCAL_POSTGRES=true → integration tests use AID_IT_DATABASE_URL (database name must end in _test; it is created automatically).',
+      );
+    }
     break;
   case 'test-down':
-    compose('--profile', 'test', 'rm', '-s', '-f', ...TEST_SERVICES);
+    compose(...testProfiles, 'rm', '-s', '-f', ...TEST_SERVICES);
     break;
   default:
     console.error('Usage: infra.mjs <up|down|reset --yes|test-up|test-down>');

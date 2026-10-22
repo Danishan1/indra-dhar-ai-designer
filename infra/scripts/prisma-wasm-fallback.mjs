@@ -23,7 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const apiDir = join(repoRoot, 'apps/api');
+const dbDir = join(repoRoot, 'packages/db');
 const rootEnv = join(repoRoot, '.env');
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
@@ -35,7 +35,7 @@ if (!['diff', 'deploy'].includes(cmd ?? '') || (cmd === 'diff' && !name)) {
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
 
-const require = createRequire(join(apiDir, 'package.json'));
+const require = createRequire(join(dbDir, 'package.json'));
 const engineCommit = JSON.parse(
   readFileSync(
     require.resolve('@prisma/engines-version/package.json', {
@@ -65,13 +65,21 @@ const { SchemaEngine } = await import(
 // 2) pg driver adapter. adapter-pg 7.x cannot map the internal "char" type (OID 18) used by
 //    catalog queries, so load a patched copy that maps it to Text.
 const adapterEntry = require.resolve('@prisma/adapter-pg').replace(/index\.js$/, 'index.mjs');
-const patched = adapterEntry.replace(/index\.mjs$/, 'index.wasm-fallback.mjs');
+const patched = adapterEntry.replace(/index\.mjs$/, 'index.wasm-fallback-v2.mjs');
 if (!existsSync(patched)) {
   const src = readFileSync(adapterEntry, 'utf8');
   const marker = '    case AdditionalScalarColumnType.NAME:';
-  if (!src.includes(marker))
+  const splitter =
+    '    const statements = script.split(";").map((stmt) => stmt.trim()).filter((stmt) => stmt.length > 0);';
+  if (!src.includes(marker) || !src.includes(splitter)) {
     throw new Error('Unexpected @prisma/adapter-pg build; update the fallback patch.');
-  writeFileSync(patched, src.replace(marker, `${marker}\n    case 18:`));
+  }
+  // (a) map OID 18 → Text; (b) run migration scripts as one multi-statement query (the stock
+  // adapter splits on ";", which breaks $$-quoted function bodies used by trigger migrations).
+  writeFileSync(
+    patched,
+    src.replace(marker, `${marker}\n    case 18:`).replace(splitter, '    const statements = [script];'),
+  );
 }
 const { PrismaPg } = await import(pathToFileURL(patched).href);
 const { bindMigrationAwareSqlAdapterFactory } = await import(
@@ -106,9 +114,9 @@ const adapter = bindMigrationAwareSqlAdapterFactory({
   },
 });
 
-const schemaPath = join(apiDir, 'prisma/schema.prisma');
+const schemaPath = join(dbDir, 'prisma/schema.prisma');
 const schema = readFileSync(schemaPath, 'utf8');
-const migDir = join(apiDir, 'prisma/migrations');
+const migDir = join(dbDir, 'prisma/migrations');
 const engine = await SchemaEngine.new(
   { datamodels: [[schemaPath, schema]] },
   () => undefined,

@@ -2,13 +2,9 @@
  * Idempotent seed entrypoint. Split into `platform` (permissions, roles, plans, built-in artifacts…)
  * and `dev` (demo org/users/projects) as later iterations add data (docs/plan/02-conventions.md §7).
  */
-import { PrismaPg } from '@prisma/adapter-pg';
+import { createPrismaClient } from '../../src/client.js';
 
-import { PrismaClient } from '../../src/generated/prisma/client.js';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
+const prisma = createPrismaClient(process.env.DATABASE_URL ?? '');
 
 async function main(): Promise<void> {
   await prisma.schemaMeta.upsert({

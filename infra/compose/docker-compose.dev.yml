@@ -1,6 +1,8 @@
 # Local development & test infrastructure for AI Designer.
 # Usage (from repo root):  pnpm infra:up      (dev services)
 #                          pnpm infra:test:up (isolated services for integration tests)
+# Using a locally installed PostgreSQL instead of the container: set INFRA_LOCAL_POSTGRES=true in .env
+# (see docs/plan/07-environment-setup.md "Using your own PostgreSQL").
 # All ports bind to 127.0.0.1 only (TECH-GDP-001 §8: never expose data services publicly).
 name: ai-designer
 
@@ -10,8 +12,10 @@ x-healthcheck-defaults: &hc
   retries: 20
 
 services:
-  # # ---------------------------------------------------------------- dev profile (default)
+  # ---------------------------------------------------------------- dev profile (default)
+  # Skipped when INFRA_LOCAL_POSTGRES=true in .env (use your own PostgreSQL ≥16 instead).
   # postgres:
+  #   profiles: ['docker-postgres']
   #   image: postgres:17-alpine
   #   environment:
   #     POSTGRES_USER: aid
@@ -60,9 +64,9 @@ services:
       test: ['CMD', '/mailpit', 'readyz']
       <<: *hc
 
-  # # ---------------------------------------------------------------- test profile (ephemeral, tmpfs)
+  # ---------------------------------------------------------------- test profile (ephemeral, tmpfs)
   # postgres-test:
-  #   profiles: ['test']
+  #   profiles: ['test-docker-postgres']
   #   image: postgres:17-alpine
   #   environment:
   #     POSTGRES_USER: aid

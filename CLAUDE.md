@@ -17,7 +17,8 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
   - `iterations/I<NN>-*.md` — what to build in each iteration.
   - `01-architecture.md`, `02-conventions.md`, `03-domain-model.md`, `05-decisions.md` — rules you must follow.
 - `docs/plan/claude-commands/` — source of the `/next-iteration`, `/finish-iteration`, `/handoff` slash commands (copy into `.claude/commands/`; I01 does this).
-- Code layout (as it gets created): `apps/web`, `apps/api`, `apps/worker`, `packages/*`, `infra/*`, `tests/*`.
+- Code layout (as it gets created): `apps/web`, `apps/api`, `apps/worker`, `packages/*` (`contracts`, `db`, `logger`, `config`, …), `infra/*`, `tests/*`.
+- `docs/architecture/platform-primitives.md` — **how to use errors, validation, ids, audit, outbox, idempotency, durable jobs.** Read before writing any module.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)
 
@@ -42,12 +43,14 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 
 ## Useful commands (available once the relevant iteration is done)
 
-| Command                                    | Purpose                                           | From    |
-| ------------------------------------------ | ------------------------------------------------- | ------- |
-| `pnpm install`                             | install workspace                                 | I01     |
-| `pnpm dev`                                 | run web + api + worker                            | I01     |
-| `pnpm verify`                              | lint + typecheck + unit tests                     | I01     |
-| `pnpm infra:up` / `infra:down`             | start/stop Postgres, Redis, object store, Mailpit | I02     |
-| `pnpm db:migrate` / `db:seed` / `db:reset` | Prisma migrations & seeds                         | I02/I03 |
-| `pnpm test:integration`                    | integration tests against compose infra           | I03     |
-| `pnpm e2e`                                 | Playwright                                        | I04     |
+| Command                                    | Purpose                                              | From    |
+| ------------------------------------------ | ---------------------------------------------------- | ------- |
+| `pnpm install`                             | install workspace                                    | I01     |
+| `pnpm dev`                                 | run web + api + worker                               | I01     |
+| `pnpm verify`                              | lint + typecheck + unit tests                        | I01     |
+| `pnpm infra:up` / `infra:down`             | start/stop Postgres, Redis, object store, Mailpit    | I02     |
+| `pnpm db:migrate` / `db:seed` / `db:reset` | Prisma migrations & seeds                            | I02/I03 |
+| `pnpm test:integration`                    | integration tests against compose infra              | I02     |
+| `pnpm logs` (`-f`, `--errors`, `api`)      | view local log files in `logs/` (git-ignored)        | ADR-036 |
+| `pnpm api:openapi`                         | regenerate `docs/api/openapi.json` after API changes | I03     |
+| `pnpm e2e`                                 | Playwright                                           | I04     |

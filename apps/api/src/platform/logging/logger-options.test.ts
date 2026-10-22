@@ -13,7 +13,7 @@ function capture() {
       cb();
     },
   });
-  const logger = pino({ redact: { paths: REDACT_PATHS, censor: '[REDACTED]' } }, stream);
+  const logger = pino({ redact: { paths: [...REDACT_PATHS], censor: '[REDACTED]' } }, stream);
   return { logger, lines };
 }
 

@@ -45,4 +45,9 @@ Thumbs.db
 .claude/settings.local.json
 
 # Generated code
-apps/api/src/generated/
+packages/db/src/generated/
+
+# Local application logs (see logs/README.md)
+logs/*
+# logs
+!logs/README.md

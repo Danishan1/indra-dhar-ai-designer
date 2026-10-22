@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { PrismaService } from './prisma.service.js';
 import { AppConfig } from '../config/app-config.js';
+
+import { PrismaService } from './prisma.service.js';
 
 describe('PrismaService (integration)', () => {
   const prisma = new PrismaService(AppConfig.fromProcessEnv());

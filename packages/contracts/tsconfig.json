@@ -1,5 +1,5 @@
 {
   "extends": "@ai-designer/config/tsconfig/library.json",
-  "compilerOptions": { "rootDir": ".", "outDir": "dist", "noEmit": true },
+  "compilerOptions": { "lib": ["ES2023", "DOM"], "rootDir": ".", "outDir": "dist", "noEmit": true },
   "include": ["src/**/*.ts", "vitest.config.ts"]
 }

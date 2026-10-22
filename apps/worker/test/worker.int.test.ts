@@ -7,9 +7,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseWorkerEnv } from '../src/config.js';
 import { startWorker, type WorkerHandle } from '../src/worker.js';
 
-// Test-profile Redis (pnpm infra:test:up). Override with AID_IT_REDIS_URL.
-const REDIS_URL = process.env.AID_IT_REDIS_URL ?? 'redis://localhost:56379';
-
 describe('worker ↔ BullMQ round trip (integration)', () => {
   let handle: WorkerHandle;
   let producerConn: Redis;
@@ -17,13 +14,15 @@ describe('worker ↔ BullMQ round trip (integration)', () => {
   let events: QueueEvents;
 
   beforeAll(async () => {
-    handle = await startWorker(
-      parseWorkerEnv({ REDIS_URL, WORKER_ID: 'it-worker', LOG_LEVEL: 'silent' }),
-      pino({ level: 'silent' }),
-    );
-    producerConn = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+    handle = await startWorker(parseWorkerEnv({ ...process.env, WORKER_ID: 'it-worker' }), {
+      logger: pino({ level: 'silent' }),
+      loops: false,
+    });
+    producerConn = new Redis(process.env.REDIS_URL ?? '', { maxRetriesPerRequest: null });
     queue = new Queue(QueueNames.system, { connection: producerConn });
-    events = new QueueEvents(QueueNames.system, { connection: { url: REDIS_URL } });
+    events = new QueueEvents(QueueNames.system, {
+      connection: { url: process.env.REDIS_URL ?? '' },
+    });
     await events.waitUntilReady();
   });
 

@@ -71,19 +71,19 @@ None.
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Confirm ADR-001/002/005 → Accepted in `05-decisions.md`.
-2. [ ] Create `packages/contracts` (pure TS, zod only); wire into api/web/worker builds.
-3. [ ] Exception filter + zod pipe; map Prisma known errors (unique violation → 409, not found → 404) without leaking SQL.
-4. [ ] `RequestContext` via AsyncLocalStorage; logger mixin adds context fields.
-5. [ ] IDs: uuidv7 helper; `IdSequenceService` with `SELECT … FOR UPDATE` inside transaction; zero-padded format per prefix.
-6. [ ] Audit table + trigger + `AuditService` + redaction utility (shared with logger list).
-7. [ ] Outbox table/service; worker dispatcher loop (configurable interval, batch size, backoff, max attempts → dead letter); consumer registry; `ProcessedEvent` helper.
-8. [ ] Idempotency interceptor + table + cleanup processor.
-9. [ ] Generic `Job`/`JobAttempt` + `JobService.create` (+ outbox `job.queued`), worker `DurableJobProcessor` base; system `noop` job kind for tests.
-10. [ ] Optimistic concurrency helper.
-11. [ ] OpenAPI generation script + snapshot test (fails when API changes without regenerating).
-12. [ ] Example module demonstrating all primitives; document usage in `docs/architecture/platform-primitives.md` (short how-to for later sessions).
-13. [ ] Update `PROGRESS.md`.
+1. [x] Confirm ADR-001/002/005 → Accepted in `05-decisions.md`.
+2. [x] Create `packages/contracts` (pure TS, zod only); wire into api/web/worker builds.
+3. [x] Exception filter + zod pipe; map Prisma known errors (unique violation → 409, not found → 404) without leaking SQL.
+4. [x] `RequestContext` via AsyncLocalStorage; logger mixin adds context fields.
+5. [x] IDs: uuidv7 helper; `IdSequenceService` with `SELECT … FOR UPDATE` inside transaction; zero-padded format per prefix.
+6. [x] Audit table + trigger + `AuditService` + redaction utility (shared with logger list).
+7. [x] Outbox table/service; worker dispatcher loop (configurable interval, batch size, backoff, max attempts → dead letter); consumer registry; `ProcessedEvent` helper.
+8. [x] Idempotency interceptor + table + cleanup processor.
+9. [x] Generic `Job`/`JobAttempt` + `JobService.create` (+ outbox `job.queued`), worker `DurableJobProcessor` base; system `noop` job kind for tests.
+10. [x] Optimistic concurrency helper.
+11. [x] OpenAPI generation script + snapshot test (fails when API changes without regenerating).
+12. [x] Example module demonstrating all primitives; document usage in `docs/architecture/platform-primitives.md` (short how-to for later sessions).
+13. [x] Update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -93,12 +93,12 @@ None.
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — All API errors use the envelope with stable codes and `requestId` (SPEC-006 §14; SPEC-004 ERR-001).
-- [ ] AC2 — Audit records are append-only at the DB level (SPEC-009 FR-SEC-178, NFR-041 of SRS).
-- [ ] AC3 — A state change and its outbox event commit atomically; consumers tolerate duplicates (SPEC-004 EVT-002, SPEC-006 §10.3).
-- [ ] AC4 — Retried mutation with the same `Idempotency-Key` creates no duplicate effect (SPEC-006 AC-013, FR-PRJ-096).
-- [ ] AC5 — A durable job record exists for every enqueued job and is recoverable after worker restart (TECH §3.5; SPEC-004 JOB-001, JOB-009 basics).
-- [ ] AC6 — OpenAPI document generated and snapshot-tested.
+- [x] AC1 — All API errors use the envelope with stable codes and `requestId` (SPEC-006 §14; SPEC-004 ERR-001).
+- [x] AC2 — Audit records are append-only at the DB level (SPEC-009 FR-SEC-178, NFR-041 of SRS).
+- [x] AC3 — A state change and its outbox event commit atomically; consumers tolerate duplicates (SPEC-004 EVT-002, SPEC-006 §10.3).
+- [x] AC4 — Retried mutation with the same `Idempotency-Key` creates no duplicate effect (SPEC-006 AC-013, FR-PRJ-096).
+- [x] AC5 — A durable job record exists for every enqueued job and is recoverable after worker restart (TECH §3.5; SPEC-004 JOB-001, JOB-009 basics).
+- [x] AC6 — OpenAPI document generated and snapshot-tested.
 
 ## 10. Risks & notes
 
@@ -115,7 +115,17 @@ None.
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
+- Completed on: 2026-10-22
+- Sessions used: 1 (same session also delivered ADR-036 local log files and ADR-037 local PostgreSQL option at the owner's request)
 - Deviations from plan:
-- Follow-ups added to backlog:
+  - ADR-038: Prisma schema/migrations/seeds/client moved from `apps/api/prisma` to `packages/db` so the worker shares them; persistence helpers (`nextDisplayId`, `appendOutboxEvent`, `recordAuditEvent`, `withIdempotentConsumer`, `createDurableJob`) live in `packages/db/src/platform` and the API services are thin wrappers that add the RequestContext.
+  - ADR-039: display ids via atomic `INSERT … ON CONFLICT … RETURNING` (not `SELECT … FOR UPDATE`); OpenAPI built from our own `@Endpoint` metadata with `z.toJSONSchema` (no `@nestjs/swagger`); `pnpm api:openapi` regenerates `docs/api/openapi.json`, and a **unit** test (part of `pnpm verify`) fails when it is stale or a route lacks `@Endpoint`.
+  - Worker layout: `src/outbox/dispatcher.ts`, `src/events/consumers.ts`, `src/jobs/{durable-job-processor,handlers}.ts`, `src/maintenance/sweeper.ts`, `src/queues/pipelines.ts` (instead of `processors/` + `framework/`). The durable-job "base class" is a function `runDurableJob` + a kind→handler registry.
+  - A basic recovery sweeper (re-enqueue stale `queued`, recover `running` jobs without heartbeat, delete expired idempotency keys) was built now because AC5 needs it; I21 extends it for AI states (`outcome_unknown` etc.).
+  - Dev-only routes (`/v1/openapi.json`, `/v1/_dev/echo-idempotent`, `/v1/_dev/jobs/:jobId`) are on outside production (`API_DEV_ROUTES`), excluded from the public OpenAPI snapshot. `GET /v1/_dev/jobs/:id` is a stand-in until I21's real job endpoints with authorization.
+  - Error codes seeded per SPEC-006 §14 + SPEC-004 ERR-001 plus `PAYLOAD_TOO_LARGE`; `job.queued`, `job.finished`, `dev.echoed` events.
+- Verification:
+  - `pnpm verify` 24/24 tasks green (api 45 unit tests incl. error mapping per code, zod pipe, request hash, version assertion, OpenAPI snapshot; worker 7; contracts 7; logger 5; web 5; db 1; config 8).
+  - `pnpm test:integration`: api 20 (concurrent display ids unique, per-org sequences, audit UPDATE/DELETE/TRUNCATE rejected, outbox rollback, idempotent replay + `IDEMPOTENCY_CONFLICT`, key released on failure, error envelopes) and worker 11 (exactly-once publish with two racing dispatchers, backoff + dead letter, duplicate delivery processed once, failing consumer retried, job created with no worker completes after start, retries recorded per attempt, permanent failure, sweeper re-enqueue after lost message, abandoned-job recovery, idempotency key cleanup).
+  - Manual: `node dist/main.js` + worker; POST echo → job `JOB-000001` succeeded within ~70 ms; same key different body → 409; log lines carry `requestId`, `correlationId`, `principalType`.
+- Follow-ups: I05 sets `RequestContext.principal`; I06/I07 set `organizationId` and add `permission` to `@Endpoint`; I21 extends job states, SSE and the sweeper.

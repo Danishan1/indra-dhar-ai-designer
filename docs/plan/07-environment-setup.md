@@ -37,7 +37,7 @@ pnpm dev                        # web :3000, api :4000, worker
 pnpm verify                     # lint + typecheck + unit tests
 ```
 
-Dev URLs: web http://localhost:3000 · API liveness http://localhost:4000/v1/health · readiness http://localhost:4000/v1/health/ready · Mailpit http://localhost:8025 · S3 (SeaweedFS) http://localhost:8333. API docs (OpenAPI) arrive in I03.
+Dev URLs: web http://localhost:3000 · API liveness http://localhost:4000/v1/health · readiness http://localhost:4000/v1/health/ready · Mailpit http://localhost:8025 · S3 (SeaweedFS) http://localhost:8333. OpenAPI document http://localhost:4000/v1/openapi.json (dev only; committed snapshot `docs/api/openapi.json`, regenerate with `pnpm api:openapi`).
 
 | Service           | Dev port                                            | Test-profile port (`pnpm infra:test:up`) |
 | ----------------- | --------------------------------------------------- | ---------------------------------------- |
@@ -50,6 +50,18 @@ Useful commands: `pnpm infra:up` (also creates buckets) · `pnpm infra:down` · 
 
 Dev seed users (created in I05/I06 seeds; passwords only in `.env.example` defaults, never real): `owner@demo.local`, `designer@demo.local`, `approver@demo.local`, `billing@demo.local`, `viewer@demo.local`, plus a second org `other-org` for tenant-isolation testing.
 
+### Using your own PostgreSQL (instead of the container)
+
+If PostgreSQL is already installed on your machine (common on Windows, where it also occupies port 5432):
+
+1. In `.env` set `INFRA_LOCAL_POSTGRES=true` and point `DATABASE_URL` at it, e.g. `postgresql://postgres:<password>@localhost:5432/ai_designer`.
+2. For integration tests also set `AID_IT_DATABASE_URL=postgresql://postgres:<password>@localhost:5432/ai_designer_test` (name must end in `_test`; it is created automatically and **wiped** by the tests).
+3. `pnpm infra:up` then starts only Redis, object storage and Mailpit; `pnpm db:migrate` creates the dev database if needed.
+
+### Logs
+
+All apps write to the git-ignored `logs/` folder in development (`logs/api`, `logs/worker`, `logs/web`). View them with `pnpm logs` (`pnpm logs api -f`, `pnpm logs --errors`, `pnpm logs --clear`). Details: [`logs/README.md`](../../logs/README.md).
+
 ## 3. Environment variables
 
 `.env.example` is the canonical list (each iteration appends what it introduces). Groups:
@@ -57,7 +69,10 @@ Dev seed users (created in I05/I06 seeds; passwords only in `.env.example` defau
 | Group                           | Examples                                                                                                                    | Introduced |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | Core                            | `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `API_PORT`, `WEB_PORT`                                                          | I01–I02    |
-| Database                        | `DATABASE_URL`                                                                                                              | I02        |
+| Database                        | `DATABASE_URL`, `INFRA_LOCAL_POSTGRES`                                                                                      | I02        |
+| API platform                    | `IDEMPOTENCY_TTL_HOURS`, `API_DEV_ROUTES`                                                                                   | I03        |
+| Worker                          | `WORKER_CONCURRENCY_*`, `OUTBOX_POLL_INTERVAL_MS`, `OUTBOX_BATCH_SIZE`, `OUTBOX_MAX_ATTEMPTS`, `JOB_*` (sweeper)            | I02–I03    |
+| Logging                         | `LOG_LEVEL`, `LOG_PRETTY`, `LOG_TO_FILE`, `LOG_DIR`, `LOG_FILE_MAX_SIZE`, `LOG_FILE_RETENTION`, `CLIENT_LOGS_ENABLED`       | ADR-036    |
 | Redis                           | `REDIS_URL`                                                                                                                 | I02        |
 | Object storage                  | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET_ASSETS`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`           | I02/I09    |
 | Auth                            | `SESSION_SECRET`, `SESSION_IDLE_TIMEOUT_MIN`, `SESSION_ABSOLUTE_TIMEOUT_H`, `CSRF_SECRET`                                   | I05        |
@@ -65,7 +80,7 @@ Dev seed users (created in I05/I06 seeds; passwords only in `.env.example` defau
 | Secrets                         | `SECRETS_MASTER_KEY` (base64 32 bytes), `SECRETS_MASTER_KEY_VERSION`                                                        | I08/I22    |
 | AI providers (platform-managed) | `AI_<PROVIDER>_API_KEY` — loaded into the encrypted secret store by a seed/admin step, never read directly by business code | I22        |
 | Payments                        | `PAYMENT_PROVIDER`, `PAYMENT_<PROVIDER>_KEY_ID`, `PAYMENT_<PROVIDER>_SECRET`, `PAYMENT_WEBHOOK_SECRET`                      | I32        |
-| Observability                   | `OTEL_EXPORTER_OTLP_ENDPOINT`, `LOG_LEVEL`                                                                                  | I46        |
+| Observability                   | `OTEL_EXPORTER_OTLP_ENDPOINT`                                                                                               | I46        |
 
 Rules: never commit `.env`; real provider keys only on machines that need them; tests use fakes and never need real keys.
 

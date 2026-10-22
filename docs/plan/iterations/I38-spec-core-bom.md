@@ -40,7 +40,7 @@ Introduce the production specification as a **structured data product** (FR-TP �
 
 - `packages/techpack-model/src/{schema,units,lifecycle,bom,material,template}.ts` + tests
 - `apps/api/src/modules/techpack/` — `techpack.module.ts`, `spec.controller.ts`, `spec.service.ts`, `spec.repository.ts`, `template.service.ts`, `bom.service.ts`, `events.ts`
-- `apps/api/prisma/seed/platform/spec-templates.ts`
+- `packages/db/prisma/seed/platform/spec-templates.ts`
 - `apps/web/src/features/techpack/` — spec list, create-spec dialog, spec workspace shell (section nav), style identity form, BOM grid
 - Permission keys added to catalog: `techpack.view`, `techpack.create`, `techpack.edit`, `techpack.view_costing` (others for I43 reserved now: `techpack.review`, `techpack.approve`, `techpack.release`, `techpack.withdraw`, `techpack.distribute`, `techpack.export`)
 

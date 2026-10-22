@@ -1,7 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 
-import { OBJECT_STORAGE, S3ObjectStorage } from './object-storage.js';
 import { AppConfig } from '../config/app-config.js';
+
+import { OBJECT_STORAGE, S3ObjectStorage } from './object-storage.js';
 
 @Global()
 @Module({

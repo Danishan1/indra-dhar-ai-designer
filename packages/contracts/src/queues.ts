@@ -7,6 +7,10 @@ import { z } from 'zod';
 export const QueueNames = {
   /** Infrastructure/system jobs (ping, maintenance). */
   system: 'system',
+  /** Domain events published from the transactional outbox (payload: event envelope). */
+  events: 'events',
+  /** Durable jobs (payload: { jobId } — state lives in the jobs table). */
+  jobs: 'jobs',
 } as const;
 
 export type QueueName = (typeof QueueNames)[keyof typeof QueueNames];

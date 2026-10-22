@@ -1,3 +1,5 @@
+import { applyIntegrationEnv, TEST_DATABASE_URL, TEST_REDIS_URL } from '@ai-designer/db/testing';
+
 /**
  * Defaults for integration tests: the isolated compose `test` profile
  * (`pnpm infra:test:up`): postgres :55432, redis :56379, object store :58333.
@@ -5,8 +7,9 @@
 export const TEST_ENV: Record<string, string> = {
   NODE_ENV: 'test',
   LOG_LEVEL: 'silent',
-  DATABASE_URL: 'postgresql://aid:aid_test_password@localhost:55432/ai_designer_test',
-  REDIS_URL: 'redis://localhost:56379',
+  LOG_TO_FILE: 'false',
+  DATABASE_URL: TEST_DATABASE_URL,
+  REDIS_URL: TEST_REDIS_URL,
   S3_ENDPOINT: 'http://localhost:58333',
   S3_REGION: 'us-east-1',
   S3_ACCESS_KEY_ID: 'aid-dev-access-key',
@@ -19,10 +22,8 @@ export const TEST_ENV: Record<string, string> = {
 
 /**
  * Forces the test-profile values so integration tests can never touch the dev database.
- * Override a single value with AID_IT_<KEY> (e.g. AID_IT_DATABASE_URL in CI).
+ * Override a single value with AID_IT_<KEY> (shell or root .env), e.g. AID_IT_DATABASE_URL.
  */
 export function applyTestEnv(): void {
-  for (const [key, value] of Object.entries(TEST_ENV)) {
-    process.env[key] = process.env[`AID_IT_${key}`] ?? value;
-  }
+  applyIntegrationEnv(TEST_ENV);
 }

@@ -26,13 +26,15 @@
     "infra:init": "pnpm --filter @ai-designer/api storage:init",
     "infra:test:up": "node infra/scripts/infra.mjs test-up",
     "infra:test:down": "node infra/scripts/infra.mjs test-down",
-    "db:migrate": "pnpm --filter @ai-designer/api db:migrate",
-    "db:deploy": "pnpm --filter @ai-designer/api db:deploy",
-    "db:reset": "pnpm --filter @ai-designer/api db:reset",
-    "db:seed": "pnpm --filter @ai-designer/api db:seed",
-    "db:studio": "pnpm --filter @ai-designer/api db:studio",
-    "db:generate": "pnpm --filter @ai-designer/api prisma:generate",
-    "db:migrate:fallback": "node --no-warnings infra/scripts/prisma-wasm-fallback.mjs"
+    "db:migrate": "pnpm --filter @ai-designer/db db:migrate",
+    "db:deploy": "pnpm --filter @ai-designer/db db:deploy",
+    "db:reset": "pnpm --filter @ai-designer/db db:reset",
+    "db:seed": "pnpm --filter @ai-designer/db db:seed",
+    "db:studio": "pnpm --filter @ai-designer/db db:studio",
+    "db:generate": "pnpm --filter @ai-designer/db prisma:generate",
+    "db:migrate:fallback": "node --no-warnings infra/scripts/prisma-wasm-fallback.mjs",
+    "logs": "node infra/scripts/logs.mjs",
+    "api:openapi": "pnpm --filter @ai-designer/api openapi:generate"
   },
   "devDependencies": {
     "@ai-designer/config": "workspace:*",

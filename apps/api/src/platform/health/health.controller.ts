@@ -1,8 +1,11 @@
+import { livenessSchema, readinessSchema } from '@ai-designer/contracts';
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 
-import { HealthService, type ReadinessReport } from './health.service.js';
 import { AppConfig } from '../config/app-config.js';
+import { Endpoint } from '../validation/endpoint.js';
+
+import { HealthService, type ReadinessReport } from './health.service.js';
 
 export interface LivenessResponse {
   status: 'ok';
@@ -20,6 +23,7 @@ export class HealthController {
 
   /** Liveness: the process is up. Public. */
   @Get()
+  @Endpoint({ summary: 'Liveness probe', tags: ['health'], response: livenessSchema })
   liveness(): LivenessResponse {
     return {
       status: 'ok',
@@ -31,6 +35,12 @@ export class HealthController {
 
   /** Readiness: dependencies reachable. 503 when degraded. Public. */
   @Get('ready')
+  @Endpoint({
+    summary: 'Readiness probe (503 when a dependency is down)',
+    tags: ['health'],
+    response: readinessSchema,
+    errors: ['DEPENDENCY_UNAVAILABLE'],
+  })
   async readiness(@Res({ passthrough: true }) res: Response): Promise<ReadinessReport> {
     const report = await this.health.readiness();
     if (report.status !== 'ok') res.status(HttpStatus.SERVICE_UNAVAILABLE);

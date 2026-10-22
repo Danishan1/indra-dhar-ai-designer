@@ -38,7 +38,7 @@ Give every specification a structured, unit-safe measurement table: points of me
 
 - `packages/techpack-model/src/{measurement,pom,tolerance,grading,unit-conversion}.ts` + tests
 - `apps/api/src/modules/techpack/{measurement.service.ts, pom-library.service.ts, grading.service.ts}` and controller routes
-- `apps/api/prisma/seed/platform/pom-libraries.ts`
+- `packages/db/prisma/seed/platform/pom-libraries.ts`
 - `apps/web/src/features/techpack/measurements/` — table grid, grade-rule editor, tolerance editor, POM diagram annotator, CSV import dialog
 
 ## 4. Data model changes
