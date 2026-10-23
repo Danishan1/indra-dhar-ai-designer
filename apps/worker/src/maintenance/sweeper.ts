@@ -12,12 +12,13 @@ export interface SweepResult {
   recovered: number;
   failed: number;
   expiredIdempotencyKeys: number;
+  expiredInvitations: number;
 }
 
 /**
  * Periodic recovery (ADR-023): re-enqueues `queued` jobs whose queue message was lost, returns
  * abandoned `running` jobs (no heartbeat, e.g. the worker crashed) to `queued` — or `failed` when
- * out of attempts — and deletes expired idempotency keys.
+ * out of attempts — deletes expired idempotency keys and marks expired invitations.
  */
 export class MaintenanceSweeper {
   private timer: NodeJS.Timeout | undefined;
@@ -78,8 +79,20 @@ export class MaintenanceSweeper {
       where: { expiresAt: { lt: new Date(now) } },
     });
 
-    const result = { requeued: queued.length, recovered, failed, expiredIdempotencyKeys };
-    if (queued.length || recovered || failed || expiredIdempotencyKeys) {
+    // Organization invitations past their expiry (I06); acceptance already rejects them lazily.
+    const { count: expiredInvitations } = await this.prisma.invitation.updateMany({
+      where: { status: 'pending', expiresAt: { lt: new Date(now) } },
+      data: { status: 'expired' },
+    });
+
+    const result = {
+      requeued: queued.length,
+      recovered,
+      failed,
+      expiredIdempotencyKeys,
+      expiredInvitations,
+    };
+    if (queued.length || recovered || failed || expiredIdempotencyKeys || expiredInvitations) {
       this.logger.info({ ...result, sweepId: newId() }, 'maintenance sweep');
     }
     return result;

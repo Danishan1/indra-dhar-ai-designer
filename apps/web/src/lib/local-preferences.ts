@@ -6,6 +6,8 @@ export const PreferenceKeys = {
   theme: 'aid.theme',
   sidebarCollapsed: 'aid.sidebar.collapsed',
   editorLayoutPrefix: 'aid.editor.layout',
+  /** Last selected organization id (re-validated against my memberships on every load). */
+  activeOrganization: 'aid.activeOrg',
 } as const;
 
 export function readPreference(key: string): string | null {

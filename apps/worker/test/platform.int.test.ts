@@ -293,5 +293,45 @@ describe('outbox, consumers and durable jobs (integration)', () => {
       });
       expect((await handle!.sweeper.sweepOnce()).expiredIdempotencyKeys).toBeGreaterThanOrEqual(1);
     });
+
+    it('the sweeper marks pending invitations past their expiry as expired', async () => {
+      const orgId = newId();
+      await prisma.organization.create({
+        data: {
+          id: orgId,
+          displayId: `ORG-${orgId.slice(0, 8)}`,
+          name: 'Sweep Org',
+          slug: `sweep-${orgId}`,
+          createdBy: newId(),
+        },
+      });
+      const base = { organizationId: orgId, proposedRoleIds: [], invitedBy: newId() };
+      const expired = await prisma.invitation.create({
+        data: {
+          ...base,
+          id: newId(),
+          email: `a-${orgId}@example.com`,
+          tokenHash: `h-${newId()}`,
+          expiresAt: new Date(Date.now() - 1000),
+        },
+      });
+      const fresh = await prisma.invitation.create({
+        data: {
+          ...base,
+          id: newId(),
+          email: `b-${orgId}@example.com`,
+          tokenHash: `h-${newId()}`,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      expect((await handle!.sweeper.sweepOnce()).expiredInvitations).toBeGreaterThanOrEqual(1);
+      const after = await prisma.invitation.findMany({
+        where: { id: { in: [expired.id, fresh.id] } },
+      });
+      expect(Object.fromEntries(after.map((i) => [i.id, i.status]))).toEqual({
+        [expired.id]: 'expired',
+        [fresh.id]: 'pending',
+      });
+    });
   });
 });

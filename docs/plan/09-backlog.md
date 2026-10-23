@@ -38,3 +38,10 @@ _(Append: date — source iteration — item — reason)_
 - Compromised-password check on register/reset/change (FR-SEC-019, SHOULD): HIBP range API (k-anonymity) behind a pluggable `PasswordBreachChecker`, fail-open with audit. → I08 or I47.
 - Worker sweep for expired `verification_tokens` and expired `sessions` rows. → I08 (session management).
 - Hashed session tokens at rest once Better Auth supports it (ADR-006 gap 1). → watch per Better Auth upgrade.
+
+## From I06 (2026-10-23)
+
+- Short-TTL membership cache invalidated by `organizations.membership_*` events — only if profiling shows the per-request membership query matters (NFR-SEC-007). → I07 or later.
+- Workspace UI and workspace-scoped role grants (schema exists, ADR-017). → when a customer needs it.
+- Invitation for an email without an account: sign-up link with the email prefilled and an automatic return to the invitation. → I47 (UX polish).
+- Platform-admin organization suspension/deletion (never ownership takeover, FR-SEC-083). → I45.

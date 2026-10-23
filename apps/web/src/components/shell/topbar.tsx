@@ -1,11 +1,10 @@
 'use client';
 
-import { Building2Icon, ChevronsUpDownIcon, SearchIcon } from 'lucide-react';
+import { SearchIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { UserMenu } from '@/features/auth/user-menu';
+import { OrgSwitcher } from '@/features/organizations/org-switcher';
 import { formatCombo } from '@/lib/shortcuts';
 
 import { ThemeMenu } from './theme-menu';
@@ -13,23 +12,7 @@ import { ThemeMenu } from './theme-menu';
 export function Topbar({ onOpenSearch }: { onOpenSearch: () => void }) {
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b bg-panel px-3">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {/* Organization switching arrives in I06. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-            aria-label="Organization (arrives in I06)"
-            aria-disabled
-          >
-            <Building2Icon aria-hidden />
-            <span className="text-[13px]">No organization</span>
-            <ChevronsUpDownIcon className="size-3.5 opacity-60" aria-hidden />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Organizations arrive in I06</TooltipContent>
-      </Tooltip>
+      <OrgSwitcher />
 
       <button
         type="button"

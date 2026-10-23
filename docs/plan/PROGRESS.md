@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I06 — Organizations, memberships & invitations** (next)                                            |
+| **Current iteration** | **I07 — Authorization engine & tenant isolation** (next)                                             |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-22 (I05 finished)                                                                            |
+| Last updated          | 2026-10-23 (I06 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -25,7 +25,7 @@
 | I03 | Platform primitives                                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | ADR-038 packages/db, ADR-039                          |
 | I04 | Web app shell & design system                         | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | → M1 reached; ADR-040                                 |
 | I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                |
-| I06 | Organizations, memberships & invitations              | 1     | todo   |            |            |          |                                                       |
+| I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                   |
 | I07 | Authorization engine & tenant isolation               | 1     | todo   |            |            |          |                                                       |
 | I08 | MFA, step-up, sessions & security audit               | 1     | todo   |            |            |          | → M2                                                  |
 | I09 | Asset & storage service                               | 2     | todo   |            |            |          |                                                       |
@@ -101,11 +101,13 @@
 _(Claude lists here any Open ADR it resolved with a default while the owner was unavailable.)_
 
 - ADR-021 — object storage: SeaweedFS chosen by default (2026-10-22, I02).
+- ADR-017 — organization + one default workspace; workspace UI deferred (2026-10-23, I06).
 
 ## Deviations from plan
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-23 — I06 — path-scoped org context (`@OrgAccess`), invitation tokens only in request bodies (`POST /v1/invitations/preview`), placeholder roles until I07 — ADR-041
 - 2026-10-22 — between I02/I03 — local log files (`logs/`, `pnpm logs`) and local PostgreSQL option, at owner's request — ADR-036, ADR-037
 - 2026-10-22 — I05 — Better Auth embedded behind our controllers; Origin-based CSRF; accepted gaps (unhashed session tokens, non-atomic audit) — ADR-006, docs/architecture/identity.md
 - 2026-10-22 — I04 — shadcn components hand-written (registry blocked), Playwright as `tests/e2e` package — ADR-040
@@ -114,6 +116,13 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-23 — I06 Organizations, memberships & invitations (session 1) — DONE
+
+- Built: `organizations`/`workspaces`/`roles`/`memberships`/`membership_roles`/`invitations` (migration `…_i06_organizations`: partial unique indexes for live membership, default workspace, pending invitation; status CHECKs; seeded placeholder roles); `organizations` module (create in one tx, list mine, rename, members suspend/reactivate/revoke with last-owner protection, invitations create/list/cancel/resend/preview/accept, ownership transfer), `@OrgAccess()` guard; worker sweeper expires invitations; web onboarding, org switcher, Settings → General / Members, invitation acceptance page.
+- Tests: api unit 63, integration api 43 + worker 12, e2e 15.
+- **Owner actions (Windows):** `pnpm install`, `pnpm db:migrate` (adds the organization tables and seeds the three roles), `pnpm dev`. Existing accounts will be sent to **/onboarding** to create their first organization. To try invitations: Settings → Members → Invite, then open the email in Mailpit (http://localhost:8025) in another browser/profile.
+- **Next step:** I07 — authorization engine & permission catalog; replace `@OrgAccess(...roles)` role lists with permissions (see I06 completion record and ADR-041).
 
 ### 2026-10-22 — I05 Accounts & authentication (session 1) — DONE
 

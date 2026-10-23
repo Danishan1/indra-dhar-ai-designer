@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { E2E_PASSWORD, resetRateLimits, uniqueEmail } from '../support/accounts.js';
 import { linkFrom, waitForEmailText } from '../support/mailpit.js';
+import { createOrganizationInOnboarding } from '../support/ui.js';
 
 // These run signed out (own empty storage state).
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -33,6 +34,7 @@ test('sign up → confirm email → sign in → sign out (AC1)', async ({ page }
 
   await page.getByLabel('Password', { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await createOrganizationInOnboarding(page);
   await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
   const cookie = (await page.context().cookies()).find((c) => c.name === '__Host-aid_session');
   expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax' });
@@ -52,13 +54,16 @@ test('returnTo brings the user back after sign-in and ignores external URLs', as
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/onboarding');
 
   await page.context().clearCookies();
   await page.goto('/library');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  // No organization yet: onboarding keeps returnTo and continues there afterwards.
+  await expect(page).toHaveURL(/\/onboarding\?returnTo=%2Flibrary$/);
+  await createOrganizationInOnboarding(page);
   await expect(page).toHaveURL(/\/library$/);
 });
 
@@ -85,5 +90,5 @@ test('forgot password → reset → sign in with the new password', async ({ pag
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(newPassword);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Welcome/ })).toBeVisible();
 });

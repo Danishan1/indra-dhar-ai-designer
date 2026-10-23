@@ -64,6 +64,19 @@ export class AccountService {
     });
   }
 
+  /** Public profile fields for other modules (organizations) — they never read `users` directly. */
+  async getProfiles(
+    userIds: readonly string[],
+  ): Promise<Map<string, { displayName: string; email: string; status: string }>> {
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(userIds)] } },
+      select: { id: true, displayName: true, email: true, status: true },
+    });
+    return new Map(
+      users.map((u) => [u.id, { displayName: u.displayName, email: u.email, status: u.status }]),
+    );
+  }
+
   async getMe(userId: string): Promise<Me> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError('UNAUTHENTICATED', 'Not signed in');

@@ -82,14 +82,14 @@ Events: `OrganizationCreated`, `InvitationCreated`, `InvitationAccepted`, `Invit
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Models + migration; partial unique index for active membership.
-2. [ ] `OrganizationService.create` (org + default workspace + owner membership + audit + outbox in one tx).
-3. [ ] Organization context middleware (validates `active` membership for the requested org; revoked/suspended → 404/403 per conventions).
-4. [ ] Invitation service (create/resend/cancel/accept; atomic consume; expiry job marks `expired`).
-5. [ ] Membership management with last-owner protection and ownership transfer.
-6. [ ] Controllers + contracts.
-7. [ ] Web onboarding, switcher, members page, acceptance page.
-8. [ ] Tests; update `PROGRESS.md`.
+1. [x] Models + migration; partial unique index for active membership.
+2. [x] `OrganizationService.create` (org + default workspace + owner membership + audit + outbox in one tx).
+3. [x] Organization context middleware (validates `active` membership for the requested org; revoked/suspended → 404/403 per conventions).
+4. [x] Invitation service (create/resend/cancel/accept; atomic consume; expiry job marks `expired`).
+5. [x] Membership management with last-owner protection and ownership transfer.
+6. [x] Controllers + contracts.
+7. [x] Web onboarding, switcher, members page, acceptance page.
+8. [x] Tests; update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -99,11 +99,11 @@ Events: `OrganizationCreated`, `InvitationCreated`, `InvitationAccepted`, `Invit
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — A registered user cannot access an organization without valid membership (AC-SEC-001; FR-SEC-069).
-- [ ] AC2 — Invitations are org-scoped, single-use, expiring, cancellable, and audited (FR-SEC-072…078).
-- [ ] AC3 — Suspended/revoked memberships cannot perform org-scoped actions (FR-SEC-070).
-- [ ] AC4 — The last owner cannot be removed; ownership transfer is explicit and audited (FR-SEC-080, 081).
-- [ ] AC5 — Tenant id is derived from trusted context + verified membership, never trusted blindly from client input (FR-SEC-217).
+- [x] AC1 — A registered user cannot access an organization without valid membership (AC-SEC-001; FR-SEC-069).
+- [x] AC2 — Invitations are org-scoped, single-use, expiring, cancellable, and audited (FR-SEC-072…078).
+- [x] AC3 — Suspended/revoked memberships cannot perform org-scoped actions (FR-SEC-070).
+- [x] AC4 — The last owner cannot be removed; ownership transfer is explicit and audited (FR-SEC-080, 081).
+- [x] AC5 — Tenant id is derived from trusted context + verified membership, never trusted blindly from client input (FR-SEC-217).
 
 ## 10. Risks & notes
 
@@ -118,7 +118,20 @@ Events: `OrganizationCreated`, `InvitationCreated`, `InvitationAccepted`, `Invit
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-23
+- Sessions used: 1 (estimate 2)
+- Deviations from plan (ADR-041 unless noted):
+  - Invitation preview is `POST /v1/invitations/preview` (token in body), not `GET /v1/invitations/{token}` — tokens stay out of URLs/access logs. The web page `/invitations/accept?token=` reads the token client-side and posts it.
+  - Org context comes from the path (`@OrgAccess()` guard), not a header/middleware; membership is checked live per request, no cache (one indexed query; add a cache with outbox invalidation only if profiling asks for it).
+  - Placeholder roles `organization_owner` / `organization_admin` / `designer` seeded with fixed ids and a rank; rules: owner manages everyone, admin manages designers only, nobody grants above their own rank, ownership only via transfer. I07 replaces them with the permission catalog.
+  - Extra endpoint `POST /v1/orgs/{orgId}/members/{membershipId}/reactivate` (suspend is reversible, FR-SEC-070).
+  - Ownership transfer requires typing the organization name (step-up added in I08); the previous owner becomes admin.
+  - New error codes `LAST_OWNER_REQUIRED` (409), `INVITATION_EMAIL_MISMATCH` (403). Event names use the `organizations.*` namespace (`organization_created`, `invitation_created|accepted|cancelled`, `membership_suspended|reactivated|revoked`, `ownership_transferred`).
+  - Expiry: acceptance rejects lazily; the worker sweeper marks `pending` past `expires_at` as `expired`.
+  - Web: `/onboarding` (route group `(setup)`, signed in, no org needed) keeps `returnTo`; settings got a sub-nav (General / Members).
+  - Sandbox tooling: the WASM migration fallback maps the pg internal `"char"` type (OID 18) to Character so CHECK constraints can be described.
+- Verification:
+  - `pnpm verify` green; api unit 63 (last-owner invariant, membership state machine, grant limits, invitation expiry + token hashing, slugs).
+  - `pnpm test:integration`: api 43 (organizations 10: create → owner + default workspace + audit + event; invite → accept with matching verified email; mismatched email / cancelled / expired / replayed rejected; resend rotates the token; org-domain registration gives no access; suspended 403 / revoked 404 on next request; placeholder role limits; last owner protection + audited transfer; cross-tenant 404), worker 12 (sweeper expires invitations).
+  - `pnpm e2e` 15/15 (setup creates the org via onboarding; new spec: owner invites → designer accepts via the email link after sign-in → sees members without manage rights → creates own org and switches back).
+- Follow-ups added to backlog: membership cache with outbox invalidation (only if needed); workspace UI; invitation email for an address without an account could deep-link to sign-up with the email prefilled; org deletion/suspension by platform admin (I45).

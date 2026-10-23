@@ -9,3 +9,6 @@ docs/api/openapi.json
 # contains verbatim code snippets matched against Prisma internals — do not reformat
 infra/scripts/prisma-wasm-fallback.mjs
 apps/web/next-env.d.ts
+# Playwright artifacts (git-ignored)
+tests/e2e/.auth/
+tests/e2e/test-results/

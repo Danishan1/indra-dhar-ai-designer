@@ -25,7 +25,7 @@ export const PRIMARY_NAV: NavItem[] = [
 
 export const SECONDARY_NAV: NavItem[] = [
   { href: '/billing', label: 'Billing', icon: CreditCardIcon, arrives: 'I30' },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, arrives: 'I05–I08' },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon },
   { href: '/admin', label: 'Admin', icon: ShieldIcon, arrives: 'I45' },
   { href: '/system', label: 'System status', icon: ActivityIcon },
 ];

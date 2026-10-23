@@ -1,15 +1,9 @@
 import type { Metadata } from 'next';
 
-import { PlaceholderPage } from '@/components/shell/placeholder-page';
+import { GeneralSettings } from '@/features/organizations/general-settings';
 
-export const metadata: Metadata = { title: 'Settings' };
+export const metadata: Metadata = { title: 'Organization settings' };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Settings"
-      description="Your account, security and organization settings."
-      arrives="I05–I08"
-    />
-  );
+  return <GeneralSettings />;
 }

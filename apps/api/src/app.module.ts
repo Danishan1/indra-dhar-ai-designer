@@ -2,6 +2,7 @@ import { type DynamicModule, Module } from '@nestjs/common';
 
 import { DevExamplesModule } from './modules/dev-examples/dev-examples.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { OrganizationsModule } from './modules/organizations/organizations.module.js';
 import { type AppConfig } from './platform/config/app-config.js';
 import { AppConfigModule } from './platform/config/config.module.js';
 import { HealthModule } from './platform/health/health.module.js';
@@ -17,7 +18,7 @@ import { RedisModule } from './platform/redis/redis.module.js';
 import { StorageModule } from './platform/storage/storage.module.js';
 
 /** Business modules (I05+) are appended here. */
-const FEATURE_MODULES: DynamicModule['imports'] = [IdentityModule];
+const FEATURE_MODULES: DynamicModule['imports'] = [IdentityModule, OrganizationsModule];
 
 @Module({})
 export class AppModule {

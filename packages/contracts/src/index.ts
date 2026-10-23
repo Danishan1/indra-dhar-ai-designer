@@ -6,6 +6,7 @@ export * from './events/platform-events.js';
 export * from './identity/index.js';
 export * from './ids.js';
 export * from './jobs.js';
+export * from './organizations/index.js';
 export * from './pagination.js';
 export * from './permissions.js';
 export * from './queues.js';

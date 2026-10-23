@@ -38,6 +38,13 @@ fetching or config code, read the matching guide in `apps/web/node_modules/next/
 - Redirect targets go through `safeReturnTo()` (same-origin paths only). Details: `docs/architecture/identity.md`.
 - Auth forms use React Hook Form + `zodResolver` with the contract schemas and `meta: { silent: true }` mutations (inline errors instead of toasts).
 
+## Organizations
+
+- `(app)` layout wraps the shell in `OrganizationProvider`: `useOrganization()` → `{ organizations, active, setActive, hasRole }`. A user without an active membership is sent to `/onboarding?returnTo=…` (route group `(setup)`).
+- The active org id is a local preference (`aid.activeOrg`) re-validated against `GET /v1/orgs`; it is never trusted by the API — org-scoped calls put it in the path (`/v1/orgs/${active.id}/…`).
+- Org-scoped query keys start with `queryKeys.org(orgId)`; switching org removes other orgs' cached queries.
+- `hasRole()` only hides UI; the API enforces. I07 replaces it with permissions.
+
 ## API access
 
 - The browser calls the API **same-origin** at `/v1/*`; `next.config.ts` rewrites it to `API_BASE_URL`

@@ -58,6 +58,12 @@ if (!existsSync(join(cacheDir, 'package/schema_engine.js'))) {
     .trim();
   execFileSync('tar', ['xzf', tgz], { cwd: cacheDir });
 }
+// Surface WASM panic messages (the engine expects this registry to exist).
+globalThis.PRISMA_WASM_PANIC_REGISTRY ??= {
+  set_message(message) {
+    console.error(`[schema-engine panic] ${message}`);
+  },
+};
 const { SchemaEngine } = await import(
   pathToFileURL(join(cacheDir, 'package/schema_engine.js')).href
 );
@@ -65,20 +71,21 @@ const { SchemaEngine } = await import(
 // 2) pg driver adapter. adapter-pg 7.x cannot map the internal "char" type (OID 18) used by
 //    catalog queries, so load a patched copy that maps it to Text.
 const adapterEntry = require.resolve('@prisma/adapter-pg').replace(/index\.js$/, 'index.mjs');
-const patched = adapterEntry.replace(/index\.mjs$/, 'index.wasm-fallback-v2.mjs');
+const patched = adapterEntry.replace(/index\.mjs$/, 'index.wasm-fallback-v3.mjs');
 if (!existsSync(patched)) {
   const src = readFileSync(adapterEntry, 'utf8');
-  const marker = '    case AdditionalScalarColumnType.NAME:';
+  const marker = '    case ScalarColumnType.BPCHAR:';
   const splitter =
     '    const statements = script.split(";").map((stmt) => stmt.trim()).filter((stmt) => stmt.length > 0);';
   if (!src.includes(marker) || !src.includes(splitter)) {
     throw new Error('Unexpected @prisma/adapter-pg build; update the fallback patch.');
   }
-  // (a) map OID 18 → Text; (b) run migration scripts as one multi-statement query (the stock
+  // (a) map OID 18 ("char", used by pg_catalog e.g. constraint types) → Character (the schema
+  // describer reads it as char — Text makes CHECK constraints panic); (b) run migration scripts as one multi-statement query (the stock
   // adapter splits on ";", which breaks $$-quoted function bodies used by trigger migrations).
   writeFileSync(
     patched,
-    src.replace(marker, `${marker}\n    case 18:`).replace(splitter, '    const statements = [script];'),
+    src.replace(marker, `    case 18:\n      return ColumnTypeEnum.Character;\n${marker}`).replace(splitter, '    const statements = [script];'),
   );
 }
 const { PrismaPg } = await import(pathToFileURL(patched).href);

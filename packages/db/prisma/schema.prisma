@@ -241,3 +241,117 @@ model VerificationToken {
   @@index([value])
   @@map("verification_tokens")
 }
+
+// ---------------------------------------------------------------- organizations (I06, ADR-017)
+
+/// Tenant boundary (FR-SEC-060/061). display_id ORG-000123 is platform-unique.
+model Organization {
+  id          String         @id @db.Uuid
+  displayId   String         @unique @map("display_id")
+  name        String
+  slug        String         @unique
+  /// active | suspended | deleted
+  status      String         @default("active")
+  /// Continuity rule (FR-SEC-079): at least one active owner at all times.
+  ownerPolicy String         @default("at_least_one_owner") @map("owner_policy")
+  settings    Json           @default("{}")
+  createdBy   String         @map("created_by") @db.Uuid
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspaces  Workspace[]
+  memberships Membership[]
+  invitations Invitation[]
+
+  @@map("organizations")
+}
+
+/// Optional sub-scope inside an organization (ADR-017). Schema + default workspace only; UI later.
+model Workspace {
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String
+  status         String       @default("active")
+  isDefault      Boolean      @default(false) @map("is_default")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("workspaces")
+}
+
+/// System roles (placeholder catalog, I06); I07 adds permissions and org-defined roles.
+model Role {
+  id          String           @id @db.Uuid
+  key         String           @unique
+  name        String
+  description String           @default("")
+  /// Higher = more authority; inviters cannot grant above their own rank (FR-SEC-076, placeholder).
+  rank        Int
+  isSystem    Boolean          @default(true) @map("is_system")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  memberships MembershipRole[]
+
+  @@map("roles")
+}
+
+/// One record per user–organization relationship (FR-SEC-067). Ended memberships are kept for
+/// history (FR-SEC-071); re-joining creates a new row. At most one active/suspended row per pair.
+model Membership {
+  id             String           @id @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  /// invited | active | suspended | revoked | expired
+  status         String
+  invitedBy      String?          @map("invited_by") @db.Uuid
+  invitationId   String?          @map("invitation_id") @db.Uuid
+  joinedAt       DateTime?        @map("joined_at") @db.Timestamptz(6)
+  endedAt        DateTime?        @map("ended_at") @db.Timestamptz(6)
+  endReason      String?          @map("end_reason")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles          MembershipRole[]
+
+  @@index([userId])
+  @@index([organizationId, status])
+  @@map("memberships")
+}
+
+model MembershipRole {
+  membershipId String     @map("membership_id") @db.Uuid
+  roleId       String     @map("role_id") @db.Uuid
+  grantedBy    String?    @map("granted_by") @db.Uuid
+  grantedAt    DateTime   @default(now()) @map("granted_at") @db.Timestamptz(6)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id])
+
+  @@id([membershipId, roleId])
+  @@map("membership_roles")
+}
+
+/// Org-scoped, single-use, expiring invitation (FR-SEC-072…077). Token stored as SHA-256 only.
+model Invitation {
+  id              String       @id @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  email           String
+  proposedRoleIds String[]     @map("proposed_role_ids") @db.Uuid
+  tokenHash       String       @unique @map("token_hash")
+  /// pending | accepted | cancelled | expired
+  status          String       @default("pending")
+  invitedBy       String       @map("invited_by") @db.Uuid
+  expiresAt       DateTime     @map("expires_at") @db.Timestamptz(6)
+  lastSentAt      DateTime     @default(now()) @map("last_sent_at") @db.Timestamptz(6)
+  sendCount       Int          @default(1) @map("send_count")
+  acceptedAt      DateTime?    @map("accepted_at") @db.Timestamptz(6)
+  acceptedBy      String?      @map("accepted_by") @db.Uuid
+  cancelledAt     DateTime?    @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy     String?      @map("cancelled_by") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([email, status])
+  @@map("invitations")
+}
