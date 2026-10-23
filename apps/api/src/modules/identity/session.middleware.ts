@@ -8,7 +8,10 @@ import { PrismaService } from '../../platform/prisma/prisma.service.js';
 import type { BetterAuthInstance } from './better-auth.js';
 import { BETTER_AUTH } from './better-auth.provider.js';
 import { forwardSetCookies, onlySessionCookies, toFetchHeaders } from './http.js';
-import './request-auth.js';
+import '../../platform/auth/request-auth.js';
+
+/** How long a password-only (second factor outstanding) session may wait for the code. */
+export const MFA_PENDING_TTL_MS = 10 * 60_000;
 
 /**
  * Resolves the session cookie into `RequestContext.principal` + `req.auth` on every request.
@@ -50,8 +53,37 @@ export class SessionMiddleware implements NestMiddleware {
             `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${this.config.env.AUTH_COOKIE_SECURE ? '; Secure' : ''}`,
           );
         } else {
-          req.auth = { userId: user.id, sessionId: session.id };
-          RequestContext.patch({ principal: { type: 'human', id: user.id } });
+          const extra = session as {
+            authAssurance?: string | null;
+            mfaVerifiedAt?: Date | string | null;
+            stepUpAt?: Date | string | null;
+            updatedAt?: Date | string;
+            createdAt?: Date | string;
+          };
+          const assurance =
+            extra.authAssurance === 'mfa_pending' || extra.authAssurance === 'mfa_verified'
+              ? extra.authAssurance
+              : 'password';
+          const createdAt = new Date(extra.createdAt ?? Date.now());
+          const pending = assurance === 'mfa_pending';
+          if (pending && Date.now() - createdAt.getTime() > MFA_PENDING_TTL_MS) {
+            // Half-finished sign-in left too long: discard it.
+            await this.prisma.session.deleteMany({ where: { id: session.id } });
+            next();
+            return;
+          }
+          req.auth = {
+            userId: user.id,
+            sessionId: session.id,
+            assurance,
+            pending,
+            createdAt,
+            lastSeenAt: new Date(extra.updatedAt ?? createdAt),
+            mfaVerifiedAt: extra.mfaVerifiedAt ? new Date(extra.mfaVerifiedAt) : null,
+            stepUpAt: extra.stepUpAt ? new Date(extra.stepUpAt) : null,
+          };
+          // A session waiting for its second factor is NOT authenticated for anything else.
+          if (!pending) RequestContext.patch({ principal: { type: 'human', id: user.id } });
         }
       }
     } catch (err) {

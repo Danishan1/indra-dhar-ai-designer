@@ -27,9 +27,18 @@ export interface AuthzRequest {
   /** Omitted = membership only. */
   permission?: PermissionKey;
   resource?: { type: string; id: string };
+  /** Facts about the caller's session (assurance, step-up, age) from the session middleware. */
+  session?: SessionFacts;
 }
 
-export type Obligation = { type: 'step_up'; reason: string };
+export interface SessionFacts {
+  mfaVerified: boolean;
+  stepUpAt: Date | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+}
+
+export type Obligation = { type: 'step_up'; maxAgeMinutes: number };
 
 export interface AuthzDecision {
   decision: 'allow' | 'deny';

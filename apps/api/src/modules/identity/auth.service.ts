@@ -1,4 +1,5 @@
 import {
+  type LoginResponse,
   SessionRevokedEvent,
   UserEmailVerifiedEvent,
   UserPasswordChangedEvent,
@@ -23,14 +24,16 @@ import { AccountService } from './account.service.js';
 import type { BetterAuthInstance } from './better-auth.js';
 import { BETTER_AUTH } from './better-auth.provider.js';
 import { emailRef } from './crypto.js';
+import { deviceLabel, deviceRef } from './device.js';
 import { forwardSetCookies, onlySessionCookies, toFetchHeaders } from './http.js';
 import { IdentityMailService } from './identity-mail.service.js';
+import { MfaRateLimits, MfaService, type SecondFactor } from './mfa/mfa.service.js';
 import { hashPassword, needsRehash } from './password-hasher.js';
 import {
   EMAIL_VERIFICATION_TTL_MS,
   VerificationTokenService,
 } from './verification-token.service.js';
-import './request-auth.js';
+import '../../platform/auth/request-auth.js';
 
 const minutes = (n: number) => n * 60;
 /** Rate limits per route (FR-SEC-041/042). Per-IP limits are looser than per-account ones. */
@@ -75,6 +78,7 @@ export class AuthService {
     private readonly rateLimits: RateLimitService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly mfa: MfaService,
   ) {}
 
   private ip(req: Request): string {
@@ -150,7 +154,7 @@ export class AuthService {
     input: { email: string; password: string },
     req: Request,
     res: Response,
-  ): Promise<Me> {
+  ): Promise<LoginResponse> {
     await this.rateLimits.enforce([
       { rule: AuthRateLimits.loginIp, subject: this.ip(req) },
       { rule: AuthRateLimits.loginEmail, subject: input.email },
@@ -173,6 +177,7 @@ export class AuthService {
 
     let userId: string;
     let setCookies: Headers;
+    let sessionToken: string;
     try {
       const result = await this.auth.api.signInEmail({
         body: { email: input.email, password: input.password, rememberMe: true },
@@ -180,6 +185,7 @@ export class AuthService {
         returnHeaders: true,
       });
       userId = result.response.user.id;
+      sessionToken = result.response.token;
       setCookies = result.headers;
     } catch (err) {
       const code = apiErrorCode(err);
@@ -233,8 +239,70 @@ export class AuthService {
     }
 
     forwardSetCookies(onlySessionCookies(setCookies, this.config.sessionCookieName), res);
-    await this.accounts.recordSuccessfulLogin(userId);
     await this.rehashIfNeeded(userId, input.password);
+    if (await this.mfa.hasActiveTotp(userId)) {
+      // Two-phase login (TR-SEC-002): the session exists but grants nothing until the code is checked.
+      await this.prisma.session.update({
+        where: { token: sessionToken },
+        data: { authAssurance: 'mfa_pending' },
+      });
+      await this.audit.record(
+        {
+          eventType: 'identity.login.mfa_pending',
+          action: 'session.create',
+          outcome: 'success',
+          resourceType: 'user',
+          resourceId: userId,
+        },
+        undefined,
+        asUser(userId),
+      );
+      return { status: 'mfa_required', methods: ['totp', 'recovery_code'] };
+    }
+    return { status: 'authenticated', user: await this.completeLogin(userId, req, 'password') };
+  }
+
+  /** Second step of the login: TOTP or recovery code for a `mfa_pending` session. */
+  async verifyMfaLogin(input: SecondFactor, req: Request): Promise<LoginResponse> {
+    const auth = req.auth;
+    if (!auth?.pending)
+      throw new AppError('UNAUTHENTICATED', 'Your sign-in expired. Sign in again.', {
+        reason: 'no_pending_sign_in',
+      });
+    await this.rateLimits.enforce([
+      { rule: AuthRateLimits.loginIp, subject: this.ip(req) },
+      { rule: MfaRateLimits.codeUser, subject: auth.userId },
+    ]);
+    const { method } = await this.mfa.verifySecondFactor(auth.userId, input);
+    const now = new Date();
+    await this.prisma.session.update({
+      where: { id: auth.sessionId },
+      data: { authAssurance: 'mfa_verified', mfaVerifiedAt: now, stepUpAt: now },
+    });
+    return { status: 'authenticated', user: await this.completeLogin(auth.userId, req, method) };
+  }
+
+  /** Bookkeeping once a sign-in is complete: audit, lockout reset, new-device notice. */
+  private async completeLogin(
+    userId: string,
+    req: Request,
+    method: 'password' | 'totp' | 'recovery_code',
+  ): Promise<Me> {
+    await this.accounts.recordSuccessfulLogin(userId);
+    const userAgent =
+      typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+    const device = deviceRef(this.config.env.BETTER_AUTH_SECRET, userAgent);
+    const previous = await this.audit.countEvents({
+      eventType: 'identity.login.success',
+      actorId: userId,
+    });
+    const seenDevice =
+      previous > 0 &&
+      (await this.audit.countEvents({
+        eventType: 'identity.login.success',
+        actorId: userId,
+        metadata: { path: ['deviceRef'], equals: device },
+      })) > 0;
     await this.audit.record(
       {
         eventType: 'identity.login.success',
@@ -242,11 +310,63 @@ export class AuthService {
         outcome: 'success',
         resourceType: 'user',
         resourceId: userId,
+        metadata: { method, deviceRef: device },
       },
       undefined,
       asUser(userId),
     );
+    if (previous > 0 && !seenDevice) {
+      await this.mfa.notify(userId, { kind: 'new_sign_in', device: deviceLabel(userAgent) });
+    }
     return this.accounts.getMe(userId);
+  }
+
+  /**
+   * Step-up (FR-SEC-040): re-verify with a TOTP code (MFA users) or the password (others) to make
+   * the session's `stepUpAt` fresh for sensitive actions.
+   */
+  async stepUp(input: { code?: string; password?: string }, req: Request): Promise<Date> {
+    const auth = req.auth;
+    if (!auth || auth.pending) throw new AppError('UNAUTHENTICATED', 'Sign in to continue');
+    await this.rateLimits.enforce([{ rule: MfaRateLimits.codeUser, subject: auth.userId }]);
+    const hasMfa = await this.mfa.hasActiveTotp(auth.userId);
+    const now = new Date();
+    if (hasMfa) {
+      if (!input.code)
+        throw new AppError('MFA_CODE_INVALID', 'Enter the code from your authenticator app', {
+          method: 'totp',
+        });
+      await this.mfa.verifySecondFactor(
+        auth.userId,
+        { code: input.code },
+        { allowRecovery: false },
+      );
+    } else {
+      if (!input.password || !(await this.mfa.checkPassword(auth.userId, input.password))) {
+        throw new AppError('VALIDATION_FAILED', 'Password is incorrect', {
+          issues: [{ path: 'password', message: 'Password is incorrect', code: 'invalid' }],
+        });
+      }
+    }
+    await this.prisma.session.update({
+      where: { id: auth.sessionId },
+      data: hasMfa
+        ? { stepUpAt: now, mfaVerifiedAt: now, authAssurance: 'mfa_verified' }
+        : { stepUpAt: now },
+    });
+    await this.audit.record(
+      {
+        eventType: 'identity.step_up',
+        action: 'session.step_up',
+        outcome: 'success',
+        resourceType: 'session',
+        resourceId: auth.sessionId,
+        metadata: { method: hasMfa ? 'totp' : 'password' },
+      },
+      undefined,
+      asUser(auth.userId),
+    );
+    return now;
   }
 
   /** Upgrades the stored hash when the argon2 baseline was raised (task I05-3). */
@@ -385,10 +505,11 @@ export class AuthService {
         asUser(auth.userId),
       );
     });
+    await this.mfa.notify(auth.userId, { kind: 'password_changed' });
   }
 
   async me(req: Request): Promise<Me> {
-    if (!req.auth) throw new AppError('UNAUTHENTICATED', 'Sign in to continue');
+    if (!req.auth || req.auth.pending) throw new AppError('UNAUTHENTICATED', 'Sign in to continue');
     return this.accounts.getMe(req.auth.userId);
   }
 }

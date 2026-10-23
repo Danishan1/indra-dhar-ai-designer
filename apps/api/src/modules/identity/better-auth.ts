@@ -74,6 +74,8 @@ export function createBetterAuth(prisma: PrismaClient, config: AppConfig, hooks:
       additionalFields: {
         absoluteExpiresAt: { type: 'date', input: false, required: false },
         authAssurance: { type: 'string', input: false, required: false, defaultValue: 'password' },
+        mfaVerifiedAt: { type: 'date', input: false, required: false },
+        stepUpAt: { type: 'date', input: false, required: false },
       },
     },
     account: { modelName: 'identityCredential', accountLinking: { enabled: false } },

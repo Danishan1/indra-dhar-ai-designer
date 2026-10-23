@@ -2,7 +2,12 @@ import { expect, test } from '@playwright/test';
 
 import { createVerifiedAccount, resetRateLimits } from '../support/accounts.js';
 import { linkFrom, waitForEmailText } from '../support/mailpit.js';
-import { createOrganizationInOnboarding, submitSignIn, uniqueOrgName } from '../support/ui.js';
+import {
+  createOrganizationInOnboarding,
+  enrollMfaInUi,
+  submitSignIn,
+  uniqueOrgName,
+} from '../support/ui.js';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -23,6 +28,8 @@ test('an owner demotes an admin to viewer: the UI hides admin actions and the AP
   await owner.goto('/sign-in');
   await submitSignIn(owner, ownerEmail);
   await createOrganizationInOnboarding(owner, orgName);
+  // Changing roles is a privileged action: it needs two-step verification (I08).
+  await enrollMfaInUi(owner);
 
   // Invite as Admin.
   await owner.goto('/settings/members');

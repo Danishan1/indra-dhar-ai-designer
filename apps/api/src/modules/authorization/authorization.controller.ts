@@ -14,8 +14,10 @@ import {
   permissionCatalogResponseSchema,
   permissionParts,
   rolesResponseSchema,
+  securityPolicySchema,
+  updateSecurityPolicyRequestSchema,
 } from '@ai-designer/contracts';
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import type { z } from 'zod';
 
@@ -32,6 +34,7 @@ import { Endpoint } from '../../platform/validation/endpoint.js';
 
 import { AuthorizationService } from './authorization.service.js';
 import { EffectivePermissionsService } from './effective-permissions.service.js';
+import { SecurityPolicyService } from './security-policy.service.js';
 
 @Controller()
 export class AuthorizationController {
@@ -39,7 +42,45 @@ export class AuthorizationController {
     private readonly prisma: PrismaService,
     private readonly pdp: AuthorizationService,
     private readonly effective: EffectivePermissionsService,
+    private readonly policies: SecurityPolicyService,
   ) {}
+
+  @Get('orgs/:orgId/security-policy')
+  @RequirePermission('security_policy.manage')
+  @Endpoint({
+    summary: 'Organization security policy (MFA requirement, step-up age, session limits)',
+    tags: ['authorization'],
+    params: orgIdParamsSchema,
+    response: securityPolicySchema,
+    errors: ['NOT_FOUND', 'PERMISSION_DENIED', 'MFA_REQUIRED'],
+  })
+  securityPolicy(@Req() req: Request) {
+    return this.policies.view(authzContext(req).organizationId);
+  }
+
+  @Put('orgs/:orgId/security-policy')
+  @RequirePermission('security_policy.manage')
+  @Endpoint({
+    summary: 'Change the security policy (new version; needs a recent step-up)',
+    tags: ['authorization'],
+    params: orgIdParamsSchema,
+    body: updateSecurityPolicyRequestSchema,
+    response: securityPolicySchema,
+    errors: [
+      'NOT_FOUND',
+      'PERMISSION_DENIED',
+      'MFA_REQUIRED',
+      'STEP_UP_REQUIRED',
+      'VALIDATION_FAILED',
+    ],
+  })
+  updateSecurityPolicy(
+    @Req() req: Request,
+    @Body() body: z.output<typeof updateSecurityPolicyRequestSchema>,
+  ) {
+    const ctx = authzContext(req);
+    return this.policies.update(ctx.organizationId, body, ctx.userId);
+  }
 
   @Get('permissions')
   @AuthenticatedOnly()
@@ -128,8 +169,10 @@ export class AuthorizationController {
   async myPermissions(@Query() query: z.output<typeof myPermissionsQuerySchema>) {
     const ctx = await this.pdp.contextFor(query.orgId, currentUserId());
     if (!ctx) throw AppError.notFound('Organization');
+    const { config } = await this.policies.current(ctx.organizationId);
     return {
       organizationId: ctx.organizationId,
+      requireMfa: config.requireMfa,
       roles: ctx.roles,
       permissions: PERMISSION_KEYS.filter((k) => ctx.permissions.has(k)),
     };

@@ -1,3 +1,4 @@
+export * from './audit/index.js';
 export * from './authorization/index.js';
 export * from './common.js';
 export * from './errors.js';

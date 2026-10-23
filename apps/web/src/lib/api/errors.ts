@@ -45,6 +45,10 @@ const FRIENDLY_MESSAGES: Partial<Record<ErrorCode, string>> = {
   ACCOUNT_NOT_ACTIVE:
     'This account cannot sign in. Contact support if you think this is a mistake.',
   TOKEN_INVALID_OR_EXPIRED: 'This link is invalid or has expired. Request a new one.',
+  MFA_REQUIRED:
+    'Turn on two-step verification in Settings → Your security to do this in this organization.',
+  STEP_UP_REQUIRED: 'Confirm it is you to continue.',
+  MFA_CODE_INVALID: 'That code is not valid. Use the current code from your authenticator app.',
   INTERNAL_ERROR: 'Something went wrong on our side. Please try again.',
 };
 

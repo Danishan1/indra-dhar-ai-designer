@@ -45,6 +45,14 @@ fetching or config code, read the matching guide in `apps/web/node_modules/next/
 - Org-scoped query keys start with `queryKeys.org(orgId)`; switching org removes other orgs' cached queries.
 - `can('members.invite')` / `usePermission()` / `<Can permission=…>` (`features/authorization/can.tsx`) come from `GET /v1/me/permissions` and only hide UI; the API enforces (`docs/architecture/authorization.md`).
 
+## Security UX (I08)
+
+- `STEP_UP_REQUIRED` is handled globally: `StepUpProvider` asks for a code and the API client retries
+  once — features need no code for it. `MFA_REQUIRED` shows a toast pointing to Settings → Your
+  security; an organization with `requireMfa` blocks the app (except that page) until enrolled.
+- Sign-in has a second step (`MfaChallenge`) when the login answers `mfa_required`.
+- Show secrets (TOTP key, recovery codes) only in the flow that creates them; never store them.
+
 ## Form controls
 
 - Never use the native `<select>`: its open list is drawn by the browser/OS and ignores the theme.

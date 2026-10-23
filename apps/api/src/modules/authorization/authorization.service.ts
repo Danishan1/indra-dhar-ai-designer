@@ -1,4 +1,9 @@
-import { isPlatformPermission, type PermissionKey } from '@ai-designer/contracts';
+import {
+  isPlatformPermission,
+  isSensitivePermission,
+  type PermissionKey,
+  requiresStepUp,
+} from '@ai-designer/contracts';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AccessCache, type MembershipAccess } from '../../platform/authz/access-cache.js';
@@ -14,6 +19,7 @@ import { ResourceResolverRegistry } from '../../platform/authz/resource-resolver
 
 import { ResourceGrantService } from './grants.service.js';
 import { roleKeysOf, RolePermissions } from './role-permissions.js';
+import { SecurityPolicyService } from './security-policy.service.js';
 
 const deny = (reasonCode: AuthzDecision['reasonCode'], context?: AuthzContext): AuthzDecision => ({
   decision: 'deny',
@@ -38,6 +44,7 @@ export class AuthorizationService implements Authorizer {
     private readonly rolePermissions: RolePermissions,
     private readonly resolvers: ResourceResolverRegistry,
     private readonly grants: ResourceGrantService,
+    private readonly policies: SecurityPolicyService,
   ) {}
 
   async authorize(request: AuthzRequest): Promise<AuthzDecision> {
@@ -77,21 +84,52 @@ export class AuthorizationService implements Authorizer {
     if (access.status !== 'active') return deny('MEMBERSHIP_INACTIVE');
 
     const context = await this.toContext(access);
-    const allow = (reasonCode: AuthzDecision['reasonCode']): AuthzDecision => ({
-      decision: 'allow',
-      reasonCode,
-      policyVersion: POLICY_VERSION,
-      obligations: [],
-      context,
-    });
-    if (!permission || context.permissions.has(permission)) return allow('ALLOWED_BY_ROLE');
-    if (
+    const { config: policy } = await this.policies.current(organizationId);
+    const session = request.session;
+
+    // Organization session limits (FR-SEC-053): only tighten the platform timeouts.
+    if (session) {
+      const now = Date.now();
+      if (
+        (policy.sessionAbsoluteHours !== null &&
+          now - session.createdAt.getTime() > policy.sessionAbsoluteHours * 3_600_000) ||
+        (policy.sessionIdleMinutes !== null &&
+          now - session.lastSeenAt.getTime() > policy.sessionIdleMinutes * 60_000)
+      ) {
+        return deny('SESSION_POLICY_EXPIRED', context);
+      }
+    }
+    const mfaVerified = session?.mfaVerified ?? false;
+    // Organization-wide MFA requirement (FR-SEC-034).
+    if (policy.requireMfa && !mfaVerified) return deny('MFA_REQUIRED', context);
+
+    let reason: AuthzDecision['reasonCode'];
+    if (!permission || context.permissions.has(permission)) reason = 'ALLOWED_BY_ROLE';
+    else if (
       resource &&
       (await this.grants.hasActiveGrant(organizationId, principal.id, resource, permission))
-    ) {
-      return allow('ALLOWED_BY_GRANT');
+    )
+      reason = 'ALLOWED_BY_GRANT';
+    else return deny('MISSING_PERMISSION', context);
+
+    // High-risk actions (sensitive permissions = privileged roles) need an MFA-verified session
+    // (FR-SEC-033/035, AC-SEC-005) — the Owner gets no exemption (§23 note).
+    if (permission && isSensitivePermission(permission) && !mfaVerified) {
+      return deny('MFA_REQUIRED', context);
     }
-    return deny('MISSING_PERMISSION', context);
+    const obligations: AuthzDecision['obligations'] = [];
+    if (permission && requiresStepUp(permission)) {
+      const maxAge = policy.stepUpMaxAgeMinutes;
+      const fresh = session?.stepUpAt && Date.now() - session.stepUpAt.getTime() <= maxAge * 60_000;
+      if (!fresh) obligations.push({ type: 'step_up', maxAgeMinutes: maxAge });
+    }
+    return {
+      decision: 'allow',
+      reasonCode: reason,
+      policyVersion: POLICY_VERSION,
+      obligations,
+      context,
+    };
   }
 
   private async access(organizationId: string, userId: string): Promise<MembershipAccess | null> {

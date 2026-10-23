@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I08 — MFA, step-up, sessions & security audit** (next)                                             |
+| **Current iteration** | **I09 — Asset & storage service** (next)                                                             |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-23 (I07 finished)                                                                            |
+| Last updated          | 2026-10-23 (I08 finished, M2 reached)                                                                |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -27,7 +27,7 @@
 | I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                |
 | I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                   |
 | I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md           |
-| I08 | MFA, step-up, sessions & security audit               | 1     | todo   |            |            |          | → M2                                                  |
+| I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                 |
 | I09 | Asset & storage service                               | 2     | todo   |            |            |          |                                                       |
 | I10 | Projects & lifecycle core                             | 2     | todo   |            |            |          |                                                       |
 | I11 | Canonical garment model package                       | 2     | todo   |            |            |          | Confirm ADR-008                                       |
@@ -75,7 +75,7 @@
 | Milestone                   | Status | Date       | Tag                   |
 | --------------------------- | ------ | ---------- | --------------------- |
 | M1 Walking skeleton         | done   | 2026-10-22 | `m1-walking-skeleton` |
-| M2 Secure multi-tenant base | todo   |            | `m2-secure-base`      |
+| M2 Secure multi-tenant base | done   | 2026-10-23 | `m2-secure-base`      |
 | M3 Structured editor alpha  | todo   |            | `m3-editor-alpha`     |
 | M4 AI-assisted design alpha | todo   |            | `m4-ai-alpha`         |
 | M5 Review workflow          | todo   |            | `m5-review`           |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-23 — I08 — own TOTP + separate MFA tables, sensitive permissions require MFA (instead of blocking privileged roles), logout public — ADR-043
 - 2026-10-23 — I07 — global PEP + PDP, catalog synced from code at API start, matrix reading, delegation rule, test-utils package — ADR-042
 - 2026-10-23 — I06 — path-scoped org context (`@OrgAccess`), invitation tokens only in request bodies (`POST /v1/invitations/preview`), placeholder roles until I07 — ADR-041
 - 2026-10-22 — between I02/I03 — local log files (`logs/`, `pnpm logs`) and local PostgreSQL option, at owner's request — ADR-036, ADR-037
@@ -117,6 +118,16 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-23 — I08 MFA, step-up, sessions & security audit (session 1) — DONE, **M2 reached**
+
+- Built: TOTP second factor (setup with QR/key, confirm → 10 recovery codes, disable with password + code, regenerate with step-up), two-phase login (`mfa_pending` sessions), step-up endpoint + PDP obligations, sensitive-permission MFA rule + org `requireMfa`, org session limits, versioned security policy API, sessions list/revoke, security notice emails, audit search API (`audit` module), minimal `SecretsService` (ADR-007); web sign-in code step, global step-up dialog, Settings → Your security / Security policy / Audit log, org MFA gate.
+- Tests: api unit 86, integration api 71 (security 28) + worker 13, e2e 17. Tag `m2-secure-base`.
+- **Owner actions (Windows):**
+  1. `pnpm install` (web gets `qrcode`), `pnpm db:migrate`, `pnpm dev`.
+  2. Optional in development, **required in production**: add `SECRETS_MASTER_KEY=` + `openssl rand -base64 32` to `.env` (encrypts authenticator secrets). Without it, development uses a key derived from `BETTER_AUTH_SECRET` — if you set it later, existing authenticator setups must be redone.
+  3. Managing members/roles, the security policy and the audit log now need two-step verification: Settings → Your security → "Set up authenticator app".
+- **Next step:** I09 — asset & storage service (first resource type with its own resolver + isolation coverage).
 
 ### 2026-10-23 — I07 Authorization engine & tenant isolation (session 1) — DONE
 

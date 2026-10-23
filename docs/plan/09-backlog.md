@@ -54,3 +54,14 @@ _(Append: date — source iteration — item — reason)_
 - Admin-delegable roles: Admins cannot assign Merchandiser/Production roles by default (they lack `techpack.edit`); revisit if owners find it restrictive (security policy option). → I08 policy work.
 - Platform-operator principal type and `platform.*` enforcement. → I45.
 - Postgres RLS as defence in depth (ADR-004). → I47 evaluation.
+
+## From I08 (2026-10-23)
+
+- Passkeys / WebAuthn as a phishing-resistant factor, preferred for privileged accounts (FR-SEC-036, ADR-043 e). → when Better Auth's passkey support is evaluated, or I47.
+- SSO/SCIM and conditional access (SPEC-009 Phase 3). → backlog.
+- Self-service second-factor reset with identity proofing; operator tooling for the runbook steps. → I45.
+- Admin notifications for critical membership/ownership/policy changes (FR-SEC-228) and credential admins (FR-SEC-229). → I29 (notifications).
+- Audit retention configuration (FR-SEC-183) and audit export (`audit.export`). → I46.
+- Anomaly alerts on repeated denials / role escalation (FR-SEC-184). → I46.
+- Org admin "sign out this member everywhere" (today: suspend/revoke takes effect immediately for the org, FR-SEC-056). → if requested.
+- Idle-timeout precision is bounded by `SESSION_TOUCH_INTERVAL_MIN` (org idle minimum = touch + 5 min); a lighter last-seen tracker could lift that. → I46.

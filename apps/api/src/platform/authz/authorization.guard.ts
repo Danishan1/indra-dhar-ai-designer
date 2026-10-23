@@ -15,6 +15,7 @@ import { AppError } from '../errors/app-error.js';
 
 import { AUTHORIZER, type Authorizer, type AuthzDecision } from './authorizer.js';
 import { AUTHZ_METADATA, type AuthzDeclaration } from './decorators.js';
+import '../auth/request-auth.js';
 import { ResourceResolverRegistry } from './resource-resolvers.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -82,6 +83,16 @@ export class AuthorizationGuard implements CanActivate {
       organizationId: orgParam ?? null,
       ...(permission ? { permission } : {}),
       ...(resource ? { resource } : {}),
+      ...(req.auth
+        ? {
+            session: {
+              mfaVerified: req.auth.assurance === 'mfa_verified',
+              stepUpAt: req.auth.stepUpAt,
+              createdAt: req.auth.createdAt,
+              lastSeenAt: req.auth.lastSeenAt,
+            },
+          }
+        : {}),
     });
 
     if (decision.decision === 'allow' && decision.context && decision.obligations.length === 0) {
@@ -90,9 +101,13 @@ export class AuthorizationGuard implements CanActivate {
       return true;
     }
     if (decision.decision === 'allow') {
-      // Obligations (step-up, approvals…) are enforced in I08+; none is satisfiable yet → deny.
-      throw new AppError('PERMISSION_DENIED', 'Additional verification is required', {
-        reason: decision.obligations[0]?.type ?? 'obligation',
+      // Obligations must be met before the operation runs (FR-SEC-243). The client re-verifies
+      // (POST /v1/auth/step-up) and retries.
+      const stepUp = decision.obligations.find((o) => o.type === 'step_up');
+      throw new AppError('STEP_UP_REQUIRED', 'Confirm it is you to continue', {
+        reason: stepUp ? 'stale' : 'obligation',
+        method: 'totp',
+        ...(stepUp ? { maxAgeMinutes: stepUp.maxAgeMinutes } : {}),
       });
     }
     await this.auditDenial(decision, permission, resource);
@@ -116,6 +131,16 @@ export class AuthorizationGuard implements CanActivate {
             reason: 'membership_suspended',
           },
         );
+      case 'MFA_REQUIRED':
+        return new AppError(
+          'MFA_REQUIRED',
+          'Turn on two-step verification to do this in this organization',
+          { reason: 'mfa_required' },
+        );
+      case 'SESSION_POLICY_EXPIRED':
+        return new AppError('UNAUTHENTICATED', 'Your session expired. Sign in again.', {
+          reason: 'session_policy_expired',
+        });
       case 'POLICY_UNAVAILABLE':
         return new AppError(
           'DEPENDENCY_UNAVAILABLE',

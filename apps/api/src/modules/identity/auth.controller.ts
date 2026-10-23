@@ -4,11 +4,14 @@ import {
   changePasswordRequestSchema,
   forgotPasswordRequestSchema,
   loginRequestSchema,
+  loginResponseSchema,
+  type LoginResponse,
+  mfaVerifyRequestSchema,
+  stepUpRequestSchema,
+  stepUpResponseSchema,
   resendVerificationRequestSchema,
   resetPasswordRequestSchema,
   registerRequestSchema,
-  sessionResponseSchema,
-  type SessionResponse,
   verifyEmailRequestSchema,
 } from '@ai-designer/contracts';
 import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
@@ -88,21 +91,55 @@ export class AuthController {
     summary: 'Sign in with email and password (sets the session cookie)',
     tags: ['auth'],
     body: loginRequestSchema,
-    response: sessionResponseSchema,
+    description:
+      'Answers `authenticated`, or `mfa_required` when the account has two-step verification: then ' +
+      'only POST /v1/auth/mfa/verify works with this session until the code is checked.',
+    response: loginResponseSchema,
     successStatus: 200,
     errors: ['UNAUTHENTICATED', 'EMAIL_NOT_VERIFIED', 'ACCOUNT_NOT_ACTIVE', 'RATE_LIMITED'],
   })
-  async login(
+  login(
     @Body() body: z.output<typeof loginRequestSchema>,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionResponse> {
-    return { user: await this.auth.login(body, req, res) };
+  ): Promise<LoginResponse> {
+    return this.auth.login(body, req, res);
+  }
+
+  @Post('mfa/verify')
+  @HttpCode(200)
+  @Endpoint({
+    summary: 'Second step of sign-in: authenticator code or recovery code',
+    tags: ['auth'],
+    body: mfaVerifyRequestSchema,
+    response: loginResponseSchema,
+    successStatus: 200,
+    errors: ['UNAUTHENTICATED', 'MFA_CODE_INVALID', 'RATE_LIMITED'],
+  })
+  verifyMfa(@Body() body: z.output<typeof mfaVerifyRequestSchema>, @Req() req: Request) {
+    return this.auth.verifyMfaLogin(body, req);
+  }
+
+  @Post('step-up')
+  @HttpCode(200)
+  @AuthenticatedOnly()
+  @Endpoint({
+    summary:
+      'Re-verify (code, or password without two-step verification) before a sensitive action',
+    tags: ['auth'],
+    body: stepUpRequestSchema,
+    response: stepUpResponseSchema,
+    successStatus: 200,
+    errors: ['UNAUTHENTICATED', 'MFA_CODE_INVALID', 'VALIDATION_FAILED', 'RATE_LIMITED'],
+  })
+  async stepUp(@Body() body: z.output<typeof stepUpRequestSchema>, @Req() req: Request) {
+    const at = await this.auth.stepUp(body, req);
+    return { stepUpAt: at.toISOString() };
   }
 
   @Post('logout')
   @HttpCode(204)
-  @AuthenticatedOnly()
+  // Public so a half-finished (code outstanding) sign-in can be cancelled; no session = no-op.
   @Endpoint({
     summary: 'Sign out (revokes the current session)',
     tags: ['auth'],

@@ -1,5 +1,6 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 
+import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthorizationModule } from './modules/authorization/authorization.module.js';
 import { DevExamplesModule } from './modules/dev-examples/dev-examples.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
@@ -21,6 +22,7 @@ import { StorageModule } from './platform/storage/storage.module.js';
 /** Business modules (I05+) are appended here. */
 const FEATURE_MODULES: DynamicModule['imports'] = [
   AuthorizationModule,
+  AuditModule,
   IdentityModule,
   OrganizationsModule,
 ];

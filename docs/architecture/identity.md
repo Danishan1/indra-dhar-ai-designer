@@ -93,6 +93,33 @@ if Redis is down. `TRUST_PROXY` (default `loopback`) decides who may set `X-Forw
   a signed-in storage state for the other specs; `auth-flows.spec.ts` covers sign-up/verify/sign-in/
   sign-out, returnTo, and forgot/reset.
 
+## Second factor, step-up & sessions (I08, ADR-043)
+
+- **TOTP** (RFC 6238, SHA-1/30 s/6 digits, ±1 step) in `modules/identity/mfa/` — our own code, not
+  Better Auth's plugin. Tables `mfa_factors` (secret envelope-encrypted by `SecretsService`, ADR-007;
+  `last_used_step` blocks replay) and `mfa_recovery_codes` (10 per user, HMAC hashes, single-use).
+  `/v1/me/mfa/totp/setup|confirm|disable`, `/v1/me/mfa/recovery-codes/regenerate` (needs a recent
+  step-up). Disabling needs password + current code — there is no email-link path (FR-SEC-039).
+  Enrol/disable signs out the user's other sessions and emails a notice.
+- **Two-phase login**: when a TOTP factor is active, `POST /v1/auth/login` answers
+  `{status:'mfa_required'}` and marks the new session `auth_assurance='mfa_pending'`. The session
+  middleware then sets `req.auth.pending` but **no principal**, so every route except
+  `POST /v1/auth/mfa/verify` (and logout) sees an anonymous caller. Pending sessions expire after
+  10 minutes. Verify (code or recovery code) upgrades the session to `mfa_verified` and sets
+  `mfa_verified_at` / `step_up_at`.
+- **Step-up**: `POST /v1/auth/step-up` (code, or password for accounts without MFA) refreshes
+  `sessions.step_up_at`. The PDP decides when it is needed (see `authorization.md`).
+- **Sessions**: `GET /v1/me/sessions`, `DELETE /v1/me/sessions/:id`, `POST /v1/me/sessions/revoke-others`.
+  Revocation deletes the row → the next request with that cookie is anonymous. "Last active" is the
+  session touch time (granularity `SESSION_TOUCH_INTERVAL_MIN`).
+- **Security notices** (email, best effort — failures are logged, never undo the action): two-step
+  verification on/off, new recovery codes, recovery code used, password changed, sign-in from a new
+  device (device = HMAC of the browser/OS label, compared with earlier `identity.login.success` audit
+  events). No secrets, codes, IPs or tokens; the link only opens Settings → Your security.
+- `SECRETS_MASTER_KEY` (32 random bytes, base64) is required in production; outside production a key
+  derived from `BETTER_AUTH_SECRET` is used when it is unset. Operator procedures:
+  `docs/deployment/runbooks.md`.
+
 ## Organizations & org-scoped routes (I06, ADR-041)
 
 - Tables (module `organizations`): `organizations`, `workspaces` (one default per org), `memberships` (`invited | active | suspended | revoked`, at most one live row per org+user), `membership_roles`, `invitations` (sha256 token hash, 7-day TTL, `pending | accepted | cancelled | expired`).

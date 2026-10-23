@@ -137,3 +137,22 @@ export function isSensitivePermission(key: PermissionKey): boolean {
 export const Permissions = Object.fromEntries(PERMISSION_KEYS.map((k) => [k, k])) as {
   readonly [K in PermissionKey]: K;
 };
+
+/**
+ * High-impact actions that need a *recent* second-factor check (step-up, FR-SEC-040), within the
+ * organization's `stepUpMaxAgeMinutes`. Every sensitive permission already needs an MFA-verified
+ * session (I08); these additionally need it to be fresh.
+ */
+export const STEP_UP_PERMISSIONS: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
+  'organization.transfer_ownership',
+  'organization.export',
+  'organization.delete',
+  'security_policy.manage',
+  'billing.manage',
+  'credentials.manage',
+  'techpack.release',
+]);
+
+export function requiresStepUp(key: PermissionKey): boolean {
+  return STEP_UP_PERMISSIONS.has(key);
+}

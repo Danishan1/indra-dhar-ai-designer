@@ -2,6 +2,8 @@
 
 import type { MyOrganization, PermissionKey } from '@ai-designer/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ShieldAlertIcon } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   createContext,
@@ -13,8 +15,10 @@ import {
   useState,
 } from 'react';
 
-import { ErrorState, LoadingState } from '@/components/states/states';
+import { EmptyState, ErrorState, LoadingState } from '@/components/states/states';
+import { Button } from '@/components/ui/button';
 import { safeReturnTo } from '@/features/auth/return-to';
+import { securityApi } from '@/features/security/api';
 import { PreferenceKeys, readPreference, writePreference } from '@/lib/local-preferences';
 import { queryKeys } from '@/lib/query/keys';
 
@@ -70,6 +74,18 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     () => new Set<PermissionKey>(permissionsQuery.data?.permissions ?? []),
     [permissionsQuery.data],
   );
+  // Organization-wide MFA requirement: block the app (except "Your security") until enrolled.
+  const requireMfa = permissionsQuery.data?.requireMfa ?? false;
+  const mfaQuery = useQuery({
+    queryKey: queryKeys.security.mfa(),
+    queryFn: ({ signal }) => securityApi.mfa(signal),
+    enabled: requireMfa,
+  });
+  const mfaBlocked =
+    requireMfa &&
+    mfaQuery.isSuccess &&
+    !mfaQuery.data.sessionMfaVerified &&
+    pathname !== '/settings/security';
 
   useEffect(() => {
     if (!query.isSuccess || active) return;
@@ -115,8 +131,30 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!value || permissionsQuery.isPending) return <LoadingState className="min-h-dvh" />;
-  return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>;
+  if (!value || permissionsQuery.isPending || (requireMfa && mfaQuery.isPending))
+    return <LoadingState className="min-h-dvh" />;
+  return (
+    <OrganizationContext.Provider value={value}>
+      {mfaBlocked ? <MfaRequiredGate organizationName={value.active.name} /> : children}
+    </OrganizationContext.Provider>
+  );
+}
+
+function MfaRequiredGate({ organizationName }: { organizationName: string }) {
+  return (
+    <div className="flex min-h-dvh items-center justify-center p-6">
+      <EmptyState
+        icon={<ShieldAlertIcon />}
+        title="Two-step verification required"
+        description={`${organizationName} requires an authenticator app for everyone. Set it up to continue.`}
+        action={
+          <Button asChild size="sm">
+            <Link href="/settings/security">Set up two-step verification</Link>
+          </Button>
+        }
+      />
+    </div>
+  );
 }
 
 export function useOrganization(): OrganizationContextValue {

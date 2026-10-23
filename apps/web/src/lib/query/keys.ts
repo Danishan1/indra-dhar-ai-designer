@@ -7,6 +7,11 @@ export const queryKeys = {
   session: {
     me: () => ['session', 'me'] as const,
   },
+  /** The signed-in user's own security settings (I08). */
+  security: {
+    mfa: () => ['security', 'mfa'] as const,
+    sessions: () => ['security', 'sessions'] as const,
+  },
   /** Organizations of the signed-in user (dropped with other user data on sign-in/out). */
   myOrgs: () => ['orgs', 'mine'] as const,
   system: {
@@ -22,6 +27,8 @@ export const queryKeys = {
       members: () => [...all, 'members'] as const,
       invitations: () => [...all, 'invitations'] as const,
       roles: () => [...all, 'roles'] as const,
+      securityPolicy: () => [...all, 'security-policy'] as const,
+      auditEvents: (filters: Record<string, unknown>) => [...all, 'audit-events', filters] as const,
       myPermissions: () => [...all, 'my-permissions'] as const,
       effectivePermissions: (membershipId: string) =>
         [...all, 'effective-permissions', membershipId] as const,

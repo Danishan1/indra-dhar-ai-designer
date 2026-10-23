@@ -21,6 +21,8 @@ export const AuthzReasonCodes = [
   'RESOURCE_STATE_FORBIDS',
   'SOD_VIOLATION',
   'STEP_UP_REQUIRED',
+  'MFA_REQUIRED',
+  'SESSION_POLICY_EXPIRED',
   'POLICY_UNAVAILABLE',
 ] as const;
 export type AuthzReasonCode = (typeof AuthzReasonCodes)[number];
@@ -80,6 +82,8 @@ export type EffectivePermissions = z.infer<typeof effectivePermissionsSchema>;
 export const myPermissionsQuerySchema = z.object({ orgId: z.uuid() });
 export const myPermissionsResponseSchema = z.object({
   organizationId: z.uuid(),
+  /** The organization requires an MFA-verified session for all access (security policy). */
+  requireMfa: z.boolean(),
   roles: z.array(orgRoleKeySchema),
   permissions: z.array(permissionKeySchema),
 });

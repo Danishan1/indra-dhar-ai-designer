@@ -11,6 +11,13 @@ import { useOrganization } from './organization-provider';
 const ITEMS: { href: string; label: string; permission?: PermissionKey }[] = [
   { href: '/settings', label: 'General' },
   { href: '/settings/members', label: 'Members', permission: 'members.view' },
+  {
+    href: '/settings/security-policy',
+    label: 'Security policy',
+    permission: 'security_policy.manage',
+  },
+  { href: '/settings/audit', label: 'Audit log', permission: 'audit.view' },
+  { href: '/settings/security', label: 'Your security' },
 ];
 
 /** Sub-navigation for organization settings pages. */

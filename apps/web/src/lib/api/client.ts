@@ -32,10 +32,34 @@ function newRequestId(): string {
 }
 
 /**
+ * Step-up (I08): when the API answers STEP_UP_REQUIRED, the registered handler asks the user to
+ * re-verify (dialog) and resolves true when done; the request is then retried once.
+ */
+type StepUpHandler = (error: ApiError) => Promise<boolean>;
+let stepUpHandler: StepUpHandler | null = null;
+export function setStepUpHandler(handler: StepUpHandler | null): void {
+  stepUpHandler = handler;
+}
+
+export async function apiRequest<S extends z.ZodType | undefined = undefined>(
+  path: string,
+  options: ApiRequestOptions<S> = {},
+): Promise<Result<S>> {
+  try {
+    return await apiRequestOnce(path, options);
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED' && stepUpHandler) {
+      if (await stepUpHandler(err)) return apiRequestOnce(path, options);
+    }
+    throw err;
+  }
+}
+
+/**
  * Typed fetch for the AI Designer API. Sends credentials and an X-Request-Id, turns the error
  * envelope into an `ApiError` (code + requestId), and validates successful responses with zod.
  */
-export async function apiRequest<S extends z.ZodType | undefined = undefined>(
+async function apiRequestOnce<S extends z.ZodType | undefined = undefined>(
   path: string,
   options: ApiRequestOptions<S> = {},
 ): Promise<Result<S>> {

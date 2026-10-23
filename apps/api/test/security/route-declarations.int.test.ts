@@ -40,6 +40,8 @@ describe('route authorization declarations', () => {
       'POST /v1/_dev/echo-idempotent',
       'GET /v1/_dev/jobs/:jobId',
       'POST /v1/auth/login',
+      'POST /v1/auth/logout',
+      'POST /v1/auth/mfa/verify',
       'POST /v1/auth/password/forgot',
       'POST /v1/auth/password/reset',
       'POST /v1/auth/register',
@@ -67,7 +69,8 @@ describe('route authorization declarations', () => {
         for (const p of others)
           if (p !== covered) problems.push(`${label(r)}: :${p} not tenant-checked`);
       }
-      if (others.length && d.kind === 'authenticated')
+      // `/v1/me/*` resources belong to the signed-in user; handlers filter by currentUserId().
+      if (others.length && d.kind === 'authenticated' && !r.path.startsWith('/v1/me/'))
         problems.push(`${label(r)}: resource id without tenant check`);
       if (
         (d.kind === 'member' || d.kind === 'permission') &&

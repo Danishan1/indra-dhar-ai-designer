@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * from their owning module. Tenant tables are then always reached through code that scopes by the
  * verified organization. Add new models here when a module introduces them.
  */
-const OWNERS: Record<string, string> = {
+const OWNERS: Record<string, string | string[]> = {
   organization: 'modules/organizations',
   workspace: 'modules/organizations',
   membership: 'modules/organizations',
@@ -23,6 +23,9 @@ const OWNERS: Record<string, string> = {
   session: 'modules/identity',
   identityCredential: 'modules/identity',
   verificationToken: 'modules/identity',
+  mfaFactor: 'modules/identity',
+  mfaRecoveryCode: 'modules/identity',
+  auditEvent: ['platform/audit', 'modules/audit'],
 };
 
 const SRC = join(import.meta.dirname, '../..');
@@ -44,7 +47,8 @@ describe('table ownership', () => {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(access)) {
         const model = match[1] ?? '';
-        if (!rel.startsWith(`${OWNERS[model]}/`)) violations.push(`${rel}: ${model}`);
+        const owners = [OWNERS[model] ?? []].flat();
+        if (!owners.some((o) => rel.startsWith(`${o}/`))) violations.push(`${rel}: ${model}`);
       }
     }
     expect(violations).toEqual([]);

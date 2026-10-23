@@ -18,6 +18,7 @@ import { friendlyMessage, toApiError } from '@/lib/api/errors';
 
 import { authApi } from './api';
 import { AuthCard, FormNotice } from './auth-card';
+import { MfaChallenge } from './mfa-challenge';
 import { safeReturnTo } from './return-to';
 import { resetUserData } from './session-provider';
 
@@ -27,6 +28,7 @@ export function SignInForm() {
   const queryClient = useQueryClient();
   const returnTo = safeReturnTo(params.get('returnTo'));
   const [resent, setResent] = useState(false);
+  const [mfaPending, setMfaPending] = useState(false);
   const form = useForm<LoginRequest, unknown, z.output<typeof loginRequestSchema>>({
     resolver: zodResolver(loginRequestSchema),
     defaultValues: { email: '', password: '' },
@@ -36,6 +38,10 @@ export function SignInForm() {
     mutationFn: authApi.login,
     meta: { silent: true },
     onSuccess: (data) => {
+      if (data.status === 'mfa_required') {
+        setMfaPending(true);
+        return;
+      }
       resetUserData(queryClient, data.user);
       router.replace(returnTo);
     },
@@ -47,6 +53,22 @@ export function SignInForm() {
   });
 
   const error = login.error ? toApiError(login.error) : null;
+
+  if (mfaPending) {
+    return (
+      <MfaChallenge
+        onDone={(user) => {
+          resetUserData(queryClient, user);
+          router.replace(returnTo);
+        }}
+        onCancel={() => {
+          void authApi.logout().catch(() => undefined);
+          setMfaPending(false);
+          login.reset();
+        }}
+      />
+    );
+  }
 
   return (
     <AuthCard

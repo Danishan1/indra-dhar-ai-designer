@@ -4,7 +4,10 @@ import {
   type LoginRequest,
   meSchema,
   type RegisterRequest,
-  sessionResponseSchema,
+  loginResponseSchema,
+  type MfaVerifyRequest,
+  type StepUpRequest,
+  stepUpResponseSchema,
   type UpdateMeRequest,
 } from '@ai-designer/contracts';
 import { z } from 'zod';
@@ -31,7 +34,11 @@ export const authApi = {
       schema: acceptedResponseSchema,
     }),
   login: (body: LoginRequest) =>
-    apiRequest('/v1/auth/login', { method: 'POST', body, schema: sessionResponseSchema }),
+    apiRequest('/v1/auth/login', { method: 'POST', body, schema: loginResponseSchema }),
+  verifyMfa: (body: MfaVerifyRequest) =>
+    apiRequest('/v1/auth/mfa/verify', { method: 'POST', body, schema: loginResponseSchema }),
+  stepUp: (body: StepUpRequest) =>
+    apiRequest('/v1/auth/step-up', { method: 'POST', body, schema: stepUpResponseSchema }),
   logout: () => apiRequest('/v1/auth/logout', { method: 'POST' }),
   forgotPassword: (email: string) =>
     apiRequest('/v1/auth/password/forgot', {

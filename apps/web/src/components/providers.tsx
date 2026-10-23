@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SessionProvider } from '@/features/auth/session-provider';
+import { StepUpProvider } from '@/features/security/step-up-provider';
 import { QueryProvider } from '@/lib/query/provider';
 import { ShortcutsProvider } from '@/lib/shortcuts-provider';
 import { ThemeProvider } from '@/lib/theme';
@@ -17,7 +18,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <SessionProvider>
           <ShortcutsProvider>
             <TooltipProvider>
-              {children}
+              <StepUpProvider>{children}</StepUpProvider>
               <Toaster />
             </TooltipProvider>
           </ShortcutsProvider>

@@ -13,6 +13,7 @@ import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor.js
 import { IdSequenceService } from './ids/id-sequence.service.js';
 import { JobService } from './jobs/job.service.js';
 import { OutboxService } from './outbox/outbox.service.js';
+import { SecretsService } from './secrets/secrets.service.js';
 
 /**
  * Platform primitives available to every module (docs/architecture/platform-primitives.md):
@@ -32,8 +33,10 @@ import { OutboxService } from './outbox/outbox.service.js';
     OutboxService,
     JobService,
     IdempotencyInterceptor,
+    SecretsService,
   ],
   exports: [
+    SecretsService,
     IdSequenceService,
     AuditService,
     OutboxService,

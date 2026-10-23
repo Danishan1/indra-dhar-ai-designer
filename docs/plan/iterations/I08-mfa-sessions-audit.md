@@ -75,15 +75,15 @@ Raise the assurance level of the platform: users can enroll TOTP MFA with recove
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] TOTP service (RFC 6238, ±1 step window, replay prevention by remembering last used step).
-2. [ ] Recovery codes (hash with argon2/sha256+pepper; single-use).
-3. [ ] Two-phase login state (password ok → `mfa_pending` session that can only call verify).
-4. [ ] Policy-driven MFA requirement for privileged roles and org-wide flag; enrollment gate.
-5. [ ] Step-up obligation in PDP + guard + frontend retry dialog.
-6. [ ] Sessions APIs + UI; revocation side effects on password/MFA change.
-7. [ ] Security notification emails via mailer.
-8. [ ] Audit query service with filters and pagination; audit-of-audit-access.
-9. [ ] Tests; tag `m2-secure-base`; update `PROGRESS.md`.
+1. [x] TOTP service (RFC 6238, ±1 step window, replay prevention by remembering last used step).
+2. [x] Recovery codes (hash with argon2/sha256+pepper; single-use).
+3. [x] Two-phase login state (password ok → `mfa_pending` session that can only call verify).
+4. [x] Policy-driven MFA requirement for privileged roles and org-wide flag; enrollment gate.
+5. [x] Step-up obligation in PDP + guard + frontend retry dialog.
+6. [x] Sessions APIs + UI; revocation side effects on password/MFA change.
+7. [x] Security notification emails via mailer.
+8. [x] Audit query service with filters and pagination; audit-of-audit-access.
+9. [x] Tests; tag `m2-secure-base`; update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -93,12 +93,12 @@ Raise the assurance level of the platform: users can enroll TOTP MFA with recove
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — High-risk roles are protected by MFA and step-up per policy (AC-SEC-005; FR-SEC-035, 040).
-- [ ] AC2 — MFA enrollment, removal and recovery require proper verification; recovery codes are single-use and hashed (FR-SEC-037…039).
-- [ ] AC3 — Users can review and revoke sessions; password/MFA changes revoke other sessions (FR-SEC-054, 055).
-- [ ] AC4 — Security-sensitive actions produce durable, access-controlled audit records searchable by actor/resource/type/time/outcome (AC-SEC-011; FR-SEC-182).
-- [ ] AC5 — Security notification emails contain no secrets and delivery failure doesn't undo the action (FR-SEC-230, 232).
-- [ ] AC6 — **M2 exit** criteria from `04-roadmap.md` pass.
+- [x] AC1 — High-risk roles are protected by MFA and step-up per policy (AC-SEC-005; FR-SEC-035, 040).
+- [x] AC2 — MFA enrollment, removal and recovery require proper verification; recovery codes are single-use and hashed (FR-SEC-037…039).
+- [x] AC3 — Users can review and revoke sessions; password/MFA changes revoke other sessions (FR-SEC-054, 055).
+- [x] AC4 — Security-sensitive actions produce durable, access-controlled audit records searchable by actor/resource/type/time/outcome (AC-SEC-011; FR-SEC-182).
+- [x] AC5 — Security notification emails contain no secrets and delivery failure doesn't undo the action (FR-SEC-230, 232).
+- [x] AC6 — **M2 exit** criteria from `04-roadmap.md` pass.
 
 ## 10. Risks & notes
 
@@ -112,7 +112,23 @@ Raise the assurance level of the platform: users can enroll TOTP MFA with recove
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-23
+- Sessions used: 1 (estimate 2)
+- Open decision: passkeys → backlog (documented default); TOTP built now. ADR-043.
+- Deviations from plan (ADR-043 unless noted):
+  - Own TOTP implementation (RFC 6238 test vectors pass) instead of Better Auth's plugin; factors in new tables `mfa_factors` / `mfa_recovery_codes`, not `identity_credentials`. Recovery codes: HMAC-SHA256 (keyed with `BETTER_AUTH_SECRET`), not argon2 (50-bit random codes; a keyed hash is enough and lookup stays O(1)).
+  - Secrets service lives in `platform/secrets/` (ADR-007 minimal version, AAD-bound contexts).
+  - Platform rule for privileged roles is implemented as **"sensitive permissions require an MFA-verified session"** (plus org `requireMfa`), rather than blocking all org access for Owners/Admins/Billing/Credential admins without MFA — same protection for privileged actions, no lockout of ordinary work.
+  - Step-up permission list adds `organization.delete`; `regenerate recovery codes` checks step-up in the identity module (it is not org-scoped).
+  - Logout became `@Public()` so a half-finished (code outstanding) sign-in can be cancelled.
+  - Org-admin forced sign-out of a member (FR-SEC-056) not built: suspend/revoke already block the next org request; backlog item added.
+  - Idle timeout precision = session touch interval; org idle minimum is touch interval + 5 min.
+  - `SecurityPolicy` keys: `requireMfa`, `stepUpMaxAgeMinutes`, `sessionIdleMinutes`, `sessionAbsoluteHours` (+ the I07 placeholders). The I07 key `requireMfaForAdmins` was dropped (replaced by the sensitive-permission rule).
+  - Prisma schema now declares the I07 foreign keys of `roles` / `resource_grants` / `security_policies` (the generated diff otherwise dropped them) and the audit actor index.
+  - New file `docs/deployment/runbooks.md` (second-factor reset, last-owner recovery FR-SEC-082, master key).
+- Verification:
+  - `pnpm verify` 29/29: api unit 86 (TOTP RFC vectors + skew + replay, recovery codes, secrets AAD/tamper/production requirement, PDP MFA/step-up/session-limit table), contracts 32, web 37, worker 7.
+  - `pnpm test:integration`: api 71 incl. security 28 — new `mfa-sessions-audit` (8): no usable session without the second factor + code replay refused; recovery code single-use, hashes and encrypted secret at rest; disable needs password + code and signs out others; sensitive actions need MFA and `requireMfa` blocks non-MFA members; step-up required when stale and satisfied after `/auth/step-up`; sessions list/revoke/revoke-others with immediate rejection (TR-SEC-013); new-device notice without secrets; audit search permissioned, org-scoped, paginated, filtered, audited, and no passwords/TOTP secrets/recovery codes/session tokens anywhere in audit metadata (TR-SEC-023). Worker 13.
+  - `pnpm e2e` 17/17 — new: enrol MFA in Settings → Your security (QR + key + recovery codes), sign out, wrong code rejected, sign in with code, second device, revoke it, audit log page. The roles spec now enrols MFA before changing roles.
+  - **M2 demo** (register → verify → create org → invite → roles enforced → MFA → audit log) is covered end to end by the auth-flows, organizations, authorization and security specs; M2 exit criteria (isolation suite, every route declared, privileged actions audited) pass. Tagged `m2-secure-base`.
+- Follow-ups added to backlog: passkeys, SSO/SCIM, self-service factor reset + operator tooling, admin security notifications, audit retention/export, anomaly alerts, org forced sign-out, finer idle tracking.

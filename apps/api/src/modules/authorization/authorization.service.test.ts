@@ -1,4 +1,9 @@
-import { BASELINE_ROLES, type PermissionKey } from '@ai-designer/contracts';
+import {
+  BASELINE_ROLES,
+  DEFAULT_SECURITY_POLICY,
+  type PermissionKey,
+  type SecurityPolicyConfig,
+} from '@ai-designer/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AccessCache, MembershipAccess } from '../../platform/authz/access-cache.js';
@@ -8,6 +13,7 @@ import { ResourceResolverRegistry } from '../../platform/authz/resource-resolver
 import { AuthorizationService } from './authorization.service.js';
 import type { ResourceGrantService } from './grants.service.js';
 import type { RolePermissions } from './role-permissions.js';
+import type { SecurityPolicyService } from './security-policy.service.js';
 
 const ORG = '00000000-0000-7000-8000-00000000a001';
 const OTHER_ORG = '00000000-0000-7000-8000-00000000b001';
@@ -20,6 +26,7 @@ function setup(
     directoryThrows?: boolean;
     grant?: boolean;
     resourceOrg?: string | null;
+    policy?: Partial<SecurityPolicyConfig>;
   } = {},
 ) {
   const directories = new MembershipDirectoryRegistry();
@@ -51,6 +58,13 @@ function setup(
     rolePermissions as unknown as RolePermissions,
     resolvers,
     grants as unknown as ResourceGrantService,
+    {
+      current: async () => ({
+        version: 1,
+        config: { ...DEFAULT_SECURITY_POLICY, ...opts.policy },
+        updatedAt: null,
+      }),
+    } as unknown as SecurityPolicyService,
   );
   return { pdp, grants };
 }
@@ -180,5 +194,84 @@ describe('AuthorizationService (PDP)', () => {
       resource: { type: 'nope', id: USER },
     });
     expect(d.reasonCode).toBe('POLICY_UNAVAILABLE');
+  });
+
+  const session = (
+    over: Partial<{
+      mfaVerified: boolean;
+      stepUpAt: Date | null;
+      createdAt: Date;
+      lastSeenAt: Date;
+    }> = {},
+  ) => ({
+    mfaVerified: true,
+    stepUpAt: new Date(),
+    createdAt: new Date(),
+    lastSeenAt: new Date(),
+    ...over,
+  });
+
+  it('sensitive permissions need an MFA-verified session, even for owners (AC-SEC-005)', async () => {
+    const { pdp } = setup({ access: member('organization_owner') });
+    const ask = (mfaVerified: boolean) =>
+      pdp.authorize({
+        principal: human,
+        organizationId: ORG,
+        permission: 'members.manage',
+        session: session({ mfaVerified }),
+      });
+    expect((await ask(false)).reasonCode).toBe('MFA_REQUIRED');
+    expect((await ask(true)).decision).toBe('allow');
+    // Non-sensitive work does not need MFA.
+    const view = await pdp.authorize({
+      principal: human,
+      organizationId: ORG,
+      permission: 'members.view',
+      session: session({ mfaVerified: false }),
+    });
+    expect(view.decision).toBe('allow');
+  });
+
+  it('adds a step-up obligation when the last verification is too old (FR-SEC-040)', async () => {
+    const { pdp } = setup({
+      access: member('organization_owner'),
+      policy: { stepUpMaxAgeMinutes: 10 },
+    });
+    const fresh = await pdp.authorize({
+      principal: human,
+      organizationId: ORG,
+      permission: 'organization.transfer_ownership',
+      session: session(),
+    });
+    expect(fresh).toMatchObject({ decision: 'allow', obligations: [] });
+    const stale = await pdp.authorize({
+      principal: human,
+      organizationId: ORG,
+      permission: 'organization.transfer_ownership',
+      session: session({ stepUpAt: new Date(Date.now() - 11 * 60_000) }),
+    });
+    expect(stale.obligations).toEqual([{ type: 'step_up', maxAgeMinutes: 10 }]);
+  });
+
+  it('applies the organization MFA requirement and session limits', async () => {
+    const strict = setup({ access: member('viewer'), policy: { requireMfa: true } });
+    expect(
+      (
+        await strict.pdp.authorize({
+          principal: human,
+          organizationId: ORG,
+          permission: 'design.view',
+          session: session({ mfaVerified: false }),
+        })
+      ).reasonCode,
+    ).toBe('MFA_REQUIRED');
+    const limited = setup({ access: member('viewer'), policy: { sessionAbsoluteHours: 1 } });
+    const old = await limited.pdp.authorize({
+      principal: human,
+      organizationId: ORG,
+      permission: 'design.view',
+      session: session({ createdAt: new Date(Date.now() - 2 * 3_600_000) }),
+    });
+    expect(old.reasonCode).toBe('SESSION_POLICY_EXPIRED');
   });
 });

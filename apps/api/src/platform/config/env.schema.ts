@@ -56,6 +56,19 @@ export const apiEnvSchema = z
     SESSION_TOUCH_INTERVAL_MIN: z.coerce.number().int().min(1).default(60),
     AUTH_LOCKOUT_THRESHOLD: z.coerce.number().int().min(3).default(5),
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().min(1).default(15),
+    /**
+     * Master key for envelope encryption of secrets at rest (ADR-007): TOTP secrets now, provider
+     * credentials in I22. 32 random bytes, base64 (`openssl rand -base64 32`). Required in
+     * production; outside production a key derived from BETTER_AUTH_SECRET is used when unset.
+     */
+    SECRETS_MASTER_KEY: z
+      .string()
+      .refine((v) => Buffer.from(v, 'base64').length === 32, {
+        message: 'must be 32 random bytes, base64-encoded (openssl rand -base64 32)',
+      })
+      .optional(),
+    /** Issuer shown in authenticator apps. */
+    MFA_ISSUER: z.string().min(1).max(64).default('AI Designer'),
     /** Browser origins allowed to send cookie-authenticated mutations (CSRF). Defaults to APP_BASE_URL. */
     AUTH_TRUSTED_ORIGINS: z.string().optional(),
     /** Express `trust proxy` (who may set X-Forwarded-For): 'loopback', a CIDR list, or a hop count. */
@@ -67,7 +80,16 @@ export const apiEnvSchema = z
     API_DEV_ROUTES: booleanString.optional(),
   })
   // Logging variables (LOG_LEVEL, LOG_PRETTY, LOG_TO_FILE, LOG_DIR, …) are shared with the worker/web.
-  .extend(logEnvSchema.omit({ NODE_ENV: true }).shape);
+  .extend(logEnvSchema.omit({ NODE_ENV: true }).shape)
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === 'production' && !env.SECRETS_MASTER_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SECRETS_MASTER_KEY'],
+        message: 'required in production (openssl rand -base64 32)',
+      });
+    }
+  });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;
 

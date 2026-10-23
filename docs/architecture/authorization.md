@@ -55,6 +55,26 @@ Responses: anonymous → 401; not a member, revoked, unknown org, or a resource 
 (`reason: membership_suspended`); missing permission → 403 (`reason: missing_permission`,
 `permission: <key>`); PDP dependency failure → 503 `DEPENDENCY_UNAVAILABLE`.
 
+## Assurance: MFA, step-up and session limits (I08, ADR-043)
+
+After membership and permission checks the PDP applies the organization's security policy
+(`security_policies`, versioned; `GET/PUT /v1/orgs/:orgId/security-policy`):
+
+1. **Session limits** — `sessionIdleMinutes` / `sessionAbsoluteHours` can only tighten the platform
+   timeouts; an older session gets 401 (`reason: session_policy_expired`) for that organization.
+2. **`requireMfa`** — every request into the organization needs an MFA-verified session.
+3. **Sensitive permissions** (`sensitive: true` in the catalog: member/role management, security
+   policy, audit, billing, credentials, approvals, releases, ownership…) always need an
+   MFA-verified session → 403 `MFA_REQUIRED` otherwise. Owners are not exempt (AC-SEC-005).
+4. **Step-up** — permissions in `STEP_UP_PERMISSIONS` (ownership transfer, org export/delete,
+   security policy, billing, credentials, tech-pack release) also need `step_up_at` within
+   `stepUpMaxAgeMinutes` (default 10). The PDP returns an obligation; the guard answers 403
+   `STEP_UP_REQUIRED` (`details.maxAgeMinutes`). The web client opens the step-up dialog
+   (`features/security/step-up-provider.tsx`), calls `POST /v1/auth/step-up` and retries the request
+   once (`setStepUpHandler` in `lib/api/client.ts`).
+
+Policy reads are cached in-process for 30 s (cleared locally on change).
+
 ## Register a resource type
 
 Each module that owns tenant resources registers a resolver in `onModuleInit` (see

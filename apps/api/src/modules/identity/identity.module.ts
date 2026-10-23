@@ -7,7 +7,10 @@ import { BETTER_AUTH, betterAuthProvider } from './better-auth.provider.js';
 import { IdentityHooksService } from './identity-hooks.service.js';
 import { IdentityMailService } from './identity-mail.service.js';
 import { MeController } from './me.controller.js';
+import { MfaService } from './mfa/mfa.service.js';
+import { SecurityController } from './security.controller.js';
 import { SessionMiddleware } from './session.middleware.js';
+import { SessionsService } from './sessions.service.js';
 import { VerificationTokenService } from './verification-token.service.js';
 
 /**
@@ -15,7 +18,7 @@ import { VerificationTokenService } from './verification-token.service.js';
  * sessions, identity_credentials and verification_tokens tables. Organizations arrive in I06.
  */
 @Module({
-  controllers: [AuthController, MeController],
+  controllers: [AuthController, MeController, SecurityController],
   providers: [
     AccountService,
     VerificationTokenService,
@@ -23,9 +26,11 @@ import { VerificationTokenService } from './verification-token.service.js';
     IdentityHooksService,
     betterAuthProvider,
     AuthService,
+    MfaService,
+    SessionsService,
     SessionMiddleware,
   ],
-  exports: [AccountService, BETTER_AUTH],
+  exports: [AccountService, BETTER_AUTH, MfaService],
 })
 export class IdentityModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

@@ -59,6 +59,7 @@ model AuditEvent {
   occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
   @@index([organizationId, occurredAt])
+  @@index([organizationId, actorId, occurredAt], map: "audit_events_org_actor_idx")
   @@index([resourceType, resourceId])
   @@index([eventType, occurredAt])
   @@map("audit_events")
@@ -177,6 +178,8 @@ model User {
   updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions         Session[]
   credentials      IdentityCredential[]
+  mfaFactors       MfaFactor[]
+  recoveryCodes    MfaRecoveryCode[]
 
   @@index([status])
   @@map("users")
@@ -192,7 +195,12 @@ model Session {
   expiresAt         DateTime @map("expires_at") @db.Timestamptz(6)
   /// Absolute expiry; never extended.
   absoluteExpiresAt DateTime @map("absolute_expires_at") @db.Timestamptz(6)
+  /// password | mfa_pending (password ok, second factor outstanding) | mfa_verified (I08)
   authAssurance     String   @default("password") @map("auth_assurance")
+  /// When this session last completed a second factor.
+  mfaVerifiedAt     DateTime? @map("mfa_verified_at") @db.Timestamptz(6)
+  /// Last re-verification (login, MFA or step-up); step-up actions need it to be recent (FR-SEC-040).
+  stepUpAt          DateTime? @map("step_up_at") @db.Timestamptz(6)
   /// HMAC of the client IP (never the raw address).
   ipAddress         String?  @map("ip_hash")
   userAgent         String?  @map("user_agent_summary")
@@ -225,6 +233,38 @@ model IdentityCredential {
   @@unique([providerId, accountId])
   @@index([userId])
   @@map("identity_credentials")
+}
+
+/// Second factors (I08). TOTP secrets are envelope-encrypted with the secrets master key (ADR-007);
+/// `lastUsedStep` blocks replay of a code within its validity window.
+model MfaFactor {
+  id               String    @id @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  /// totp (passkeys later)
+  type             String
+  /// pending (setup started) | active
+  status           String
+  secretCiphertext String    @map("secret_ciphertext")
+  lastUsedStep     BigInt?   @map("last_used_step")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  confirmedAt      DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("mfa_factors")
+}
+
+/// Single-use recovery codes, stored only as keyed hashes (FR-SEC-037).
+model MfaRecoveryCode {
+  id        String    @id @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @unique @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
 }
 
 /// Single-use tokens (email verification, password reset). `identifier` is stored as a SHA-256
@@ -260,6 +300,10 @@ model Organization {
   updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   workspaces  Workspace[]
   memberships Membership[]
+  /// Relations declared so Prisma keeps the FKs (rows owned by the authorization module).
+  customRoles      Role[]
+  resourceGrants   ResourceGrant[]
+  securityPolicies SecurityPolicy[]
   invitations Invitation[]
 
   @@map("organizations")
@@ -300,6 +344,7 @@ model Role {
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   memberships    MembershipRole[]
   permissions    RolePermission[]
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("roles")
 }
@@ -345,6 +390,7 @@ model ResourceGrant {
   revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
   revokedBy      String?   @map("revoked_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, recipientType, recipientId])
   @@index([resourceType, resourceId])
@@ -359,6 +405,7 @@ model SecurityPolicy {
   config         Json     @default("{}")
   createdBy      String?  @map("created_by") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, version])
   @@map("security_policies")

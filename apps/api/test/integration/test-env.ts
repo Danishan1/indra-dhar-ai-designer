@@ -15,6 +15,8 @@ export const TEST_ENV: Record<string, string> = {
   S3_ACCESS_KEY_ID: 'aid-dev-access-key',
   S3_SECRET_ACCESS_KEY: 'aid-dev-secret-key-change-me',
   BETTER_AUTH_SECRET: 'integration-test-secret-integration-test-00',
+  // 32 bytes of 0x01 — test-only key.
+  SECRETS_MASTER_KEY: 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=',
   SMTP_URL: 'smtp://localhost:51025',
   APP_BASE_URL: 'http://localhost:3000',
   S3_FORCE_PATH_STYLE: 'true',

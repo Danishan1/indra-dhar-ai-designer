@@ -8,6 +8,8 @@ export type {
   Job,
   JobAttempt,
   Membership,
+  MfaFactor,
+  MfaRecoveryCode,
   MembershipRole,
   Organization,
   OutboxEvent,

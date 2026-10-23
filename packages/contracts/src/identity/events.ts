@@ -23,6 +23,30 @@ export const SessionRevokedEvent = defineEvent(
   z.object({
     userId: z.uuid(),
     sessionId: z.uuid(),
-    reason: z.enum(['logout', 'password_reset', 'password_change', 'expired', 'admin']),
+    reason: z.enum([
+      'logout',
+      'password_reset',
+      'password_change',
+      'expired',
+      'admin',
+      'user_revoked',
+      'mfa_change',
+    ]),
   }),
+);
+
+export const MfaEnabledEvent = defineEvent(
+  'identity.mfa_enabled',
+  1,
+  z.object({ userId: z.uuid(), method: z.literal('totp') }),
+);
+export const MfaDisabledEvent = defineEvent(
+  'identity.mfa_disabled',
+  1,
+  z.object({ userId: z.uuid(), method: z.literal('totp') }),
+);
+export const RecoveryCodesRegeneratedEvent = defineEvent(
+  'identity.recovery_codes_regenerated',
+  1,
+  z.object({ userId: z.uuid() }),
 );

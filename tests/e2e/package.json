@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@ai-designer/config": "workspace:*",
+    "@ai-designer/test-utils": "workspace:*",
     "@playwright/test": "1.64.0",
     "@types/node": "^24.0.0",
     "eslint": "10.13.0",

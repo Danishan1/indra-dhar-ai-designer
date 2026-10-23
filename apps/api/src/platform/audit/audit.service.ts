@@ -1,4 +1,10 @@
-import { type AuditInput, type DbClient, recordAuditEvent, type WriteMeta } from '@ai-designer/db';
+import {
+  type AuditInput,
+  type DbClient,
+  type Prisma,
+  recordAuditEvent,
+  type WriteMeta,
+} from '@ai-designer/db';
 import { Injectable } from '@nestjs/common';
 
 import { RequestContext } from '../context/request-context.js';
@@ -15,5 +21,10 @@ export class AuditService {
     meta: Partial<WriteMeta> = {},
   ): Promise<string> {
     return recordAuditEvent(db, input, RequestContext.writeMeta(meta));
+  }
+
+  /** Counts matching audit events (e.g. "has this user signed in from this device before?"). */
+  countEvents(where: Prisma.AuditEventWhereInput): Promise<number> {
+    return this.prisma.auditEvent.count({ where });
   }
 }
