@@ -45,6 +45,12 @@ fetching or config code, read the matching guide in `apps/web/node_modules/next/
 - Org-scoped query keys start with `queryKeys.org(orgId)`; switching org removes other orgs' cached queries.
 - `can('members.invite')` / `usePermission()` / `<Can permission=…>` (`features/authorization/can.tsx`) come from `GET /v1/me/permissions` and only hide UI; the API enforces (`docs/architecture/authorization.md`).
 
+## Form controls
+
+- Never use the native `<select>`: its open list is drawn by the browser/OS and ignores the theme.
+  Use `SimpleSelect` (or the `Select*` parts) from `components/ui/select.tsx` (Radix Select); it
+  works inside `FormField` and with React Hook Form via `<Controller>`.
+
 ## API access
 
 - The browser calls the API **same-origin** at `/v1/*`; `next.config.ts` rewrites it to `API_BASE_URL`

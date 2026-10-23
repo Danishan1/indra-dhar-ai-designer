@@ -29,7 +29,12 @@ test('an owner demotes an admin to viewer: the UI hides admin actions and the AP
   await owner.getByRole('button', { name: 'Invite' }).click();
   const dialog = owner.getByRole('dialog');
   await dialog.getByLabel('Email').fill(adminEmail);
-  await dialog.getByLabel('Role').selectOption('organization_admin');
+  await dialog.getByRole('combobox', { name: 'Role' }).click();
+  // Themed list (not the browser's native one): role name + description per option.
+  const adminOption = owner.getByRole('option', { name: /^Admin/ });
+  await expect(adminOption).toContainText('Members, settings');
+  await adminOption.click();
+  await expect(dialog.getByRole('combobox', { name: 'Role' })).toHaveText(/Admin/);
   await dialog.getByRole('button', { name: 'Send invitation' }).click();
   await expect(owner.getByText(`Invitation sent to ${adminEmail}`)).toBeVisible();
 

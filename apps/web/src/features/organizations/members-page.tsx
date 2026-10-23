@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { SimpleSelect } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -103,19 +104,23 @@ function InviteDialog({
             <Input type="email" autoFocus {...form.register('email')} />
           </FormField>
           <FormField label="Role" error={form.formState.errors.role?.message}>
-            <select
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-[13px] focus-visible:outline-2 focus-visible:outline-ring"
-              {...form.register('role')}
-            >
-              {(invitable.length ? invitable : []).map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.name} — {r.description}
-                </option>
-              ))}
-              {!invitable.length ? (
-                <option value="designer">{OrgRoleLabels.designer}</option>
-              ) : null}
-            </select>
+            <SimpleSelect
+              value={form.watch('role')}
+              onValueChange={(v) =>
+                form.setValue('role', v as CreateInvitationRequest['role'], {
+                  shouldValidate: true,
+                })
+              }
+              options={
+                invitable.length
+                  ? invitable.map((r) => ({
+                      value: r.key,
+                      label: r.name,
+                      description: r.description,
+                    }))
+                  : [{ value: 'designer', label: OrgRoleLabels.designer }]
+              }
+            />
           </FormField>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

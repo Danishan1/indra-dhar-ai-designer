@@ -15,6 +15,7 @@ import { FormField } from '@/components/forms/form-field';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SimpleSelect } from '@/components/ui/select';
 import { useSession } from '@/features/auth/session-provider';
 import { queryKeys } from '@/lib/query/keys';
 
@@ -99,18 +100,17 @@ function TransferOwnership() {
         </p>
       </div>
       <FormField label="New owner">
-        <select
-          className="h-8 rounded-md border border-input bg-transparent px-2 text-[13px] focus-visible:outline-2 focus-visible:outline-ring"
+        <SimpleSelect
           value={target}
-          onChange={(e) => setTarget(e.target.value)}
-        >
-          <option value="">Choose an active member…</option>
-          {candidates.map((m) => (
-            <option key={m.membershipId} value={m.membershipId}>
-              {m.displayName} ({m.email})
-            </option>
-          ))}
-        </select>
+          onValueChange={setTarget}
+          placeholder={candidates.length ? 'Choose an active member…' : 'No other active members'}
+          disabled={!candidates.length}
+          options={candidates.map((m) => ({
+            value: m.membershipId,
+            label: m.displayName,
+            description: m.email,
+          }))}
+        />
       </FormField>
       <FormField label={`Type “${active.name}” to confirm`}>
         <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
