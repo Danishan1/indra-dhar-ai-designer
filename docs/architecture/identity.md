@@ -49,7 +49,7 @@ Every outcome writes an audit event (`identity.*`), and state changes append out
   absolute `SESSION_ABSOLUTE_TIMEOUT_H` (30 d) enforced by `SessionMiddleware`, which also rejects
   non-`active` accounts and deletes the offending session.
 - The middleware sets `RequestContext.principal = { type: 'human', id }` and `req.auth`.
-  Protect a route with `@RequireAuth()`; read the user with `currentUserId()`.
+  Protect a route with `@AuthenticatedOnly()` (or a permission decorator, see `authorization.md`); read the user with `currentUserId()`.
 
 ## CSRF (FR-SEC-049)
 
@@ -95,8 +95,8 @@ if Redis is down. `TRUST_PROXY` (default `loopback`) decides who may set `X-Forw
 
 ## Organizations & org-scoped routes (I06, ADR-041)
 
-- Tables (module `organizations`): `organizations`, `workspaces` (one default per org), `roles` (placeholder system roles with fixed ids: owner `…0001`, admin `…0002`, designer `…0003`), `memberships` (`invited | active | suspended | revoked`, at most one live row per org+user), `membership_roles`, `invitations` (sha256 token hash, 7-day TTL, `pending | accepted | cancelled | expired`).
-- Org-scoped controllers put the org in the path (`/v1/orgs/:orgId/…`) and use `@OrgAccess()` (any active member) or `@OrgAccess('organization_owner', 'organization_admin')`. The guard implies `@RequireAuth()`, loads the caller's membership live each request, answers **404** for non-members / revoked / malformed ids, **403** for suspended members or a missing role, stores it on `req.orgMembership` (read with `orgMembership(req)`) and sets `RequestContext.organizationId`. Never read an org id from a header or body for authorization.
-- Role rules (until I07): owner manages everyone; admin manages designers; nobody grants above their own rank; ownership only moves via `POST /v1/orgs/:orgId/ownership-transfer` (type the org name; previous owner becomes admin); the last active owner cannot be suspended/revoked (`LAST_OWNER_REQUIRED`).
+- Tables (module `organizations`): `organizations`, `workspaces` (one default per org), `memberships` (`invited | active | suspended | revoked`, at most one live row per org+user), `membership_roles`, `invitations` (sha256 token hash, 7-day TTL, `pending | accepted | cancelled | expired`).
+- Org-scoped controllers put the org in the path (`/v1/orgs/:orgId/…`) and declare `@RequirePermission(…)` / `@RequireMembership()`; the global guard verifies the live membership and sets `req.authz` (read with `authzContext(req)`) and `RequestContext.organizationId`. Roles, permissions, delegation and caching: **`authorization.md`** (I07). Never read an org id from a header or body for authorization.
+- Ownership only moves via `POST /v1/orgs/:orgId/ownership-transfer` (type the org name; the new owner keeps their other roles, the previous owner becomes admin); the last active owner cannot be suspended/revoked (`LAST_OWNER_REQUIRED`).
 - Invitations: tokens only in request bodies (`POST /v1/invitations/preview`, `/accept`); acceptance requires a signed-in, verified user whose email equals the invitation email (`INVITATION_EMAIL_MISMATCH` otherwise) and consumes the invitation atomically; resend rotates the token. Same email domain never grants access (FR-SEC-068).
-- Other modules get the current org from `orgMembership(req)` / `RequestContext`; they must not query `memberships` directly (I07 provides the PDP).
+- Other modules get the current org from `authzContext(req)` / `RequestContext`; they must not query `memberships` directly (the PDP reads them through the organizations module's `MembershipDirectory`).

@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {
     ...testDefaults,
-    include: ['src/**/*.int.test.ts', 'test/integration/**/*.int.test.ts'],
+    include: [
+      'src/**/*.int.test.ts',
+      'test/integration/**/*.int.test.ts',
+      'test/security/**/*.int.test.ts',
+    ],
     globalSetup: ['test/integration/global-setup.ts'],
     setupFiles: ['test/integration/setup-file.ts'],
     fileParallelism: false,

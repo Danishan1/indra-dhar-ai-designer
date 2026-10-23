@@ -246,7 +246,7 @@ describe('organizations, memberships & invitations (integration)', () => {
     ).toBeGreaterThanOrEqual(4);
   });
 
-  it('enforces placeholder roles: designers cannot invite or manage; admins cannot manage admins or owners', async () => {
+  it('enforces permissions: designers cannot invite or manage; admins cannot manage owners or transfer ownership', async () => {
     const { client: owner, org } = await ownerWithOrg();
     const designer = await memberJoined(owner, org.id, 'designer');
     expect(
@@ -297,9 +297,10 @@ describe('organizations, memberships & invitations (integration)', () => {
     const members = await json<{ items: MemberBody[] }>(
       await owner.get(`/v1/orgs/${org.id}/members`),
     );
-    expect(members.items.find((m) => m.membershipId === admin.membershipId)?.roles).toEqual([
-      'organization_owner',
-    ]);
+    // The new owner keeps the roles they had (I07); the previous owner becomes admin.
+    expect(
+      [...(members.items.find((m) => m.membershipId === admin.membershipId)?.roles ?? [])].sort(),
+    ).toEqual(['organization_admin', 'organization_owner']);
     expect(members.items.find((m) => m.membershipId === org.membership.id)?.roles).toEqual([
       'organization_admin',
     ]);
@@ -321,7 +322,7 @@ describe('organizations, memberships & invitations (integration)', () => {
   it('LAST_OWNER_REQUIRED when two owners exist and one tries to remove the other last active one', async () => {
     const { client: owner, org } = await ownerWithOrg('Two Owners');
     const second = await memberJoined(owner, org.id, 'organization_admin');
-    // Make second an owner as well (direct DB setup: multi-owner orgs arrive with I07 role management).
+    // Make second an owner as well (direct DB setup: Owner is never granted through role management, only by transfer).
     await prisma.membershipRole.updateMany({
       where: { membershipId: second.membershipId },
       data: { roleId: '00000000-0000-7000-8000-000000000001' },

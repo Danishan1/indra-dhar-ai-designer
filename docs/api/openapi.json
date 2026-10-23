@@ -14,6 +14,9 @@
       "name": "auth"
     },
     {
+      "name": "authorization"
+    },
+    {
       "name": "health"
     },
     {
@@ -171,7 +174,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/auth/logout": {
@@ -220,7 +224,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       }
     },
     "/v1/auth/password/change": {
@@ -305,7 +310,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       }
     },
     "/v1/auth/password/forgot": {
@@ -389,7 +395,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/auth/password/reset": {
@@ -476,7 +483,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/auth/register": {
@@ -573,7 +581,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/auth/resend-verification": {
@@ -657,7 +666,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/auth/verify-email": {
@@ -738,7 +748,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/health": {
@@ -802,7 +813,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/health/ready": {
@@ -903,7 +915,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/invitations/accept": {
@@ -994,7 +1007,15 @@
                                 "enum": [
                                   "organization_owner",
                                   "organization_admin",
-                                  "designer"
+                                  "design_lead",
+                                  "designer",
+                                  "merchandiser",
+                                  "production_user",
+                                  "approver",
+                                  "billing_admin",
+                                  "credential_admin",
+                                  "viewer",
+                                  "external_collaborator"
                                 ]
                               }
                             }
@@ -1092,7 +1113,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       }
     },
     "/v1/invitations/preview": {
@@ -1146,7 +1168,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -1196,7 +1226,8 @@
               }
             }
           }
-        }
+        },
+        "x-authorization": "public"
       }
     },
     "/v1/me": {
@@ -1291,7 +1322,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       },
       "patch": {
         "operationId": "Me_update",
@@ -1404,7 +1436,208 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
+      }
+    },
+    "/v1/me/permissions": {
+      "get": {
+        "operationId": "Authorization_myPermissions",
+        "summary": "Your roles and permissions in an organization (for UI gating only)",
+        "tags": [
+          "authorization"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "organization_owner",
+                          "organization_admin",
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
+                        ]
+                      }
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "organization.view",
+                          "organization.update",
+                          "organization.transfer_ownership",
+                          "organization.export",
+                          "organization.delete",
+                          "members.view",
+                          "members.invite",
+                          "members.manage",
+                          "members.manage_roles",
+                          "roles.view",
+                          "roles.manage",
+                          "security_policy.manage",
+                          "audit.view",
+                          "audit.export",
+                          "api_tokens.manage",
+                          "notifications.manage",
+                          "project.view",
+                          "project.create",
+                          "project.edit",
+                          "project.archive",
+                          "project.delete",
+                          "project.manage_access",
+                          "asset.view",
+                          "asset.upload",
+                          "asset.delete",
+                          "design.view",
+                          "design.create",
+                          "design.edit",
+                          "design.commit",
+                          "design.restore",
+                          "design.generate",
+                          "design.export",
+                          "design.submit_review",
+                          "design.approve",
+                          "design.revoke_approval",
+                          "review.view",
+                          "review.comment",
+                          "artifact.view",
+                          "artifact.use",
+                          "artifact.create",
+                          "artifact.edit",
+                          "artifact.publish",
+                          "artifact.delete",
+                          "operation.submit",
+                          "operation.view",
+                          "job.view",
+                          "job.cancel",
+                          "validation.view",
+                          "validation.run",
+                          "validation.override",
+                          "techpack.view",
+                          "techpack.create",
+                          "techpack.edit",
+                          "techpack.view_costing",
+                          "techpack.submit_review",
+                          "techpack.review",
+                          "techpack.approve",
+                          "techpack.approve_exception",
+                          "techpack.release",
+                          "techpack.withdraw",
+                          "techpack.distribute",
+                          "techpack.export",
+                          "usage.view",
+                          "billing.view",
+                          "billing.manage",
+                          "budget.manage",
+                          "credentials.view",
+                          "credentials.manage",
+                          "platform.ai.manage",
+                          "platform.ai.inspect",
+                          "platform.billing.manage",
+                          "platform.billing.adjust",
+                          "platform.billing.refund",
+                          "platform.pricing.manage",
+                          "platform.finance.view",
+                          "platform.finance.reconcile",
+                          "platform.catalog.manage",
+                          "platform.settings.manage",
+                          "platform.security.manage",
+                          "platform.support.view",
+                          "platform.breakglass.request"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "organizationId",
+                    "roles",
+                    "permissions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "authenticated"
       }
     },
     "/v1/orgs": {
@@ -1477,7 +1710,15 @@
                                   "enum": [
                                     "organization_owner",
                                     "organization_admin",
-                                    "designer"
+                                    "design_lead",
+                                    "designer",
+                                    "merchandiser",
+                                    "production_user",
+                                    "approver",
+                                    "billing_admin",
+                                    "credential_admin",
+                                    "viewer",
+                                    "external_collaborator"
                                   ]
                                 }
                               }
@@ -1546,7 +1787,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       },
       "post": {
         "operationId": "Organizations_create",
@@ -1632,7 +1874,15 @@
                             "enum": [
                               "organization_owner",
                               "organization_admin",
-                              "designer"
+                              "design_lead",
+                              "designer",
+                              "merchandiser",
+                              "production_user",
+                              "approver",
+                              "billing_admin",
+                              "credential_admin",
+                              "viewer",
+                              "external_collaborator"
                             ]
                           }
                         }
@@ -1704,7 +1954,8 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "authenticated"
       }
     },
     "/v1/orgs/{orgId}": {
@@ -1784,7 +2035,15 @@
                             "enum": [
                               "organization_owner",
                               "organization_admin",
-                              "designer"
+                              "design_lead",
+                              "designer",
+                              "merchandiser",
+                              "production_user",
+                              "approver",
+                              "billing_admin",
+                              "credential_admin",
+                              "viewer",
+                              "external_collaborator"
                             ]
                           }
                         }
@@ -1866,7 +2125,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "organization.view"
       },
       "patch": {
         "operationId": "Organizations_update",
@@ -1964,7 +2225,15 @@
                             "enum": [
                               "organization_owner",
                               "organization_admin",
-                              "designer"
+                              "design_lead",
+                              "designer",
+                              "merchandiser",
+                              "production_user",
+                              "approver",
+                              "billing_admin",
+                              "credential_admin",
+                              "viewer",
+                              "external_collaborator"
                             ]
                           }
                         }
@@ -2046,7 +2315,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "organization.update"
       }
     },
     "/v1/orgs/{orgId}/invitations": {
@@ -2096,7 +2367,15 @@
                               "enum": [
                                 "organization_owner",
                                 "organization_admin",
-                                "designer"
+                                "design_lead",
+                                "designer",
+                                "merchandiser",
+                                "production_user",
+                                "approver",
+                                "billing_admin",
+                                "credential_admin",
+                                "viewer",
+                                "external_collaborator"
                               ]
                             }
                           },
@@ -2214,7 +2493,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.invite"
       },
       "post": {
         "operationId": "OrgInvitations_create",
@@ -2248,8 +2529,17 @@
                   "role": {
                     "type": "string",
                     "enum": [
+                      "organization_owner",
                       "organization_admin",
-                      "designer"
+                      "design_lead",
+                      "designer",
+                      "merchandiser",
+                      "production_user",
+                      "approver",
+                      "billing_admin",
+                      "credential_admin",
+                      "viewer",
+                      "external_collaborator"
                     ]
                   }
                 },
@@ -2284,7 +2574,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -2415,7 +2713,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.invite"
       }
     },
     "/v1/orgs/{orgId}/invitations/{invitationId}/cancel": {
@@ -2516,7 +2816,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.invite"
       }
     },
     "/v1/orgs/{orgId}/invitations/{invitationId}/resend": {
@@ -2571,7 +2873,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -2702,7 +3012,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.invite"
       }
     },
     "/v1/orgs/{orgId}/members": {
@@ -2770,7 +3082,15 @@
                               "enum": [
                                 "organization_owner",
                                 "organization_admin",
-                                "designer"
+                                "design_lead",
+                                "designer",
+                                "merchandiser",
+                                "production_user",
+                                "approver",
+                                "billing_admin",
+                                "credential_admin",
+                                "viewer",
+                                "external_collaborator"
                               ]
                             }
                           },
@@ -2871,7 +3191,389 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.view"
+      }
+    },
+    "/v1/orgs/{orgId}/members/{membershipId}/effective-permissions": {
+      "get": {
+        "operationId": "Authorization_effectivePermissions",
+        "summary": "Effective permissions of a member (yourself, or anyone with members.view)",
+        "tags": [
+          "authorization"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "membershipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "membershipId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "organization_owner",
+                          "organization_admin",
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
+                        ]
+                      }
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "enum": [
+                              "organization.view",
+                              "organization.update",
+                              "organization.transfer_ownership",
+                              "organization.export",
+                              "organization.delete",
+                              "members.view",
+                              "members.invite",
+                              "members.manage",
+                              "members.manage_roles",
+                              "roles.view",
+                              "roles.manage",
+                              "security_policy.manage",
+                              "audit.view",
+                              "audit.export",
+                              "api_tokens.manage",
+                              "notifications.manage",
+                              "project.view",
+                              "project.create",
+                              "project.edit",
+                              "project.archive",
+                              "project.delete",
+                              "project.manage_access",
+                              "asset.view",
+                              "asset.upload",
+                              "asset.delete",
+                              "design.view",
+                              "design.create",
+                              "design.edit",
+                              "design.commit",
+                              "design.restore",
+                              "design.generate",
+                              "design.export",
+                              "design.submit_review",
+                              "design.approve",
+                              "design.revoke_approval",
+                              "review.view",
+                              "review.comment",
+                              "artifact.view",
+                              "artifact.use",
+                              "artifact.create",
+                              "artifact.edit",
+                              "artifact.publish",
+                              "artifact.delete",
+                              "operation.submit",
+                              "operation.view",
+                              "job.view",
+                              "job.cancel",
+                              "validation.view",
+                              "validation.run",
+                              "validation.override",
+                              "techpack.view",
+                              "techpack.create",
+                              "techpack.edit",
+                              "techpack.view_costing",
+                              "techpack.submit_review",
+                              "techpack.review",
+                              "techpack.approve",
+                              "techpack.approve_exception",
+                              "techpack.release",
+                              "techpack.withdraw",
+                              "techpack.distribute",
+                              "techpack.export",
+                              "usage.view",
+                              "billing.view",
+                              "billing.manage",
+                              "budget.manage",
+                              "credentials.view",
+                              "credentials.manage",
+                              "platform.ai.manage",
+                              "platform.ai.inspect",
+                              "platform.billing.manage",
+                              "platform.billing.adjust",
+                              "platform.billing.refund",
+                              "platform.pricing.manage",
+                              "platform.finance.view",
+                              "platform.finance.reconcile",
+                              "platform.catalog.manage",
+                              "platform.settings.manage",
+                              "platform.security.manage",
+                              "platform.support.view",
+                              "platform.breakglass.request"
+                            ]
+                          },
+                          "viaRoles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "organization_owner",
+                                "organization_admin",
+                                "design_lead",
+                                "designer",
+                                "merchandiser",
+                                "production_user",
+                                "approver",
+                                "billing_admin",
+                                "credential_admin",
+                                "viewer",
+                                "external_collaborator"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "viaRoles"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "grants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "resourceType": {
+                            "type": "string"
+                          },
+                          "resourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "actions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "organization.view",
+                                "organization.update",
+                                "organization.transfer_ownership",
+                                "organization.export",
+                                "organization.delete",
+                                "members.view",
+                                "members.invite",
+                                "members.manage",
+                                "members.manage_roles",
+                                "roles.view",
+                                "roles.manage",
+                                "security_policy.manage",
+                                "audit.view",
+                                "audit.export",
+                                "api_tokens.manage",
+                                "notifications.manage",
+                                "project.view",
+                                "project.create",
+                                "project.edit",
+                                "project.archive",
+                                "project.delete",
+                                "project.manage_access",
+                                "asset.view",
+                                "asset.upload",
+                                "asset.delete",
+                                "design.view",
+                                "design.create",
+                                "design.edit",
+                                "design.commit",
+                                "design.restore",
+                                "design.generate",
+                                "design.export",
+                                "design.submit_review",
+                                "design.approve",
+                                "design.revoke_approval",
+                                "review.view",
+                                "review.comment",
+                                "artifact.view",
+                                "artifact.use",
+                                "artifact.create",
+                                "artifact.edit",
+                                "artifact.publish",
+                                "artifact.delete",
+                                "operation.submit",
+                                "operation.view",
+                                "job.view",
+                                "job.cancel",
+                                "validation.view",
+                                "validation.run",
+                                "validation.override",
+                                "techpack.view",
+                                "techpack.create",
+                                "techpack.edit",
+                                "techpack.view_costing",
+                                "techpack.submit_review",
+                                "techpack.review",
+                                "techpack.approve",
+                                "techpack.approve_exception",
+                                "techpack.release",
+                                "techpack.withdraw",
+                                "techpack.distribute",
+                                "techpack.export",
+                                "usage.view",
+                                "billing.view",
+                                "billing.manage",
+                                "budget.manage",
+                                "credentials.view",
+                                "credentials.manage",
+                                "platform.ai.manage",
+                                "platform.ai.inspect",
+                                "platform.billing.manage",
+                                "platform.billing.adjust",
+                                "platform.billing.refund",
+                                "platform.pricing.manage",
+                                "platform.finance.view",
+                                "platform.finance.reconcile",
+                                "platform.catalog.manage",
+                                "platform.settings.manage",
+                                "platform.security.manage",
+                                "platform.support.view",
+                                "platform.breakglass.request"
+                              ]
+                            }
+                          },
+                          "expiresAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "resourceType",
+                          "resourceId",
+                          "actions",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "membershipId",
+                    "userId",
+                    "roles",
+                    "permissions",
+                    "grants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "member"
       }
     },
     "/v1/orgs/{orgId}/members/{membershipId}/reactivate": {
@@ -2944,7 +3646,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -3048,7 +3758,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.manage"
       }
     },
     "/v1/orgs/{orgId}/members/{membershipId}/revoke": {
@@ -3121,7 +3833,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -3225,7 +3945,232 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.manage"
+      }
+    },
+    "/v1/orgs/{orgId}/members/{membershipId}/roles": {
+      "put": {
+        "operationId": "Members_updateRoles",
+        "summary": "Replace the roles of a member (only roles you can delegate)",
+        "tags": [
+          "members"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "membershipId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "organization_owner",
+                        "organization_admin",
+                        "design_lead",
+                        "designer",
+                        "merchandiser",
+                        "production_user",
+                        "approver",
+                        "billing_admin",
+                        "credential_admin",
+                        "viewer",
+                        "external_collaborator"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "roles"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "membershipId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "invited",
+                        "active",
+                        "suspended",
+                        "revoked",
+                        "expired"
+                      ]
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "organization_owner",
+                          "organization_admin",
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
+                        ]
+                      }
+                    },
+                    "joinedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "endedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "endReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "membershipId",
+                    "userId",
+                    "displayName",
+                    "email",
+                    "status",
+                    "roles",
+                    "joinedAt",
+                    "endedAt",
+                    "endReason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: INVALID_STATE_TRANSITION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.manage_roles"
       }
     },
     "/v1/orgs/{orgId}/members/{membershipId}/suspend": {
@@ -3298,7 +4243,15 @@
                         "enum": [
                           "organization_owner",
                           "organization_admin",
-                          "designer"
+                          "design_lead",
+                          "designer",
+                          "merchandiser",
+                          "production_user",
+                          "approver",
+                          "billing_admin",
+                          "credential_admin",
+                          "viewer",
+                          "external_collaborator"
                         ]
                       }
                     },
@@ -3402,7 +4355,9 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "members.manage"
       }
     },
     "/v1/orgs/{orgId}/ownership-transfer": {
@@ -3518,7 +4473,430 @@
           {
             "sessionCookie": []
           }
-        ]
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "organization.transfer_ownership"
+      }
+    },
+    "/v1/orgs/{orgId}/roles": {
+      "get": {
+        "operationId": "Authorization_roles",
+        "summary": "Roles available in the organization, with permissions and whether you can assign them",
+        "tags": [
+          "authorization"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "key": {
+                            "type": "string",
+                            "enum": [
+                              "organization_owner",
+                              "organization_admin",
+                              "design_lead",
+                              "designer",
+                              "merchandiser",
+                              "production_user",
+                              "approver",
+                              "billing_admin",
+                              "credential_admin",
+                              "viewer",
+                              "external_collaborator"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "isSystem": {
+                            "type": "boolean"
+                          },
+                          "assignable": {
+                            "type": "boolean"
+                          },
+                          "delegableByMe": {
+                            "type": "boolean"
+                          },
+                          "permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "organization.view",
+                                "organization.update",
+                                "organization.transfer_ownership",
+                                "organization.export",
+                                "organization.delete",
+                                "members.view",
+                                "members.invite",
+                                "members.manage",
+                                "members.manage_roles",
+                                "roles.view",
+                                "roles.manage",
+                                "security_policy.manage",
+                                "audit.view",
+                                "audit.export",
+                                "api_tokens.manage",
+                                "notifications.manage",
+                                "project.view",
+                                "project.create",
+                                "project.edit",
+                                "project.archive",
+                                "project.delete",
+                                "project.manage_access",
+                                "asset.view",
+                                "asset.upload",
+                                "asset.delete",
+                                "design.view",
+                                "design.create",
+                                "design.edit",
+                                "design.commit",
+                                "design.restore",
+                                "design.generate",
+                                "design.export",
+                                "design.submit_review",
+                                "design.approve",
+                                "design.revoke_approval",
+                                "review.view",
+                                "review.comment",
+                                "artifact.view",
+                                "artifact.use",
+                                "artifact.create",
+                                "artifact.edit",
+                                "artifact.publish",
+                                "artifact.delete",
+                                "operation.submit",
+                                "operation.view",
+                                "job.view",
+                                "job.cancel",
+                                "validation.view",
+                                "validation.run",
+                                "validation.override",
+                                "techpack.view",
+                                "techpack.create",
+                                "techpack.edit",
+                                "techpack.view_costing",
+                                "techpack.submit_review",
+                                "techpack.review",
+                                "techpack.approve",
+                                "techpack.approve_exception",
+                                "techpack.release",
+                                "techpack.withdraw",
+                                "techpack.distribute",
+                                "techpack.export",
+                                "usage.view",
+                                "billing.view",
+                                "billing.manage",
+                                "budget.manage",
+                                "credentials.view",
+                                "credentials.manage",
+                                "platform.ai.manage",
+                                "platform.ai.inspect",
+                                "platform.billing.manage",
+                                "platform.billing.adjust",
+                                "platform.billing.refund",
+                                "platform.pricing.manage",
+                                "platform.finance.view",
+                                "platform.finance.reconcile",
+                                "platform.catalog.manage",
+                                "platform.settings.manage",
+                                "platform.security.manage",
+                                "platform.support.view",
+                                "platform.breakglass.request"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "key",
+                          "name",
+                          "description",
+                          "isSystem",
+                          "assignable",
+                          "delegableByMe",
+                          "permissions"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "roles.view"
+      }
+    },
+    "/v1/permissions": {
+      "get": {
+        "operationId": "Authorization_catalog",
+        "summary": "Permission catalog",
+        "tags": [
+          "authorization"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "enum": [
+                              "organization.view",
+                              "organization.update",
+                              "organization.transfer_ownership",
+                              "organization.export",
+                              "organization.delete",
+                              "members.view",
+                              "members.invite",
+                              "members.manage",
+                              "members.manage_roles",
+                              "roles.view",
+                              "roles.manage",
+                              "security_policy.manage",
+                              "audit.view",
+                              "audit.export",
+                              "api_tokens.manage",
+                              "notifications.manage",
+                              "project.view",
+                              "project.create",
+                              "project.edit",
+                              "project.archive",
+                              "project.delete",
+                              "project.manage_access",
+                              "asset.view",
+                              "asset.upload",
+                              "asset.delete",
+                              "design.view",
+                              "design.create",
+                              "design.edit",
+                              "design.commit",
+                              "design.restore",
+                              "design.generate",
+                              "design.export",
+                              "design.submit_review",
+                              "design.approve",
+                              "design.revoke_approval",
+                              "review.view",
+                              "review.comment",
+                              "artifact.view",
+                              "artifact.use",
+                              "artifact.create",
+                              "artifact.edit",
+                              "artifact.publish",
+                              "artifact.delete",
+                              "operation.submit",
+                              "operation.view",
+                              "job.view",
+                              "job.cancel",
+                              "validation.view",
+                              "validation.run",
+                              "validation.override",
+                              "techpack.view",
+                              "techpack.create",
+                              "techpack.edit",
+                              "techpack.view_costing",
+                              "techpack.submit_review",
+                              "techpack.review",
+                              "techpack.approve",
+                              "techpack.approve_exception",
+                              "techpack.release",
+                              "techpack.withdraw",
+                              "techpack.distribute",
+                              "techpack.export",
+                              "usage.view",
+                              "billing.view",
+                              "billing.manage",
+                              "budget.manage",
+                              "credentials.view",
+                              "credentials.manage",
+                              "platform.ai.manage",
+                              "platform.ai.inspect",
+                              "platform.billing.manage",
+                              "platform.billing.adjust",
+                              "platform.billing.refund",
+                              "platform.pricing.manage",
+                              "platform.finance.view",
+                              "platform.finance.reconcile",
+                              "platform.catalog.manage",
+                              "platform.settings.manage",
+                              "platform.security.manage",
+                              "platform.support.view",
+                              "platform.breakglass.request"
+                            ]
+                          },
+                          "resourceType": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "sensitive": {
+                            "type": "boolean"
+                          },
+                          "platform": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "resourceType",
+                          "action",
+                          "description",
+                          "sensitive",
+                          "platform"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "authenticated"
       }
     }
   },

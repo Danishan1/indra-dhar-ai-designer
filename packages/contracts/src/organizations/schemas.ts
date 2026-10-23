@@ -1,22 +1,25 @@
 import { z } from 'zod';
 
 import { emailSchema, emailTokenSchema } from '../identity/schemas.js';
+import { BASELINE_ROLES, type BaselineRoleKey, BaselineRoleKeys } from '../roles.js';
 
 /**
- * Placeholder role catalog (I06). I07 replaces the placeholder checks with the permission catalog;
- * the keys stay. Ownership is never granted by invitation — only by ownership transfer.
+ * Organization roles = the baseline system roles (`roles.ts`, I07). Ownership is never granted by
+ * invitation or role assignment — only by ownership transfer.
  */
-export const OrgRoleKeys = ['organization_owner', 'organization_admin', 'designer'] as const;
-export const orgRoleKeySchema = z.enum(OrgRoleKeys);
-export type OrgRoleKey = z.infer<typeof orgRoleKeySchema>;
-export const InvitableRoleKeys = ['organization_admin', 'designer'] as const;
-export const invitableRoleKeySchema = z.enum(InvitableRoleKeys);
+export const OrgRoleKeys = BaselineRoleKeys;
+export const orgRoleKeySchema = z.enum(BaselineRoleKeys);
+export type OrgRoleKey = BaselineRoleKey;
+/** Roles that can be proposed in an invitation (the server also checks delegation). */
+export const InvitableRoleKeys = BaselineRoleKeys.filter((k) => BASELINE_ROLES[k].assignable);
+export const invitableRoleKeySchema = orgRoleKeySchema.refine(
+  (k) => BASELINE_ROLES[k].assignable,
+  'Ownership can only be transferred',
+);
 
-export const OrgRoleLabels: Record<OrgRoleKey, string> = {
-  organization_owner: 'Owner',
-  organization_admin: 'Admin',
-  designer: 'Designer',
-};
+export const OrgRoleLabels = Object.fromEntries(
+  BaselineRoleKeys.map((k) => [k, BASELINE_ROLES[k].name]),
+) as Record<OrgRoleKey, string>;
 
 export const OrganizationStatuses = ['active', 'suspended', 'deleted'] as const;
 export const MembershipStatuses = ['invited', 'active', 'suspended', 'revoked', 'expired'] as const;

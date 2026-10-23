@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import {
+  BASELINE_ROLES,
+  canDelegateRole,
   type Invitation as InvitationView,
   InvitationAcceptedEvent,
   InvitationCancelledEvent,
@@ -8,11 +10,13 @@ import {
   type InvitationPreview,
   type MyOrganization,
   type OrgRoleKey,
+  roleKeyById,
 } from '@ai-designer/contracts';
 import { newId, Prisma } from '@ai-designer/db';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AuditService } from '../../platform/audit/audit.service.js';
+import type { AuthzContext } from '../../platform/authz/authorizer.js';
 import { AppError } from '../../platform/errors/app-error.js';
 import { OutboxService } from '../../platform/outbox/outbox.service.js';
 import { PrismaService } from '../../platform/prisma/prisma.service.js';
@@ -20,10 +24,8 @@ import { RateLimitService } from '../../platform/rate-limit/rate-limit.service.j
 import { AccountService } from '../identity/account.service.js';
 import { randomToken } from '../identity/crypto.js';
 
-import type { OrgMembershipContext } from './org-access.js';
 import { toOrganizationView } from './organization.service.js';
 import { OrganizationsMailService } from './organizations-mail.service.js';
-import { roleKeyById, canGrant, SystemRoleIds } from './roles.js';
 
 export const INVITATION_TTL_MS = 7 * 24 * 3_600_000;
 
@@ -99,7 +101,7 @@ export class InvitationService {
     }));
   }
 
-  async list(ctx: OrgMembershipContext): Promise<InvitationView[]> {
+  async list(ctx: AuthzContext): Promise<InvitationView[]> {
     const rows = await this.prisma.invitation.findMany({
       where: { organizationId: ctx.organizationId, status: 'pending' },
       orderBy: { createdAt: 'desc' },
@@ -131,16 +133,13 @@ export class InvitationService {
     }
   }
 
-  async create(
-    ctx: OrgMembershipContext,
-    email: string,
-    role: OrgRoleKey,
-  ): Promise<InvitationView> {
-    if (!canGrant(ctx.roles, role))
-      throw new AppError(
-        'PERMISSION_DENIED',
-        'You cannot invite someone with a role above your own',
-      );
+  async create(ctx: AuthzContext, email: string, role: OrgRoleKey): Promise<InvitationView> {
+    // Inviters can only propose roles they could assign themselves (FR-SEC-076, §24.1).
+    if (!canDelegateRole(ctx.roles, role))
+      throw new AppError('PERMISSION_DENIED', 'You cannot invite someone with this role', {
+        reason: 'delegation',
+        roles: [role],
+      });
     await this.rateLimits.enforce([
       { rule: InvitationRateLimits.createPerOrg, subject: ctx.organizationId },
     ]);
@@ -177,7 +176,7 @@ export class InvitationService {
             id,
             organizationId: ctx.organizationId,
             email,
-            proposedRoleIds: [SystemRoleIds[role]],
+            proposedRoleIds: [BASELINE_ROLES[role].id],
             tokenHash: hashInvitationToken(token),
             invitedBy: ctx.userId,
             expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
@@ -220,7 +219,7 @@ export class InvitationService {
     return user ? [user.id] : [];
   }
 
-  private async pendingInOrg(ctx: OrgMembershipContext, invitationId: string) {
+  private async pendingInOrg(ctx: AuthzContext, invitationId: string) {
     const inv = await this.prisma.invitation.findFirst({
       where: { id: invitationId, organizationId: ctx.organizationId },
     });
@@ -230,7 +229,7 @@ export class InvitationService {
     return inv;
   }
 
-  async cancel(ctx: OrgMembershipContext, invitationId: string): Promise<void> {
+  async cancel(ctx: AuthzContext, invitationId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const inv = await this.pendingInOrg(ctx, invitationId);
       const { count } = await tx.invitation.updateMany({
@@ -256,7 +255,7 @@ export class InvitationService {
   }
 
   /** New token (the old link stops working) and a fresh 7-day window. */
-  async resend(ctx: OrgMembershipContext, invitationId: string): Promise<InvitationView> {
+  async resend(ctx: AuthzContext, invitationId: string): Promise<InvitationView> {
     await this.rateLimits.enforce([
       { rule: InvitationRateLimits.resendPerInvitation, subject: invitationId },
     ]);

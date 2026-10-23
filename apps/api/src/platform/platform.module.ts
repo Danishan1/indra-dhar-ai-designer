@@ -1,9 +1,12 @@
 import { Global, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 
 import { AuditService } from './audit/audit.service.js';
 import { CsrfMiddleware } from './auth/csrf.middleware.js';
-import { AuthenticatedGuard } from './auth/require-auth.js';
+import { AccessCache } from './authz/access-cache.js';
+import { AuthorizationGuard } from './authz/authorization.guard.js';
+import { MembershipDirectoryRegistry } from './authz/membership-directory.js';
+import { ResourceResolverRegistry } from './authz/resource-resolvers.js';
 import { RequestContextMiddleware } from './context/request-context.middleware.js';
 import { AllExceptionsFilter } from './errors/all-exceptions.filter.js';
 import { IdempotencyInterceptor } from './idempotency/idempotency.interceptor.js';
@@ -19,12 +22,16 @@ import { OutboxService } from './outbox/outbox.service.js';
 @Module({
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // Deny by default: every route must declare its authorization (docs/architecture/authorization.md).
+    { provide: APP_GUARD, useClass: AuthorizationGuard },
+    ResourceResolverRegistry,
+    MembershipDirectoryRegistry,
+    AccessCache,
     IdSequenceService,
     AuditService,
     OutboxService,
     JobService,
     IdempotencyInterceptor,
-    AuthenticatedGuard,
   ],
   exports: [
     IdSequenceService,
@@ -32,7 +39,9 @@ import { OutboxService } from './outbox/outbox.service.js';
     OutboxService,
     JobService,
     IdempotencyInterceptor,
-    AuthenticatedGuard,
+    ResourceResolverRegistry,
+    MembershipDirectoryRegistry,
+    AccessCache,
   ],
 })
 export class PlatformModule implements NestModule {

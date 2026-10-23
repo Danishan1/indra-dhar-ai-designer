@@ -43,6 +43,8 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from '@/features/auth/session-provider';
+import { EffectivePermissionsSheet } from '@/features/authorization/effective-permissions-sheet';
+import { RoleEditorDialog } from '@/features/authorization/role-editor-dialog';
 import { queryKeys } from '@/lib/query/keys';
 
 import { orgsApi } from './api';
@@ -56,8 +58,14 @@ function InviteDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { active, hasRole } = useOrganization();
+  const { active } = useOrganization();
   const queryClient = useQueryClient();
+  const roles = useQuery({
+    queryKey: queryKeys.org(active.id).roles(),
+    queryFn: ({ signal }) => orgsApi.roles(active.id, signal),
+    enabled: open,
+  });
+  const invitable = (roles.data?.items ?? []).filter((r) => r.assignable && r.delegableByMe);
   const form = useForm<
     CreateInvitationRequest,
     unknown,
@@ -99,11 +107,13 @@ function InviteDialog({
               className="h-8 rounded-md border border-input bg-transparent px-2 text-[13px] focus-visible:outline-2 focus-visible:outline-ring"
               {...form.register('role')}
             >
-              <option value="designer">{OrgRoleLabels.designer} — creates and edits designs</option>
-              {hasRole('organization_owner', 'organization_admin') ? (
-                <option value="organization_admin">
-                  {OrgRoleLabels.organization_admin} — manages members and settings
+              {(invitable.length ? invitable : []).map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.name} — {r.description}
                 </option>
+              ))}
+              {!invitable.length ? (
+                <option value="designer">{OrgRoleLabels.designer}</option>
               ) : null}
             </select>
           </FormField>
@@ -121,9 +131,13 @@ function InviteDialog({
   );
 }
 
-function MemberActions({ member }: { member: Member }) {
-  const { active } = useOrganization();
+function MemberActions({ member, isSelf }: { member: Member; isSelf: boolean }) {
+  const { active, can } = useOrganization();
   const queryClient = useQueryClient();
+  const [editingRoles, setEditingRoles] = useState(false);
+  const [viewingPermissions, setViewingPermissions] = useState(false);
+  const manage = can('members.manage') && !isSelf;
+  const editRoles = can('members.manage_roles') && member.status !== 'revoked';
   const action = useMutation({
     mutationFn: (kind: 'suspend' | 'reactivate' | 'revoke') =>
       orgsApi.memberAction(active.id, member.membershipId, kind),
@@ -136,33 +150,50 @@ function MemberActions({ member }: { member: Member }) {
   });
   if (member.status === 'revoked') return null;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${member.displayName}`}>
-          <MoreHorizontalIcon />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {member.status === 'active' ? (
-          <DropdownMenuItem onSelect={() => action.mutate('suspend')}>Suspend</DropdownMenuItem>
-        ) : null}
-        {member.status === 'suspended' ? (
-          <DropdownMenuItem onSelect={() => action.mutate('reactivate')}>
-            Reactivate
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${member.displayName}`}>
+            <MoreHorizontalIcon />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setViewingPermissions(true)}>
+            View permissions
           </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem variant="destructive" onSelect={() => action.mutate('revoke')}>
-          Remove from organization
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {editRoles ? (
+            <DropdownMenuItem onSelect={() => setEditingRoles(true)}>Edit roles</DropdownMenuItem>
+          ) : null}
+          {manage && member.status === 'active' ? (
+            <DropdownMenuItem onSelect={() => action.mutate('suspend')}>Suspend</DropdownMenuItem>
+          ) : null}
+          {manage && member.status === 'suspended' ? (
+            <DropdownMenuItem onSelect={() => action.mutate('reactivate')}>
+              Reactivate
+            </DropdownMenuItem>
+          ) : null}
+          {manage ? (
+            <DropdownMenuItem variant="destructive" onSelect={() => action.mutate('revoke')}>
+              Remove from organization
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {editRoles ? (
+        <RoleEditorDialog member={member} open={editingRoles} onOpenChange={setEditingRoles} />
+      ) : null}
+      <EffectivePermissionsSheet
+        member={member}
+        open={viewingPermissions}
+        onOpenChange={setViewingPermissions}
+      />
+    </>
   );
 }
 
 function MembersTable() {
-  const { active, hasRole } = useOrganization();
+  const { active } = useOrganization();
   const { user } = useSession();
-  const canManage = hasRole('organization_owner', 'organization_admin');
   const members = useQuery({
     queryKey: queryKeys.org(active.id).members(),
     queryFn: ({ signal }) => orgsApi.members(active.id, signal),
@@ -196,7 +227,7 @@ function MembersTable() {
           {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : '—'}
         </TableCell>
         <TableCell className="w-10 text-right">
-          {canManage && m.userId !== user?.id ? <MemberActions member={m} /> : null}
+          <MemberActions member={m} isSelf={m.userId === user?.id} />
         </TableCell>
       </TableRow>
     ));
@@ -320,9 +351,22 @@ function InvitationsTable() {
 }
 
 export function MembersPage() {
-  const { active, hasRole } = useOrganization();
+  const { active, can } = useOrganization();
   const [inviting, setInviting] = useState(false);
-  const canManage = hasRole('organization_owner', 'organization_admin');
+  const canManage = can('members.invite');
+  if (!can('members.view')) {
+    return (
+      <>
+        <PageHeader title="Members" description={`People with access to ${active.name}.`} />
+        <div className="p-6">
+          <EmptyState
+            title="You can't see the member list"
+            description="Your roles in this organization don't include viewing members. Ask an admin if you need it."
+          />
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader

@@ -281,18 +281,87 @@ model Workspace {
 }
 
 /// System roles (placeholder catalog, I06); I07 adds permissions and org-defined roles.
+/// Role = named set of permissions (SPEC-009 §11.3). System roles (organization_id NULL) are synced
+/// from packages/contracts/src/roles.ts at API start / `pnpm db:seed`; custom roles (organization_id
+/// set) arrive later with the same catalog and checks (FR-SEC-092).
 model Role {
-  id          String           @id @db.Uuid
-  key         String           @unique
-  name        String
-  description String           @default("")
-  /// Higher = more authority; inviters cannot grant above their own rank (FR-SEC-076, placeholder).
-  rank        Int
-  isSystem    Boolean          @default(true) @map("is_system")
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  memberships MembershipRole[]
+  id             String           @id @db.Uuid
+  key            String
+  name           String
+  description    String           @default("")
+  /// organization | workspace
+  scopeType      String           @default("organization") @map("scope_type")
+  isSystem       Boolean          @default(true) @map("is_system")
+  /// NULL for system roles; the owning organization for custom roles.
+  organizationId String?          @map("organization_id") @db.Uuid
+  /// Can be given through role assignment (false for Owner: transfer only).
+  assignable     Boolean          @default(true)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships    MembershipRole[]
+  permissions    RolePermission[]
 
   @@map("roles")
+}
+
+/// Mirror of the permission catalog (packages/contracts/src/permissions.ts) for reporting and
+/// referential integrity. Keys are never renamed or reused (FR-SEC-084).
+model Permission {
+  key          String           @id
+  resourceType String           @map("resource_type")
+  action       String
+  description  String
+  isPlatform   Boolean          @default(false) @map("is_platform")
+  sensitive    Boolean          @default(false)
+  roles        RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String     @map("role_id") @db.Uuid
+  permissionKey String     @map("permission_key")
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionKey], references: [key])
+
+  @@id([roleId, permissionKey])
+  @@index([permissionKey])
+  @@map("role_permissions")
+}
+
+/// Explicit resource-level share (FR-SEC-094…100), evaluated by the PDP after role permissions.
+/// Creation endpoints arrive with shareable resources (projects I10, tech packs I43).
+model ResourceGrant {
+  id             String    @id @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  resourceType   String    @map("resource_type")
+  resourceId     String    @map("resource_id") @db.Uuid
+  /// user | external (I43)
+  recipientType  String    @map("recipient_type")
+  recipientId    String    @map("recipient_id") @db.Uuid
+  actions        String[]
+  grantedBy      String    @map("granted_by") @db.Uuid
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([organizationId, recipientType, recipientId])
+  @@index([resourceType, resourceId])
+  @@map("resource_grants")
+}
+
+/// Versioned organization security policy (defaults created with the org; used by I08/I28).
+model SecurityPolicy {
+  id             String   @id @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  version        Int
+  config         Json     @default("{}")
+  createdBy      String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, version])
+  @@map("security_policies")
 }
 
 /// One record per user–organization relationship (FR-SEC-067). Ended memberships are kept for
@@ -321,6 +390,8 @@ model Membership {
 model MembershipRole {
   membershipId String     @map("membership_id") @db.Uuid
   roleId       String     @map("role_id") @db.Uuid
+  /// Workspace id for workspace-scoped grants (ADR-017, not used yet); NULL = whole organization.
+  scopeId      String?    @map("scope_id") @db.Uuid
   grantedBy    String?    @map("granted_by") @db.Uuid
   grantedAt    DateTime   @default(now()) @map("granted_at") @db.Timestamptz(6)
   membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)

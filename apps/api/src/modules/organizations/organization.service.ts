@@ -1,21 +1,24 @@
 import {
+  BASELINE_ROLES,
   DisplayIdPrefixes,
   type MyOrganization,
   type Organization as OrganizationView,
   OrganizationCreatedEvent,
   type OrgRoleKey,
   OwnershipTransferredEvent,
+  roleKeyById,
 } from '@ai-designer/contracts';
 import { newId, nextDisplayId, Prisma, type TxClient } from '@ai-designer/db';
 import { Injectable } from '@nestjs/common';
 
 import { AuditService } from '../../platform/audit/audit.service.js';
+import { AccessCache } from '../../platform/authz/access-cache.js';
+import type { AuthzContext } from '../../platform/authz/authorizer.js';
 import { AppError } from '../../platform/errors/app-error.js';
 import { OutboxService } from '../../platform/outbox/outbox.service.js';
 import { PrismaService } from '../../platform/prisma/prisma.service.js';
+import { SecurityPolicyService } from '../authorization/security-policy.service.js';
 
-import type { OrgMembershipContext } from './org-access.js';
-import { roleKeyById, SystemRoleIds } from './roles.js';
 import { slugify, slugWithSuffix } from './slug.js';
 
 export function toOrganizationView(org: {
@@ -47,6 +50,8 @@ export class OrganizationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly accessCache: AccessCache,
+    private readonly securityPolicies: SecurityPolicyService,
   ) {}
 
   /** Org + default workspace + owner membership + audit + outbox, all in one transaction. */
@@ -71,9 +76,12 @@ export class OrganizationService {
               userId,
               status: 'active',
               joinedAt: new Date(),
-              roles: { create: { roleId: SystemRoleIds.organization_owner, grantedBy: userId } },
+              roles: {
+                create: { roleId: BASELINE_ROLES.organization_owner.id, grantedBy: userId },
+              },
             },
           });
+          await this.securityPolicies.createDefault(tx, id, userId);
           const meta = { organizationId: id };
           await this.audit.record(
             {
@@ -128,7 +136,7 @@ export class OrganizationService {
     }));
   }
 
-  async get(ctx: OrgMembershipContext): Promise<MyOrganization> {
+  async get(ctx: AuthzContext): Promise<MyOrganization> {
     const org = await this.prisma.organization.findUniqueOrThrow({
       where: { id: ctx.organizationId },
     });
@@ -138,7 +146,7 @@ export class OrganizationService {
     };
   }
 
-  async rename(ctx: OrgMembershipContext, name: string): Promise<MyOrganization> {
+  async rename(ctx: AuthzContext, name: string): Promise<MyOrganization> {
     await this.prisma.$transaction(async (tx) => {
       const before = await tx.organization.findUniqueOrThrow({ where: { id: ctx.organizationId } });
       await tx.organization.update({ where: { id: ctx.organizationId }, data: { name } });
@@ -163,10 +171,11 @@ export class OrganizationService {
    * Step-up authentication is added in I08.
    */
   async transferOwnership(
-    ctx: OrgMembershipContext,
+    ctx: AuthzContext,
     toMembershipId: string,
     confirmName: string,
   ): Promise<void> {
+    let targetUserId: string | null = null;
     await this.prisma.$transaction(async (tx) => {
       await lockOrganization(tx, ctx.organizationId);
       const org = await tx.organization.findUniqueOrThrow({ where: { id: ctx.organizationId } });
@@ -190,22 +199,21 @@ export class OrganizationService {
       if (target.id === ctx.membershipId)
         throw new AppError('CONFLICT', 'You already own this organization');
 
-      await tx.membershipRole.deleteMany({ where: { membershipId: target.id } });
-      await tx.membershipRole.create({
-        data: {
-          membershipId: target.id,
-          roleId: SystemRoleIds.organization_owner,
-          grantedBy: ctx.userId,
-        },
+      // The new owner keeps their other roles; the previous owner keeps theirs and becomes admin.
+      const ownerId = BASELINE_ROLES.organization_owner.id;
+      const adminId = BASELINE_ROLES.organization_admin.id;
+      await tx.membershipRole.createMany({
+        data: [{ membershipId: target.id, roleId: ownerId, grantedBy: ctx.userId }],
+        skipDuplicates: true,
       });
-      await tx.membershipRole.deleteMany({ where: { membershipId: ctx.membershipId } });
-      await tx.membershipRole.create({
-        data: {
-          membershipId: ctx.membershipId,
-          roleId: SystemRoleIds.organization_admin,
-          grantedBy: ctx.userId,
-        },
+      await tx.membershipRole.deleteMany({
+        where: { membershipId: ctx.membershipId, roleId: ownerId },
       });
+      await tx.membershipRole.createMany({
+        data: [{ membershipId: ctx.membershipId, roleId: adminId, grantedBy: ctx.userId }],
+        skipDuplicates: true,
+      });
+      targetUserId = target.userId;
 
       await this.audit.record(
         {
@@ -228,5 +236,7 @@ export class OrganizationService {
         toUserId: target.userId,
       });
     });
+    await this.accessCache.invalidate(ctx.organizationId, ctx.userId);
+    if (targetUserId) await this.accessCache.invalidate(ctx.organizationId, targetUserId);
   }
 }

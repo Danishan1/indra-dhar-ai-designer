@@ -186,7 +186,7 @@ If you need data owned by another module, **call its service** (synchronous read
 
 ## 4. Permission catalog — planned master list (ADR-033)
 
-Implemented in `packages/contracts/src/permissions.ts` starting in I07. Iterations add keys when they add endpoints; keep this list in sync (it is the planning view, the code is authoritative once written).
+Implemented in `packages/contracts/src/permissions.ts` (I07: **every key below already exists**, mapped to baseline roles in `roles.ts`). Iterations that need a new key add it there with its role mappings; the code is authoritative, this table is the planning view.
 
 | Resource                                                       | Actions                                                                                                                                                                                                                                                                                                                                                   | Introduced in                            |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |

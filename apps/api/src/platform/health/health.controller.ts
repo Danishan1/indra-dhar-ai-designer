@@ -2,6 +2,7 @@ import { livenessSchema, readinessSchema } from '@ai-designer/contracts';
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 
+import { Public } from '../authz/decorators.js';
 import { AppConfig } from '../config/app-config.js';
 import { Endpoint } from '../validation/endpoint.js';
 
@@ -15,6 +16,7 @@ export interface LivenessResponse {
 }
 
 @Controller('health')
+@Public()
 export class HealthController {
   constructor(
     private readonly config: AppConfig,

@@ -1,10 +1,22 @@
-import { type EventEnvelope, JobQueuedEvent, DevEchoedEvent } from '@ai-designer/contracts';
+import {
+  accessCacheKey,
+  DevEchoedEvent,
+  type EventEnvelope,
+  JobQueuedEvent,
+  MembershipReactivatedEvent,
+  MembershipRevokedEvent,
+  MembershipSuspendedEvent,
+  OwnershipTransferredEvent,
+  RoleAssignmentChangedEvent,
+} from '@ai-designer/contracts';
 import { type PrismaClient, type TxClient, withIdempotentConsumer } from '@ai-designer/db';
 import type { Logger } from 'pino';
 
 export interface ConsumerDeps {
   logger: Logger;
   enqueueJob: (jobId: string) => Promise<void>;
+  /** Deletes Redis cache keys (best effort; idempotent). */
+  invalidateCache: (keys: string[]) => Promise<void>;
 }
 
 /**
@@ -26,6 +38,28 @@ export const platformConsumers: EventConsumer[] = [
     async handle(event, _tx, deps) {
       const payload = JobQueuedEvent.payload.parse(event.payload);
       await deps.enqueueJob(payload.jobId);
+    },
+  },
+  {
+    // Second line of defence for authorization caches: the API invalidates synchronously after a
+    // change; this repeats it from the outbox in case that failed (TTL is the final bound).
+    name: 'authorization.access-cache-invalidate',
+    types: [
+      MembershipSuspendedEvent.type,
+      MembershipReactivatedEvent.type,
+      MembershipRevokedEvent.type,
+      RoleAssignmentChangedEvent.type,
+      OwnershipTransferredEvent.type,
+    ],
+    async handle(event, _tx, deps) {
+      const p = event.payload as {
+        organizationId: string;
+        userId?: string;
+        fromUserId?: string;
+        toUserId?: string;
+      };
+      const users = [p.userId, p.fromUserId, p.toUserId].filter((u): u is string => !!u);
+      await deps.invalidateCache(users.map((u) => accessCacheKey(p.organizationId, u)));
     },
   },
   {

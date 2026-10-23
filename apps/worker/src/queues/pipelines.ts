@@ -73,6 +73,9 @@ export function createEventsWorker(
       return processEvent(envelope, deps.consumers, deps.prisma, {
         logger: deps.logger,
         enqueueJob: (id) => deps.producers.enqueueJob(id),
+        invalidateCache: async (keys) => {
+          if (keys.length) await connection.del(...keys);
+        },
       });
     },
     { connection, concurrency },

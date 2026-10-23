@@ -3,20 +3,21 @@
 Built in I03. **Reuse these; never re-invent the plumbing in a module.** The reference
 implementation is `apps/api/src/modules/dev-examples/dev-examples.controller.ts` (dev-only routes).
 
-| Need                                | Use                                                                                                       | Where                                                                       |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Validate input + document the route | `@Endpoint({ summary, tags, body, query, params, response, successStatus, errors })`                      | `apps/api/src/platform/validation/endpoint.ts`                              |
-| Fail with a stable error code       | `throw new AppError('CONFLICT', 'message', details?)` (`AppError.notFound('Project')`)                    | `platform/errors/app-error.ts`; codes in `packages/contracts/src/errors.ts` |
-| Who/which request am I serving      | `RequestContext.get()` / `.writeMeta()`                                                                   | `platform/context/request-context.ts`                                       |
-| Human-readable id (`PRJ-000123`)    | `IdSequenceService.next('PRJ', organizationId, tx)`                                                       | `platform/ids/` → `@ai-designer/db` `nextDisplayId`                         |
-| Primary key                         | `newId()` (UUIDv7)                                                                                        | `@ai-designer/db`                                                           |
-| Audit trail                         | `AuditService.record({ eventType, action, outcome, resourceType, resourceId, metadata }, tx)`             | `platform/audit/` (rows are immutable; metadata redacted)                   |
-| Domain event                        | `OutboxService.append(tx, MyEvent, payload)` with `defineEvent(type, version, zodSchema)` in contracts    | `platform/outbox/`; events in `packages/contracts/src/events/`              |
-| React to an event (worker)          | add an `EventConsumer` to `apps/worker/src/events/consumers.ts`                                           | runs at most once per (consumer, eventId) in a transaction                  |
-| Background work                     | `JobService.create({ kind, payload, maxAttempts }, tx)` + a handler in `apps/worker/src/jobs/handlers.ts` | Postgres `jobs` row is the truth; BullMQ carries only the id                |
-| Retry-safe POST                     | `@Idempotent()` on the handler                                                                            | `platform/idempotency/`; header `Idempotency-Key`                           |
-| Optimistic concurrency              | `assertVersion(expected, actual)` / `assertUpdated(count)` after `updateMany({ where: { id, version } })` | `platform/concurrency/`                                                     |
-| API docs                            | automatic from `@Endpoint`; regenerate `pnpm api:openapi`                                                 | `docs/api/openapi.json` (snapshot test fails when stale)                    |
+| Need                                | Use                                                                                                               | Where                                                                       |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Validate input + document the route | `@Endpoint({ summary, tags, body, query, params, response, successStatus, errors })`                              | `apps/api/src/platform/validation/endpoint.ts`                              |
+| Fail with a stable error code       | `throw new AppError('CONFLICT', 'message', details?)` (`AppError.notFound('Project')`)                            | `platform/errors/app-error.ts`; codes in `packages/contracts/src/errors.ts` |
+| Who/which request am I serving      | `RequestContext.get()` / `.writeMeta()`                                                                           | `platform/context/request-context.ts`                                       |
+| Human-readable id (`PRJ-000123`)    | `IdSequenceService.next('PRJ', organizationId, tx)`                                                               | `platform/ids/` → `@ai-designer/db` `nextDisplayId`                         |
+| Primary key                         | `newId()` (UUIDv7)                                                                                                | `@ai-designer/db`                                                           |
+| Audit trail                         | `AuditService.record({ eventType, action, outcome, resourceType, resourceId, metadata }, tx)`                     | `platform/audit/` (rows are immutable; metadata redacted)                   |
+| Domain event                        | `OutboxService.append(tx, MyEvent, payload)` with `defineEvent(type, version, zodSchema)` in contracts            | `platform/outbox/`; events in `packages/contracts/src/events/`              |
+| React to an event (worker)          | add an `EventConsumer` to `apps/worker/src/events/consumers.ts`                                                   | runs at most once per (consumer, eventId) in a transaction                  |
+| Background work                     | `JobService.create({ kind, payload, maxAttempts }, tx)` + a handler in `apps/worker/src/jobs/handlers.ts`         | Postgres `jobs` row is the truth; BullMQ carries only the id                |
+| Retry-safe POST                     | `@Idempotent()` on the handler                                                                                    | `platform/idempotency/`; header `Idempotency-Key`                           |
+| Optimistic concurrency              | `assertVersion(expected, actual)` / `assertUpdated(count)` after `updateMany({ where: { id, version } })`         | `platform/concurrency/`                                                     |
+| Protect a route                     | `@RequirePermission('project.edit', { resource })`, `@Public()`, `@AuthenticatedOnly()` — required on every route | `platform/authz/`; see `docs/architecture/authorization.md`                 |
+| API docs                            | automatic from `@Endpoint`; regenerate `pnpm api:openapi`                                                         | `docs/api/openapi.json` (snapshot test fails when stale)                    |
 
 ## Writing a mutation — the canonical shape
 

@@ -2,13 +2,14 @@ import { type Me, meSchema, updateMeRequestSchema } from '@ai-designer/contracts
 import { Body, Controller, Get, Patch } from '@nestjs/common';
 import type { z } from 'zod';
 
-import { currentUserId, RequireAuth } from '../../platform/auth/require-auth.js';
+import { AuthenticatedOnly } from '../../platform/authz/decorators.js';
+import { currentUserId } from '../../platform/authz/principal.js';
 import { Endpoint } from '../../platform/validation/endpoint.js';
 
 import { AccountService } from './account.service.js';
 
 @Controller('me')
-@RequireAuth()
+@AuthenticatedOnly()
 export class MeController {
   constructor(private readonly accounts: AccountService) {}
 

@@ -1,4 +1,11 @@
-import { DevEchoedEvent, type EventEnvelope, JobKinds, QueueNames } from '@ai-designer/contracts';
+import {
+  accessCacheKey,
+  DevEchoedEvent,
+  type EventEnvelope,
+  JobKinds,
+  QueueNames,
+  RoleAssignmentChangedEvent,
+} from '@ai-designer/contracts';
 import {
   appendOutboxEvent,
   createDurableJob,
@@ -14,7 +21,7 @@ import { pino } from 'pino';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { parseWorkerEnv } from '../src/config.js';
-import { type EventConsumer, processEvent } from '../src/events/consumers.js';
+import { type EventConsumer, platformConsumers, processEvent } from '../src/events/consumers.js';
 import { OutboxDispatcher } from '../src/outbox/dispatcher.js';
 import { startWorker, type WorkerHandle } from '../src/worker.js';
 
@@ -135,7 +142,11 @@ describe('outbox, consumers and durable jobs (integration)', () => {
         });
       },
     };
-    const deps = { logger, enqueueJob: async () => undefined };
+    const deps = {
+      logger,
+      enqueueJob: async () => undefined,
+      invalidateCache: async () => undefined,
+    };
     const results = await Promise.all([
       processEvent(envelope, [counting], prisma, deps),
       processEvent(envelope, [counting], prisma, deps),
@@ -157,12 +168,38 @@ describe('outbox, consumers and durable jobs (integration)', () => {
         if (calls === 1) throw new Error('transient');
       },
     };
-    const deps = { logger, enqueueJob: async () => undefined };
+    const deps = {
+      logger,
+      enqueueJob: async () => undefined,
+      invalidateCache: async () => undefined,
+    };
     await expect(processEvent(envelope, [flaky], prisma, deps)).rejects.toThrow('transient');
     expect(await processEvent(envelope, [flaky], prisma, deps)).toEqual([
       { consumer: 'test.flaky', processed: true },
     ]);
     expect(calls).toBe(2);
+  });
+
+  it('membership and role events invalidate the API authorization cache', async () => {
+    const organizationId = newId();
+    const userId = newId();
+    const key = accessCacheKey(organizationId, userId);
+    await redis.set(key, '{"cached":true}', 'EX', 30);
+    const id = await appendOutboxEvent(
+      prisma,
+      RoleAssignmentChangedEvent,
+      { organizationId, membershipId: newId(), userId, added: ['viewer'], removed: ['designer'] },
+      meta,
+    );
+    const envelope = toEnvelope(await prisma.outboxEvent.findUniqueOrThrow({ where: { id } }));
+    await processEvent(envelope, platformConsumers, prisma, {
+      logger,
+      enqueueJob: async () => undefined,
+      invalidateCache: async (keys) => {
+        if (keys.length) await redis.del(...keys);
+      },
+    });
+    expect(await redis.exists(key)).toBe(0);
   });
 
   describe('durable jobs through a running worker', () => {

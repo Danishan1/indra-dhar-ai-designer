@@ -1,6 +1,6 @@
 'use client';
 
-import type { MyOrganization, OrgRoleKey } from '@ai-designer/contracts';
+import type { MyOrganization, PermissionKey } from '@ai-designer/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -24,8 +24,11 @@ interface OrganizationContextValue {
   organizations: MyOrganization[];
   active: MyOrganization;
   setActive(organizationId: string): void;
-  /** Placeholder role check (I07 replaces with permissions); the API always enforces. */
-  hasRole(...roles: OrgRoleKey[]): boolean;
+  /**
+   * Whether the signed-in user holds `permission` in the active organization (GET /v1/me/permissions).
+   * Cosmetic only — hides or disables UI; the API enforces every request.
+   */
+  can(permission: PermissionKey): boolean;
 }
 
 const OrganizationContext = createContext<OrganizationContextValue | null>(null);
@@ -57,6 +60,16 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   });
   const organizations = useMemo(() => query.data?.items ?? [], [query.data]);
   const active = pickActive(organizations, preferredId);
+  const permissionsQuery = useQuery({
+    queryKey: queryKeys.org(active?.id ?? 'none').myPermissions(),
+    queryFn: ({ signal }) => orgsApi.myPermissions(active?.id ?? '', signal),
+    enabled: !!active,
+    staleTime: 30_000,
+  });
+  const permissions = useMemo(
+    () => new Set<PermissionKey>(permissionsQuery.data?.permissions ?? []),
+    [permissionsQuery.data],
+  );
 
   useEffect(() => {
     if (!query.isSuccess || active) return;
@@ -85,10 +98,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             organizations,
             active,
             setActive,
-            hasRole: (...roles) => active.membership.roles.some((r) => roles.includes(r)),
+            can: (permission) => permissions.has(permission),
           }
         : null,
-    [organizations, active, setActive],
+    [organizations, active, setActive, permissions],
   );
 
   if (query.isError) {
@@ -102,7 +115,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!value) return <LoadingState className="min-h-dvh" />;
+  if (!value || permissionsQuery.isPending) return <LoadingState className="min-h-dvh" />;
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>;
 }
 

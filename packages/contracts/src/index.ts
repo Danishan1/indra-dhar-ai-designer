@@ -1,3 +1,4 @@
+export * from './authorization/index.js';
 export * from './common.js';
 export * from './errors.js';
 export * from './health.js';
@@ -10,4 +11,5 @@ export * from './organizations/index.js';
 export * from './pagination.js';
 export * from './permissions.js';
 export * from './queues.js';
+export * from './roles.js';
 export * from './value-status.js';

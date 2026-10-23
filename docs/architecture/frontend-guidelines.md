@@ -40,10 +40,10 @@ fetching or config code, read the matching guide in `apps/web/node_modules/next/
 
 ## Organizations
 
-- `(app)` layout wraps the shell in `OrganizationProvider`: `useOrganization()` → `{ organizations, active, setActive, hasRole }`. A user without an active membership is sent to `/onboarding?returnTo=…` (route group `(setup)`).
+- `(app)` layout wraps the shell in `OrganizationProvider`: `useOrganization()` → `{ organizations, active, setActive, can }`. A user without an active membership is sent to `/onboarding?returnTo=…` (route group `(setup)`).
 - The active org id is a local preference (`aid.activeOrg`) re-validated against `GET /v1/orgs`; it is never trusted by the API — org-scoped calls put it in the path (`/v1/orgs/${active.id}/…`).
 - Org-scoped query keys start with `queryKeys.org(orgId)`; switching org removes other orgs' cached queries.
-- `hasRole()` only hides UI; the API enforces. I07 replaces it with permissions.
+- `can('members.invite')` / `usePermission()` / `<Can permission=…>` (`features/authorization/can.tsx`) come from `GET /v1/me/permissions` and only hide UI; the API enforces (`docs/architecture/authorization.md`).
 
 ## API access
 

@@ -13,14 +13,17 @@ import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/commo
 import type { Request } from 'express';
 import type { z } from 'zod';
 
-import { currentUserId, RequireAuth } from '../../platform/auth/require-auth.js';
+import { authzContext } from '../../platform/authz/authorizer.js';
+import { AuthenticatedOnly, Public, RequirePermission } from '../../platform/authz/decorators.js';
+import { currentUserId } from '../../platform/authz/principal.js';
 import { Endpoint } from '../../platform/validation/endpoint.js';
 
 import { InvitationService } from './invitation.service.js';
-import { OrgAccess, orgMembership } from './org-access.js';
+
+const INVITATION = { type: 'invitation', param: 'invitationId' };
 
 @Controller('orgs/:orgId/invitations')
-@OrgAccess('organization_owner', 'organization_admin')
+@RequirePermission('members.invite')
 export class OrgInvitationsController {
   constructor(private readonly invitations: InvitationService) {}
 
@@ -33,7 +36,7 @@ export class OrgInvitationsController {
     errors: ['NOT_FOUND', 'PERMISSION_DENIED'],
   })
   async list(@Req() req: Request) {
-    return { items: await this.invitations.list(orgMembership(req)) };
+    return { items: await this.invitations.list(authzContext(req)) };
   }
 
   @Post()
@@ -50,11 +53,12 @@ export class OrgInvitationsController {
     @Req() req: Request,
     @Body() body: z.output<typeof createInvitationRequestSchema>,
   ): Promise<Invitation> {
-    return this.invitations.create(orgMembership(req), body.email, body.role);
+    return this.invitations.create(authzContext(req), body.email, body.role);
   }
 
   @Post(':invitationId/cancel')
   @HttpCode(204)
+  @RequirePermission('members.invite', { resource: INVITATION })
   @Endpoint({
     summary: 'Cancel a pending invitation',
     tags: ['invitations'],
@@ -63,11 +67,12 @@ export class OrgInvitationsController {
     errors: ['NOT_FOUND', 'PERMISSION_DENIED', 'INVALID_STATE_TRANSITION'],
   })
   async cancel(@Req() req: Request, @Param('invitationId') invitationId: string): Promise<void> {
-    await this.invitations.cancel(orgMembership(req), invitationId);
+    await this.invitations.cancel(authzContext(req), invitationId);
   }
 
   @Post(':invitationId/resend')
   @HttpCode(200)
+  @RequirePermission('members.invite', { resource: INVITATION })
   @Endpoint({
     summary: 'Resend with a new link (the old link stops working)',
     tags: ['invitations'],
@@ -77,7 +82,7 @@ export class OrgInvitationsController {
     errors: ['NOT_FOUND', 'PERMISSION_DENIED', 'INVALID_STATE_TRANSITION', 'RATE_LIMITED'],
   })
   resend(@Req() req: Request, @Param('invitationId') invitationId: string): Promise<Invitation> {
-    return this.invitations.resend(orgMembership(req), invitationId);
+    return this.invitations.resend(authzContext(req), invitationId);
   }
 }
 
@@ -88,6 +93,7 @@ export class InvitationsController {
 
   @Post('preview')
   @HttpCode(200)
+  @Public()
   @Endpoint({
     summary: 'Preview an invitation (public, minimal information)',
     tags: ['invitations'],
@@ -102,7 +108,7 @@ export class InvitationsController {
 
   @Post('accept')
   @HttpCode(200)
-  @RequireAuth()
+  @AuthenticatedOnly()
   @Endpoint({
     summary: 'Accept an invitation as the signed-in user (email must match)',
     tags: ['invitations'],

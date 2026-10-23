@@ -15,7 +15,7 @@ import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
-import { RequireAuth } from '../../platform/auth/require-auth.js';
+import { AuthenticatedOnly, Public } from '../../platform/authz/decorators.js';
 import { Endpoint } from '../../platform/validation/endpoint.js';
 
 import { AuthService } from './auth.service.js';
@@ -25,6 +25,7 @@ const statusSchema = (value: string) => z.object({ status: z.literal(value) });
 
 /** Public + session auth endpoints (I05). Permissions: public routes are rate-limited; see I07. */
 @Controller('auth')
+@Public()
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
@@ -101,7 +102,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(204)
-  @RequireAuth()
+  @AuthenticatedOnly()
   @Endpoint({
     summary: 'Sign out (revokes the current session)',
     tags: ['auth'],
@@ -150,7 +151,7 @@ export class AuthController {
 
   @Post('password/change')
   @HttpCode(204)
-  @RequireAuth()
+  @AuthenticatedOnly()
   @Endpoint({
     summary: 'Change password (re-enter current password; signs out other sessions)',
     tags: ['auth'],

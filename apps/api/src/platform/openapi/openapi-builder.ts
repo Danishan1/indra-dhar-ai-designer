@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common/constants.js';
 import { z } from 'zod';
 
-import { AUTH_METADATA } from '../auth/require-auth.js';
+import { AUTH_METADATA, AUTHZ_METADATA, type AuthzDeclaration } from '../authz/decorators.js';
 import { IDEMPOTENT_METADATA } from '../idempotency/idempotent.decorator.js';
 import { ENDPOINT_METADATA, type EndpointSpec } from '../validation/endpoint.js';
 
@@ -122,6 +122,8 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
         (method === RequestMethod.POST ? 201 : 200);
       const idempotent =
         spec?.idempotent ?? Reflect.getMetadata(IDEMPOTENT_METADATA, handler) === true;
+      const authz = (Reflect.getMetadata(AUTHZ_METADATA, handler) ??
+        Reflect.getMetadata(AUTHZ_METADATA, controller)) as AuthzDeclaration | undefined;
       const requiresSession =
         (Reflect.getMetadata(AUTH_METADATA, handler) ??
           Reflect.getMetadata(AUTH_METADATA, controller)) === 'session';
@@ -191,6 +193,9 @@ export function buildOpenApiDocument(controllers: Type[], options: OpenApiOption
           : {}),
         responses,
         ...(requiresSession ? { security: [{ sessionCookie: [] }] } : {}),
+        // Authorization declared on the route (docs/architecture/authorization.md).
+        ...(authz ? { 'x-authorization': authz.kind } : {}),
+        ...(authz?.kind === 'permission' ? { 'x-required-permission': authz.permission } : {}),
         ...(spec ? {} : { 'x-undocumented': true }),
       };
       paths[path] = { ...(paths[path] ?? {}), [httpMethod]: operation };

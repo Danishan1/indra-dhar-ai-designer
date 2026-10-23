@@ -11,10 +11,11 @@ import { Body, Controller, Get, HttpCode, Patch, Post, Req } from '@nestjs/commo
 import type { Request } from 'express';
 import type { z } from 'zod';
 
-import { currentUserId, RequireAuth } from '../../platform/auth/require-auth.js';
+import { authzContext } from '../../platform/authz/authorizer.js';
+import { AuthenticatedOnly, RequirePermission } from '../../platform/authz/decorators.js';
+import { currentUserId } from '../../platform/authz/principal.js';
 import { Endpoint } from '../../platform/validation/endpoint.js';
 
-import { OrgAccess, orgMembership } from './org-access.js';
 import { OrganizationService } from './organization.service.js';
 
 @Controller('orgs')
@@ -22,7 +23,7 @@ export class OrganizationsController {
   constructor(private readonly orgs: OrganizationService) {}
 
   @Post()
-  @RequireAuth()
+  @AuthenticatedOnly()
   @Endpoint({
     summary: 'Create an organization (you become its owner)',
     tags: ['organizations'],
@@ -36,7 +37,7 @@ export class OrganizationsController {
   }
 
   @Get()
-  @RequireAuth()
+  @AuthenticatedOnly()
   @Endpoint({
     summary: 'My organizations',
     tags: ['organizations'],
@@ -48,7 +49,7 @@ export class OrganizationsController {
   }
 
   @Get(':orgId')
-  @OrgAccess()
+  @RequirePermission('organization.view')
   @Endpoint({
     summary: 'Organization details',
     tags: ['organizations'],
@@ -57,11 +58,11 @@ export class OrganizationsController {
     errors: ['NOT_FOUND', 'PERMISSION_DENIED'],
   })
   get(@Req() req: Request): Promise<MyOrganization> {
-    return this.orgs.get(orgMembership(req));
+    return this.orgs.get(authzContext(req));
   }
 
   @Patch(':orgId')
-  @OrgAccess('organization_owner', 'organization_admin')
+  @RequirePermission('organization.update')
   @Endpoint({
     summary: 'Rename the organization',
     tags: ['organizations'],
@@ -74,12 +75,12 @@ export class OrganizationsController {
     @Req() req: Request,
     @Body() body: z.output<typeof updateOrganizationRequestSchema>,
   ): Promise<MyOrganization> {
-    return this.orgs.rename(orgMembership(req), body.name);
+    return this.orgs.rename(authzContext(req), body.name);
   }
 
   @Post(':orgId/ownership-transfer')
   @HttpCode(204)
-  @OrgAccess('organization_owner')
+  @RequirePermission('organization.transfer_ownership')
   @Endpoint({
     summary: 'Transfer ownership to another active member (explicit confirmation required)',
     tags: ['organizations'],
@@ -93,7 +94,7 @@ export class OrganizationsController {
     @Body() body: z.output<typeof transferOwnershipRequestSchema>,
   ): Promise<void> {
     await this.orgs.transferOwnership(
-      orgMembership(req),
+      authzContext(req),
       body.toMembershipId,
       body.confirmOrganizationName,
     );

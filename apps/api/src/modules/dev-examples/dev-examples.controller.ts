@@ -3,6 +3,7 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { z } from 'zod';
 
 import { AuditService } from '../../platform/audit/audit.service.js';
+import { Public } from '../../platform/authz/decorators.js';
 import { RequestContext } from '../../platform/context/request-context.js';
 import { Idempotent } from '../../platform/idempotency/idempotent.decorator.js';
 import { JobService } from '../../platform/jobs/job.service.js';
@@ -24,6 +25,7 @@ export const echoResponseSchema = z.object({
  * Registered only when dev routes are enabled (never in production).
  */
 @Controller('_dev')
+@Public()
 export class DevExamplesController {
   constructor(
     private readonly prisma: PrismaService,

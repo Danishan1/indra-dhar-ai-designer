@@ -21,7 +21,8 @@ export const ENDPOINT_METADATA = 'aid:endpoint';
  *             response: projectSchema, successStatus: 201, errors: ['CONFLICT'] })
  * create(@Body() body: CreateProject) { … }
  * ```
- * I07 adds a required `permission` field; every route must declare one.
+ * Authorization is declared separately with `@Public()` / `@AuthenticatedOnly()` /
+ * `@RequirePermission()` (docs/architecture/authorization.md).
  */
 export interface EndpointSpec {
   summary: string;

@@ -45,3 +45,12 @@ _(Append: date — source iteration — item — reason)_
 - Workspace UI and workspace-scoped role grants (schema exists, ADR-017). → when a customer needs it.
 - Invitation for an email without an account: sign-up link with the email prefilled and an automatic return to the invitation. → I47 (UX polish).
 - Platform-admin organization suspension/deletion (never ownership takeover, FR-SEC-083). → I45.
+
+## From I07 (2026-10-23)
+
+- Custom roles UI and API (`roles.manage`; schema + PDP already support organization-owned roles, FR-SEC-092). → when requested.
+- Workspace-scoped role assignments (`membership_roles.scope_id`, ADR-017). → with workspace UI.
+- Audit view limited to billing events for Billing admins ("Billing scope only", §23) — needs audit filtering by category. → I46.
+- Admin-delegable roles: Admins cannot assign Merchandiser/Production roles by default (they lack `techpack.edit`); revisit if owners find it restrictive (security policy option). → I08 policy work.
+- Platform-operator principal type and `platform.*` enforcement. → I45.
+- Postgres RLS as defence in depth (ADR-004). → I47 evaluation.

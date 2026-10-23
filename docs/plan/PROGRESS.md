@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I07 — Authorization engine & tenant isolation** (next)                                             |
+| **Current iteration** | **I08 — MFA, step-up, sessions & security audit** (next)                                             |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-23 (I06 finished)                                                                            |
+| Last updated          | 2026-10-23 (I07 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -26,7 +26,7 @@
 | I04 | Web app shell & design system                         | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | → M1 reached; ADR-040                                 |
 | I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                |
 | I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                   |
-| I07 | Authorization engine & tenant isolation               | 1     | todo   |            |            |          |                                                       |
+| I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md           |
 | I08 | MFA, step-up, sessions & security audit               | 1     | todo   |            |            |          | → M2                                                  |
 | I09 | Asset & storage service                               | 2     | todo   |            |            |          |                                                       |
 | I10 | Projects & lifecycle core                             | 2     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-23 — I07 — global PEP + PDP, catalog synced from code at API start, matrix reading, delegation rule, test-utils package — ADR-042
 - 2026-10-23 — I06 — path-scoped org context (`@OrgAccess`), invitation tokens only in request bodies (`POST /v1/invitations/preview`), placeholder roles until I07 — ADR-041
 - 2026-10-22 — between I02/I03 — local log files (`logs/`, `pnpm logs`) and local PostgreSQL option, at owner's request — ADR-036, ADR-037
 - 2026-10-22 — I05 — Better Auth embedded behind our controllers; Origin-based CSRF; accepted gaps (unhashed session tokens, non-atomic audit) — ADR-006, docs/architecture/identity.md
@@ -116,6 +117,13 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-23 — I07 Authorization engine & tenant isolation (session 1) — DONE
+
+- Built: permission catalog (81 keys incl. planned ones) + 11 baseline roles with the §23 mapping (`packages/contracts`); `permissions`/`role_permissions`/`resource_grants`/`security_policies` (migration `…_i07_authorization`), catalog sync at API start / `pnpm db:seed`; global `AuthorizationGuard` + PDP (reason codes, fail closed), resource resolvers, Redis membership cache with immediate invalidation; role assignment with delegation, effective permissions, `/v1/me/permissions`; every I05/I06 route retrofitted; `packages/test-utils` + security suites; web role editor, permissions drawer, `can()` / `<Can>`.
+- Tests: contracts 32, api unit 71, integration api 63 (security 20) + worker 13, e2e 16.
+- **Owner actions (Windows):** `pnpm install` (new package `@ai-designer/test-utils`), `pnpm db:migrate`, then `pnpm dev` — the API fills the roles/permissions tables itself at start (or run `pnpm db:seed`). Existing owners keep full admin rights; to see billing/credential/approval features later, an owner gives themselves the matching role in Settings → Members → Edit roles.
+- **Next step:** I08 — MFA, step-up (wire `STEP_UP_REQUIRED` obligations for sensitive permissions), session management and security audit → milestone M2 (tag `m2` after I08).
 
 ### 2026-10-23 — I06 Organizations, memberships & invitations (session 1) — DONE
 

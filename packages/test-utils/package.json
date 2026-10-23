@@ -1,0 +1,35 @@
+{
+  "name": "@ai-designer/test-utils",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared test helpers: HTTP test client, route inventory, tenant fixtures and the cross-tenant isolation harness",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0"
+  },
+  "devDependencies": {
+    "@ai-designer/config": "workspace:*",
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0",
+    "@types/node": "^24.0.0",
+    "eslint": "10.13.0",
+    "reflect-metadata": "0.2.2",
+    "rimraf": "6.1.3",
+    "rxjs": "7.8.2",
+    "typescript": "6.0.3"
+  }
+}

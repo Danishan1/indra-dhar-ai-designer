@@ -1,21 +1,25 @@
 'use client';
 
+import type { PermissionKey } from '@ai-designer/contracts';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
 
-const ITEMS = [
+import { useOrganization } from './organization-provider';
+
+const ITEMS: { href: string; label: string; permission?: PermissionKey }[] = [
   { href: '/settings', label: 'General' },
-  { href: '/settings/members', label: 'Members' },
+  { href: '/settings/members', label: 'Members', permission: 'members.view' },
 ];
 
 /** Sub-navigation for organization settings pages. */
 export function SettingsNav() {
   const pathname = usePathname();
+  const { can } = useOrganization();
   return (
     <nav aria-label="Settings" className="flex gap-1 border-b px-6">
-      {ITEMS.map((item) => {
+      {ITEMS.filter((item) => !item.permission || can(item.permission)).map((item) => {
         const active = pathname === item.href;
         return (
           <Link

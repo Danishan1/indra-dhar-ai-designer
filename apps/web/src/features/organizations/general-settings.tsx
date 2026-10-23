@@ -129,19 +129,19 @@ function TransferOwnership() {
 }
 
 export function GeneralSettings() {
-  const { active, hasRole } = useOrganization();
+  const { active, can } = useOrganization();
   return (
     <>
       <PageHeader title="Organization settings" description={active.name} />
       <div className="flex flex-col gap-8 p-6">
-        {hasRole('organization_owner', 'organization_admin') ? (
+        {can('organization.update') ? (
           <RenameForm />
         ) : (
           <p className="text-[13px] text-muted-foreground">
-            Only owners and admins can change organization settings.
+            Your roles don't include changing organization settings.
           </p>
         )}
-        {hasRole('organization_owner') ? <TransferOwnership /> : null}
+        {can('organization.transfer_ownership') ? <TransferOwnership /> : null}
       </div>
     </>
   );

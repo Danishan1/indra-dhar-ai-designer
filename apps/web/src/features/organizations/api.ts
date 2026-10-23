@@ -1,5 +1,9 @@
 import {
   acceptInvitationResponseSchema,
+  effectivePermissionsSchema,
+  myPermissionsResponseSchema,
+  type OrgRoleKey,
+  rolesResponseSchema,
   type CreateInvitationRequest,
   invitationPreviewSchema,
   invitationSchema,
@@ -54,6 +58,27 @@ export const orgsApi = {
     apiRequest(`${org(orgId)}/invitations/${encodeURIComponent(invitationId)}/resend`, {
       method: 'POST',
       schema: invitationSchema,
+    }),
+  updateMemberRoles: (orgId: string, membershipId: string, roles: OrgRoleKey[]) =>
+    apiRequest(`${org(orgId)}/members/${encodeURIComponent(membershipId)}/roles`, {
+      method: 'PUT',
+      body: { roles },
+      schema: memberSchema,
+    }),
+  effectivePermissions: (orgId: string, membershipId: string, signal?: AbortSignal) =>
+    apiRequest(`${org(orgId)}/members/${encodeURIComponent(membershipId)}/effective-permissions`, {
+      schema: effectivePermissionsSchema,
+      ...(signal ? { signal } : {}),
+    }),
+  roles: (orgId: string, signal?: AbortSignal) =>
+    apiRequest(`${org(orgId)}/roles`, {
+      schema: rolesResponseSchema,
+      ...(signal ? { signal } : {}),
+    }),
+  myPermissions: (orgId: string, signal?: AbortSignal) =>
+    apiRequest(`/v1/me/permissions?orgId=${encodeURIComponent(orgId)}`, {
+      schema: myPermissionsResponseSchema,
+      ...(signal ? { signal } : {}),
     }),
   transferOwnership: (orgId: string, body: TransferOwnershipRequest) =>
     apiRequest(`${org(orgId)}/ownership-transfer`, { method: 'POST', body }),

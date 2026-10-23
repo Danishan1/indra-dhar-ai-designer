@@ -81,17 +81,17 @@ Events: `RoleAssignmentChanged`, `ResourceGrantCreated`, `ResourceGrantRevoked`,
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Write permission catalog + baseline roles + §23 mapping table (document interpretations of "If granted"/"Policy-limited": not in default role; grantable via additional role or grant).
-2. [ ] Models, migration, idempotent seed.
-3. [ ] PDP with reason codes, fail-closed wrapper, policy version constant.
-4. [ ] Decorators + global guard + resource resolvers (load resource org id by type: project, design, artifact, asset, job…; registry extended by later modules).
-5. [ ] Retrofit I05/I06 routes with decorators; add route-declaration test.
-6. [ ] Delegation-checked role assignment; last-owner rule retained.
-7. [ ] Tenant repository helpers; refactor organizations module to use them; add lint rule/check.
-8. [ ] Caching + invalidation on outbox events; revocation-latency test.
-9. [ ] Test-utils fixtures and isolation harness; security test suites.
-10. [ ] Web role management + permission hook.
-11. [ ] `docs/architecture/authorization.md`; update `PROGRESS.md`; tag `m2` only after I08.
+1. [x] Write permission catalog + baseline roles + §23 mapping table (document interpretations of "If granted"/"Policy-limited": not in default role; grantable via additional role or grant).
+2. [x] Models, migration, idempotent seed.
+3. [x] PDP with reason codes, fail-closed wrapper, policy version constant.
+4. [x] Decorators + global guard + resource resolvers (load resource org id by type: project, design, artifact, asset, job…; registry extended by later modules).
+5. [x] Retrofit I05/I06 routes with decorators; add route-declaration test.
+6. [x] Delegation-checked role assignment; last-owner rule retained.
+7. [x] Tenant repository helpers; refactor organizations module to use them; add lint rule/check.
+8. [x] Caching + invalidation on outbox events; revocation-latency test.
+9. [x] Test-utils fixtures and isolation harness; security test suites.
+10. [x] Web role management + permission hook.
+11. [x] `docs/architecture/authorization.md`; update `PROGRESS.md`; tag `m2` only after I08.
 
 ## 8. Tests
 
@@ -101,13 +101,13 @@ Events: `RoleAssignmentChanged`, `ResourceGrantCreated`, `ResourceGrantRevoked`,
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Every protected route declares a permission or `@Public`; CI/test fails otherwise (FR-SEC-085; TR-SEC-022).
-- [ ] AC2 — Changing a resource identifier cannot expose another tenant's resource (AC-SEC-002; FR-SEC-216).
-- [ ] AC3 — Users cannot assign permissions they cannot delegate; role grants cannot cross tenants (AC-SEC-003, AC-SEC-013).
-- [ ] AC4 — Authorization dependency failure denies the request (AC-SEC-009; NFR-SEC-004).
-- [ ] AC5 — Edit/generate permissions are distinct from approve/release; billing and credential administration are separate permissions (AC-SEC-006, AC-SEC-007 at catalog level).
-- [ ] AC6 — Role and grant changes are audited; denial reason codes are machine-readable but client responses do not leak resource existence (FR-SEC-240…242).
-- [ ] AC7 — Effective permissions are reviewable per member (FR-SEC-093).
+- [x] AC1 — Every protected route declares a permission or `@Public`; CI/test fails otherwise (FR-SEC-085; TR-SEC-022).
+- [x] AC2 — Changing a resource identifier cannot expose another tenant's resource (AC-SEC-002; FR-SEC-216).
+- [x] AC3 — Users cannot assign permissions they cannot delegate; role grants cannot cross tenants (AC-SEC-003, AC-SEC-013).
+- [x] AC4 — Authorization dependency failure denies the request (AC-SEC-009; NFR-SEC-004).
+- [x] AC5 — Edit/generate permissions are distinct from approve/release; billing and credential administration are separate permissions (AC-SEC-006, AC-SEC-007 at catalog level).
+- [x] AC6 — Role and grant changes are audited; denial reason codes are machine-readable but client responses do not leak resource existence (FR-SEC-240…242).
+- [x] AC7 — Effective permissions are reviewable per member (FR-SEC-093).
 
 ## 10. Risks & notes
 
@@ -125,7 +125,22 @@ Events: `RoleAssignmentChanged`, `ResourceGrantCreated`, `ResourceGrantRevoked`,
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-23
+- Sessions used: 1 (estimate 2–3)
+- Deviations from plan (ADR-042 unless noted):
+  - File layout: the PEP lives in `platform/authz/` (`decorators.ts`, `authorization.guard.ts`, `authorizer.ts`, `resource-resolvers.ts`, `access-cache.ts`, `membership-directory.ts`, `principal.ts`); `@Public()` and the others are in one `decorators.ts`. The PDP is `modules/authorization/authorization.service.ts`; there is no `roles.controller.ts`/`repository.ts` — `authorization.controller.ts` serves the catalog, roles, effective and own permissions; role assignment is `PUT …/members/:id/roles` in the organizations module (it owns `membership_roles`). The seed function is `packages/db/src/platform/authorization-catalog.ts` (`syncAuthorizationCatalog`), run at API start and by `pnpm db:seed`.
+  - Extra decorator `@RequireMembership()` for "self or `members.view`" style rules (effective permissions).
+  - Route declaration test also enforces that every non-`orgId` id in an org path is the declared resource (tenant-checked by the PEP) and pins the list of public routes.
+  - The "lint rule" for raw tenant-model access is a test (`platform/tenancy/table-ownership.test.ts`): models may only be accessed by their owning module.
+  - Cache: Redis, 30 s TTL, invalidated synchronously by the API after commit **and** by a worker consumer on membership/role events (rather than only by outbox events).
+  - Matrix interpretation (documented in `roles.ts` + `authorization.md`): Owner/Admin do not hold approve/release/billing/credential permissions by default; Owner can delegate every org permission. Admins may now manage other Admins (delegation rule) — previously (I06) they could not.
+  - Ownership transfer keeps the new owner's other roles (I06 replaced them).
+  - Obligations are part of the decision contract, but no policy emits them until I08; an `allow` with obligations is denied by the guard.
+  - `ResourceGrant` creation/revocation service exists (audited, outbox events); no HTTP endpoints until I10/I43, as planned.
+  - Denials of `sensitive` permissions are audited (`authorization.denied`), others only logged.
+  - New package `packages/test-utils` (TestClient, `listRoutes`, `createTenant`, `checkTenantIsolation`); security suites live in `apps/api/test/security/` as `*.int.test.ts`.
+- Verification:
+  - `pnpm verify` green: contracts 32 (catalog naming, every key mapped, no platform keys in org roles, §23 decision table, delegation), api unit 71 (PDP decision table + fail-closed, table ownership), web 37, worker 7.
+  - `pnpm test:integration`: api 63 incl. security 20 — route declarations (4); cross-tenant isolation over every org-scoped route both directions, mixed ids, ignored tenant hints (5); privilege escalation (11): viewer 403s, no self-escalation, Billing-admin delegation, owner only by transfer, no cross-tenant role grants, role change effective on the next request + audited + outbox, audited denials, effective permissions (self / members.view), ignored client role claims, grant allow/expiry/revocation, fail-closed 503. Worker 13 (cache invalidation consumer).
+  - `pnpm e2e` 16/16 (new: owner demotes an admin to Viewer through the role editor; the viewer's UI loses member/settings actions and the API answers 403).
+- Follow-ups added to backlog: custom roles UI, workspace-scoped roles, billing-scoped audit view, admin-delegable role policy, platform operators (I45), RLS (I47).
