@@ -24,6 +24,16 @@ const BODIES: Record<string, unknown> = {
     confirmOrganizationName: 'x',
   },
   'PUT /v1/orgs/:orgId/members/:membershipId/roles': { roles: ['viewer'] },
+  'PATCH /v1/orgs/:orgId/projects/:projectId': { expectedVersion: 1, name: 'Hijacked' },
+  'PUT /v1/orgs/:orgId/projects/:projectId/visibility': {
+    expectedVersion: 1,
+    visibility: 'restricted',
+  },
+  'POST /v1/orgs/:orgId/projects/:projectId/grants': {
+    userId: '0197b0a0-0000-7000-8000-000000000000',
+    actions: ['project.view'],
+  },
+  'POST /v1/orgs/:orgId/projects': { name: 'Isolation probe' },
   'POST /v1/orgs/:orgId/assets/uploads': {
     assetType: 'source_image',
     fileName: 'x.png',
@@ -44,13 +54,21 @@ describe('cross-tenant isolation', () => {
   let a: TenantFixture;
   let b: TenantFixture;
   const assetIds = new Map<string, string>();
+  const projectIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
     membershipId: t.members['designer']?.membershipId ?? '',
     invitationId: t.pendingInvitationId,
     assetId: assetIds.get(t.orgId) ?? '',
+    projectId: projectIds.get(t.orgId) ?? '',
   });
+
+  async function startProject(t: TenantFixture): Promise<void> {
+    const res = await t.owner.client.post(`/v1/orgs/${t.orgId}/projects`, { name: 'Probe' });
+    expect(res.status).toBe(201);
+    projectIds.set(t.orgId, ((await res.json()) as { id: string }).id);
+  }
 
   async function startUpload(t: TenantFixture): Promise<void> {
     const res = await t.owner.client.post(
@@ -72,6 +90,8 @@ describe('cross-tenant isolation', () => {
     a = await createTenant(fixtureDeps(baseUrl), 'Tenant A', ['designer']);
     b = await createTenant(fixtureDeps(baseUrl), 'Tenant B', ['designer']);
     await startUpload(a);
+    await startProject(a);
+    await startProject(b);
     await startUpload(b);
   }, 120_000);
 
@@ -105,7 +125,7 @@ describe('cross-tenant isolation', () => {
 
   it("mixing ids (own org, other tenant's member/invitation/asset) is also 404", async () => {
     const failures = await checkTenantIsolation({
-      routes: routes.filter((r) => /:membershipId|:invitationId|:assetId/.test(r.path)),
+      routes: routes.filter((r) => /:membershipId|:invitationId|:assetId|:projectId/.test(r.path)),
       attacker: b.owner.client,
       params: { ...paramsFor(a), orgId: b.orgId },
       bodies: BODIES,

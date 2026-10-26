@@ -15,7 +15,7 @@ export default function HomePage() {
             href: '/projects',
             icon: FolderKanbanIcon,
             title: 'Projects',
-            text: 'Design projects and their lifecycle (I10).',
+            text: 'Design projects, lifecycle and access.',
           },
           {
             href: '/editor/demo',

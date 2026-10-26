@@ -27,6 +27,7 @@ const OWNERS: Record<string, string | string[]> = {
   mfaRecoveryCode: 'modules/identity',
   auditEvent: ['platform/audit', 'modules/audit'],
   asset: 'modules/assets',
+  project: 'modules/projects',
 };
 
 const SRC = join(import.meta.dirname, '../..');

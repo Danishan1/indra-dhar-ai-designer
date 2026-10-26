@@ -70,12 +70,15 @@ export class AuthorizationService implements Authorizer {
     if (permission && isPlatformPermission(permission)) return deny('MISSING_PERMISSION');
 
     let organizationId = request.organizationId;
+    let restricted = false;
     if (resource) {
-      const owner = await this.resolvers.get(resource.type).organizationOf(resource.id);
+      const resolver = this.resolvers.get(resource.type);
+      const owner = await resolver.organizationOf(resource.id);
       if (!owner || (organizationId && owner !== organizationId)) {
         return deny('RESOURCE_NOT_IN_TENANT');
       }
       organizationId = owner;
+      restricted = (await resolver.isRestricted?.(resource.id)) ?? false;
     }
     if (!organizationId) throw new Error('authorization request without organization');
 
@@ -104,7 +107,18 @@ export class AuthorizationService implements Authorizer {
     if (policy.requireMfa && !mfaVerified) return deny('MFA_REQUIRED', context);
 
     let reason: AuthzDecision['reasonCode'];
-    if (!permission || context.permissions.has(permission)) reason = 'ALLOWED_BY_ROLE';
+    // Restricted resources (projects): roles alone are not enough — the caller needs
+    // `<type>.manage_access` or an explicit grant; without any grant it does not exist for them.
+    const managesAccess =
+      resource !== undefined &&
+      context.permissions.has(`${resource.type}.manage_access` as PermissionKey);
+    if (permission && resource && restricted && !managesAccess) {
+      if (await this.grants.hasActiveGrant(organizationId, principal.id, resource, permission))
+        reason = 'ALLOWED_BY_GRANT';
+      else if (await this.grants.hasAnyActiveGrant(organizationId, principal.id, resource))
+        return deny('MISSING_PERMISSION', context);
+      else return deny('RESOURCE_RESTRICTED', context);
+    } else if (!permission || context.permissions.has(permission)) reason = 'ALLOWED_BY_ROLE';
     else if (
       resource &&
       (await this.grants.hasActiveGrant(organizationId, principal.id, resource, permission))

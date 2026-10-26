@@ -6,6 +6,7 @@ import { AuthorizationModule } from './modules/authorization/authorization.modul
 import { DevExamplesModule } from './modules/dev-examples/dev-examples.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { OrganizationsModule } from './modules/organizations/organizations.module.js';
+import { ProjectsModule } from './modules/projects/projects.module.js';
 import { type AppConfig } from './platform/config/app-config.js';
 import { AppConfigModule } from './platform/config/config.module.js';
 import { HealthModule } from './platform/health/health.module.js';
@@ -26,6 +27,7 @@ const FEATURE_MODULES: DynamicModule['imports'] = [
   AuditModule,
   IdentityModule,
   AssetsModule,
+  ProjectsModule,
   OrganizationsModule,
 ];
 

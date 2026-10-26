@@ -71,6 +71,17 @@ _(Append: date — source iteration — item — reason)_
 - Presigned direct browser → bucket PUT (`presignPut` + CORS on the bucket) for very large files; today uploads stream through the API (ADR-044). → when files > 50 MB are needed (I36 GLB?).
 - ClamAV adapter for the `Scanner` port and a `clamd` compose service (ADR-029). → I47.
 - Retention purge job: hard-delete soft-deleted assets after `retention_until`, orphaned `pending_upload` rows and objects. → I47.
-- Validate `projectId` on uploads and filter by project (upload currently refuses `projectId`). → I10.
+- Validate `projectId` on uploads and filter by project (upload currently refuses `projectId`). → I12 (project sources arrive with designs; needs a project-existence check via `ProjectsService`).
 - Signed-URL thumbnails with refresh on expiry (today thumbnails stream same-origin through the API); revisit when a CDN/reverse proxy is in place. → I48.
 - Color-space/ICC metadata extraction and normalized previews for CMYK sources. → I23 (AI input preparation).
+
+## From I10 (2026-10-26)
+
+- Trigram (`pg_trgm`) index for project search once lists grow past a few thousand rows per org. → I48.
+- Duplicate project should also copy designs (latest approved/working revision) and sources. → I12.
+- Dependents counts (designs, revisions, tech packs) and completion checks (unresolved reviews): modules call `ProjectLifecycleRegistry`. → I12, I28.
+- Physical erasure of deleted projects after retention. → I47.
+- Grant expiry in the Access tab (API supports `expiresAt`; UI does not set it). → I28.
+- Project thumbnails/cover image on cards. → I35.
+- Move the Files page into project Sources; wire `projectId` on uploads. → I12.
+- Bulk lifecycle actions and saved filters on the dashboard. → unscheduled.

@@ -8,6 +8,8 @@ export const PreferenceKeys = {
   editorLayoutPrefix: 'aid.editor.layout',
   /** Last selected organization id (re-validated against my memberships on every load). */
   activeOrganization: 'aid.activeOrg',
+  /** Projects dashboard layout: grid | list. */
+  projectsView: 'aid.projects.view',
 } as const;
 
 export function readPreference(key: string): string | null {

@@ -121,6 +121,7 @@ export class AuthorizationGuard implements CanActivate {
         return new AppError('UNAUTHENTICATED', 'Sign in to continue');
       case 'NO_MEMBERSHIP':
       case 'RESOURCE_NOT_IN_TENANT':
+      case 'RESOURCE_RESTRICTED':
         // Never reveal whether another tenant's resource exists (FR-SEC-216/241).
         return AppError.notFound(notFoundLabel);
       case 'MEMBERSHIP_INACTIVE':

@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I10 — Projects & lifecycle core** (next)                                                           |
+| **Current iteration** | **I11 — Canonical garment model package** (next)                                                     |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-26 (I09 finished)                                                                            |
+| Last updated          | 2026-10-26 (I10 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -29,7 +29,7 @@
 | I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md           |
 | I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                 |
 | I09 | Asset & storage service                               | 2     | done   | 2026-10-23 | 2026-10-26 | 1        | ADR-044; docs/architecture/assets.md                  |
-| I10 | Projects & lifecycle core                             | 2     | todo   |            |            |          |                                                       |
+| I10 | Projects & lifecycle core                             | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-045; docs/architecture/projects.md                |
 | I11 | Canonical garment model package                       | 2     | todo   |            |            |          | Confirm ADR-008                                       |
 | I12 | Designs, working copies & immutable revisions         | 2     | todo   |            |            |          |                                                       |
 | I13 | Artifact registry & built-in library                  | 2     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-26 — I10 — typed columns, restricted visibility in the PDP (404), grants revoked by `?userId=`, lifecycle registry — ADR-045
 - 2026-10-26 — I09 — API-proxied uploads, `packages/media`, SVG overwrite, thumbnails via streaming endpoint, `/files` dev page — ADR-044
 - 2026-10-23 — I08 — own TOTP + separate MFA tables, sensitive permissions require MFA (instead of blocking privileged roles), logout public — ADR-043
 - 2026-10-23 — I07 — global PEP + PDP, catalog synced from code at API start, matrix reading, delegation rule, test-utils package — ADR-042
@@ -119,6 +120,15 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-26 — I10 Projects & lifecycle core (session 1) — DONE
+
+- Built: `projects` table (migration `20261026135858_i10_projects` + CHECKs), contracts (`packages/contracts/src/projects`: schemas, events, shared lifecycle table), `ProjectsModule` (CRUD with `expectedVersion`, list/search/filter/sort with keyset paging, hold/resume/complete/reopen/archive/restore/delete, dependents + completion registry, duplicate, visibility + grants), PDP restricted-visibility hook, web Projects dashboard (grid/list), create dialog, project overview (Details / Access tabs, lifecycle dialogs).
+- Tests: contracts 38, api unit 86, web 37, integration api 89 + worker 13, e2e 19. OpenAPI regenerated.
+- **Owner actions (Windows):**
+  1. `pnpm db:migrate` (adds `projects`; no new dependencies, no `.env` changes).
+  2. `pnpm dev`, open **Projects**: create one, edit, archive it, find it under Status → Archived, restore. Try Access → Restricted with a second member.
+- **Next step:** I11 — canonical garment model package (confirm ADR-008 first: shirt + T-shirt).
 
 ### 2026-10-26 — I09 Asset & storage service (session 1) — DONE
 

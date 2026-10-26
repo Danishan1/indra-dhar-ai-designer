@@ -74,7 +74,6 @@ export function FilesPage() {
       toast.success('File deleted');
       await refresh();
     },
-    onError: (err) => toastApiError(err),
   });
   const download = async (asset: Asset) => {
     try {

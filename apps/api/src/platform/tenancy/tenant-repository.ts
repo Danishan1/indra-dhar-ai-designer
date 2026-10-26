@@ -6,8 +6,8 @@ import { AppError } from '../errors/app-error.js';
  * the AuthorizationGuard verified for this request — never by an id taken from the client.
  *
  * ```ts
- * const project = await prisma.project.findFirst({ where: tenantWhere({ id: projectId }) });
- * if (!project) throw AppError.notFound('Project'); // also for other tenants' ids
+ * const widget = await prisma.widget.findFirst({ where: tenantWhere({ id: widgetId }) });
+ * if (!widget) throw AppError.notFound('Widget'); // also for other tenants' ids
  * ```
  * Tests: add the route to the cross-tenant isolation suite (docs/architecture/authorization.md).
  */

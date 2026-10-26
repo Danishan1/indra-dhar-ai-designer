@@ -134,6 +134,10 @@ after role permissions when the route declares a `resource`; expiry and revocati
 every request. Sharing endpoints arrive with shareable resources (projects I10, tech packs I43) and
 must require `<resource>.manage_access` themselves.
 
+## Restricted resources (I10, ADR-045)
+
+A resolver can implement `isRestricted(id)` (today only `project`, when `visibility = 'restricted'`). For a restricted resource the PDP ignores the role permission and requires an **active resource grant** for the action, unless the caller holds `<type>.manage_access`. Members without any grant get **404** (`RESOURCE_RESTRICTED`, indistinguishable from not found); a member with a grant for a different action gets 403. List endpoints must filter with `GrantsService.resourceIdsGrantedTo(...)` unless the caller manages access. See `docs/architecture/projects.md`.
+
 ## Caching and revocation latency
 
 The PDP caches each membership (status + role ids) in Redis for **30 s**

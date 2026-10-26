@@ -55,6 +55,63 @@ export class ResourceGrantService {
     return grant?.id ?? null;
   }
 
+  /** Whether the user holds any active grant on the resource (for restricted visibility). */
+  async hasAnyActiveGrant(
+    organizationId: string,
+    userId: string,
+    resource: { type: string; id: string },
+  ): Promise<boolean> {
+    const grant = await this.prisma.resourceGrant.findFirst({
+      where: {
+        organizationId,
+        recipientType: 'user',
+        recipientId: userId,
+        resourceType: resource.type,
+        resourceId: resource.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+
+  /** Active grants on one resource (the project's access tab). */
+  async listForResource(organizationId: string, resource: { type: string; id: string }) {
+    return this.prisma.resourceGrant.findMany({
+      where: {
+        organizationId,
+        resourceType: resource.type,
+        resourceId: resource.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /** Resource ids of one type the user may access through active grants (restricted listings). */
+  async resourceIdsGrantedTo(
+    organizationId: string,
+    userId: string,
+    resourceType: string,
+    action: PermissionKey,
+  ): Promise<string[]> {
+    const rows = await this.prisma.resourceGrant.findMany({
+      where: {
+        organizationId,
+        recipientType: 'user',
+        recipientId: userId,
+        resourceType,
+        revokedAt: null,
+        actions: { has: action },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { resourceId: true },
+    });
+    return rows.map((r) => r.resourceId);
+  }
+
   async listActiveForUser(organizationId: string, userId: string) {
     return this.prisma.resourceGrant.findMany({
       where: {

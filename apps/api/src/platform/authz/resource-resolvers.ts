@@ -5,6 +5,11 @@ export interface ResourceResolver {
   label: string;
   /** Returns the owning organization id, or null when the resource does not exist. */
   organizationOf(id: string): Promise<string | null>;
+  /**
+   * Resource types with restricted visibility (projects, FR-SEC-094): when true, role permissions
+   * alone do not give access — the caller needs `<type>.manage_access` or an explicit grant.
+   */
+  isRestricted?(id: string): Promise<boolean>;
 }
 
 /**

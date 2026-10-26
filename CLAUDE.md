@@ -22,6 +22,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/architecture/identity.md` — **authentication design (Better Auth), sessions, CSRF, rate limits; `currentUserId()`.**
 - `docs/architecture/authorization.md` — **permissions, roles, `@RequirePermission()` & friends, resource resolvers, tenant isolation tests. Every route must declare one.**
 - `docs/architecture/assets.md` — **storing files: upload flow, `packages/media`, `storeGeneratedAsset`, reference checks before delete.**
+- `docs/architecture/projects.md` — **project lifecycle table, dependents/completion registry, restricted visibility.**
 - `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)

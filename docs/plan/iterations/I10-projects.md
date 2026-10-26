@@ -74,15 +74,15 @@ All mutating routes accept `Idempotency-Key`.
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Model + migration + display id prefix `PRJ`.
-2. [ ] State machine table + unit tests from §7.5 diagram.
-3. [ ] Service with transactions, audit + outbox per transition, idempotency.
-4. [ ] Listing/search with indexes; pagination.
-5. [ ] Visibility + grants integration with PDP (restricted project requires grant or `project.manage_access`).
-6. [ ] Dependents registry (modules register counters later).
-7. [ ] Controllers/contracts; isolation tests added to harness.
-8. [ ] Web dashboard + overview.
-9. [ ] Update `PROGRESS.md`.
+1. [x] Model + migration + display id prefix `PRJ`.
+2. [x] State machine table + unit tests from §7.5 diagram.
+3. [x] Service with transactions, audit + outbox per transition, idempotency.
+4. [x] Listing/search with indexes; pagination.
+5. [x] Visibility + grants integration with PDP (restricted project requires grant or `project.manage_access`).
+6. [x] Dependents registry (modules register counters later).
+7. [x] Controllers/contracts; isolation tests added to harness.
+8. [x] Web dashboard + overview.
+9. [x] Update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -92,12 +92,12 @@ All mutating routes accept `Idempotency-Key`.
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Project creation yields stable ID, `ACTIVE` state, owning tenant, attributable creator (SPEC-006 AC-001; FR-PRJ-001).
-- [ ] AC2 — Lifecycle transitions follow §7.5 exactly; invalid transitions return `INVALID_STATE_TRANSITION` (FR-PRJ-083…088).
-- [ ] AC3 — Archiving/deletion never erases history; deletion is logical with dependency warning (FR-PRJ-087, 089, 091).
-- [ ] AC4 — Listing supports filtering by state and metadata and search (FR-PRJ-012, 013).
-- [ ] AC5 — Every transition generates an audit event with actor attribution (FR-PRJ-093, 094).
-- [ ] AC6 — Project access is enforced server-side, incl. restricted projects (FR-PRJ-010; FR-SEC-106, 108).
+- [x] AC1 — Project creation yields stable ID, `ACTIVE` state, owning tenant, attributable creator (SPEC-006 AC-001; FR-PRJ-001).
+- [x] AC2 — Lifecycle transitions follow §7.5 exactly; invalid transitions return `INVALID_STATE_TRANSITION` (FR-PRJ-083…088).
+- [x] AC3 — Archiving/deletion never erases history; deletion is logical with dependency warning (FR-PRJ-087, 089, 091).
+- [x] AC4 — Listing supports filtering by state and metadata and search (FR-PRJ-012, 013).
+- [x] AC5 — Every transition generates an audit event with actor attribution (FR-PRJ-093, 094).
+- [x] AC6 — Project access is enforced server-side, incl. restricted projects (FR-PRJ-010; FR-SEC-106, 108).
 
 ## 10. Risks & notes
 
@@ -111,7 +111,13 @@ All mutating routes accept `Idempotency-Key`.
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1
+- Deviations from plan (ADR-045):
+  - Typed columns for metadata instead of JSONB; search is `ILIKE` (no trigram index yet).
+  - Restricted visibility is enforced inside the PDP through a resolver hook (`isRestricted`), returning 404 (`RESOURCE_RESTRICTED`) to non-granted members; listing filters through grants.
+  - Grant revoke is `DELETE …/grants?userId=` (route-declaration rule forbids an extra path id).
+  - Added `PUT …/visibility` (`project.manage_access`) and `POST …/duplicate`; reopen/archive/restore use `project.archive`.
+  - `projectId` on uploads is still refused; Files page stays until I12 (project sources).
+- Tests: contracts 38, api unit 86, web 37, integration api 89 + worker 13 (projects 10, security incl. project routes), e2e 19 (projects spec added).
+- Follow-ups added to backlog: see `09-backlog.md` "From I10".

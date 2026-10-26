@@ -302,6 +302,7 @@ model Organization {
   memberships Membership[]
   /// Relations declared so Prisma keeps the FKs (rows owned by the authorization module).
   customRoles      Role[]
+  projects       Project[]
   assets           Asset[]
   resourceGrants   ResourceGrant[]
   securityPolicies SecurityPolicy[]
@@ -473,6 +474,45 @@ model Invitation {
   @@index([organizationId, status])
   @@index([email, status])
   @@map("invitations")
+}
+
+/// Garment project (SS-02, I10). Lifecycle per SPEC-006 §7.5; status is independent of design status.
+model Project {
+  id               String    @id @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  displayId        String    @map("display_id")
+  name             String
+  description      String?
+  /// ACTIVE | ON_HOLD | COMPLETED | ARCHIVED | DELETED (logical; erasure is I47)
+  status           String    @default("ACTIVE")
+  /// organization | restricted (restricted: members need a grant or project.manage_access)
+  visibility       String    @default("organization")
+  productCategory  String?   @map("product_category")
+  season           String?
+  brand            String?
+  targetMarket     String?   @map("target_market")
+  styleNumber      String?   @map("style_number")
+  tags             String[]  @default([])
+  /// Set by the designs module (I12); no FK until then.
+  defaultDesignId  String?   @map("default_design_id") @db.Uuid
+  /// Reason of the last hold / reopen / archive / delete.
+  statusReason     String?   @map("status_reason")
+  /// Source project of a duplicate (metadata only; approvals are never copied).
+  duplicatedFromId String?   @map("duplicated_from_id") @db.Uuid
+  version          Int       @default(1)
+  createdBy        String?   @map("created_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
+  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, status, updatedAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, name])
+  @@map("projects")
 }
 
 /// Every stored file (SS-11, I09). Originals and derived variants are separate rows; derived rows
