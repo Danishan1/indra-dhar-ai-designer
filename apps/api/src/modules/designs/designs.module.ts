@@ -9,6 +9,7 @@ import {
   RevisionsController,
 } from './designs.controller.js';
 import { DesignsService } from './designs.service.js';
+import { DesignReferencesService } from './references.service.js';
 import { RevisionService } from './revision.service.js';
 import { WorkingCopyService } from './working-copy.service.js';
 
@@ -19,7 +20,13 @@ import { WorkingCopyService } from './working-copy.service.js';
 @Module({
   imports: [IdentityModule],
   controllers: [ProjectDesignsController, DesignsController, RevisionsController],
-  providers: [DesignsService, WorkingCopyService, RevisionService, CompareService],
-  exports: [DesignsService, WorkingCopyService, RevisionService],
+  providers: [
+    DesignsService,
+    WorkingCopyService,
+    RevisionService,
+    CompareService,
+    DesignReferencesService,
+  ],
+  exports: [DesignsService, WorkingCopyService, RevisionService, DesignReferencesService],
 })
 export class DesignsModule {}

@@ -105,3 +105,13 @@ _(Append: date — source iteration — item — reason)_
 - Move uploads into project sources and allow `projectId` on uploads (carried from I10). → I26.
 - Branches (`branch_id` column reserved; ADR-018). → unscheduled.
 - Alerting pipeline for `alert: revision_integrity` log lines. → I46 (observability).
+
+## From I13 (2026-10-26)
+
+- Organization-defined compatibility rules (`CompatibilityRule` table) evaluated with the built-in ones. → I20.
+- Validate artifact revision ids in design states (`knownArtifactRevisions`) and tighten `design_revisions.artifact_revision_refs` to `uuid[]`. → I18 (attach artifacts).
+- Physical/manufacturing property editing for artifacts with evidence (UI) and a richer definition editor per category. → I18 / I38.
+- Project-scoped library (scope reserved). → unscheduled.
+- Cross-organization sharing / marketplace (SPEC-003 open decision 6). → unscheduled.
+- 3D model refs for artifacts. → I36.
+- Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.

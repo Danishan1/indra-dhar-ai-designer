@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I13 — Artifact registry & built-in library** (next)                                                |
+| **Current iteration** | **I14 — Design operation router (deterministic)** (next)                                             |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-26 (I12 finished)                                                                            |
+| Last updated          | 2026-10-26 (I13 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -32,7 +32,7 @@
 | I10 | Projects & lifecycle core                             | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-045; docs/architecture/projects.md                |
 | I11 | Canonical garment model package                       | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-046; ADR-008 default applied (owner to confirm)   |
 | I12 | Designs, working copies & immutable revisions         | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-047; docs/architecture/designs.md                 |
-| I13 | Artifact registry & built-in library                  | 2     | todo   |            |            |          |                                                       |
+| I13 | Artifact registry & built-in library                  | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-048; docs/architecture/artifacts.md               |
 | I14 | Design operation router (deterministic)               | 3     | todo   |            |            |          |                                                       |
 | I15 | Editor shell, editor-core & autosave                  | 3     | todo   |            |            |          |                                                       |
 | I16 | Parametric 2D garment renderer (SVG)                  | 3     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-26 — I13 — built-in library synced at API start with inline SVG previews (no seed script), revision route by id, scope hooks in the PDP, no CompatibilityRule table yet — ADR-048
 - 2026-10-26 — I12 — revision route by id, `design.create` for create/duplicate, PDP restriction inheritance (`governedBy`), `PolicyEnforcer`, text[] refs until I13 — ADR-047
 - 2026-10-26 — I11 — ADR-008 default applied without owner confirmation; `semanticHash`, `cloneWithNewIds` added; coverage not measured — ADR-046
 - 2026-10-26 — I10 — typed columns, restricted visibility in the PDP (404), grants revoked by `?userId=`, lifecycle registry — ADR-045
@@ -123,10 +124,19 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-10-26 — I13 Artifact registry & built-in library (session 1) — DONE
+
+- Built: `garment-model` artifacts (definition/properties schemas, derived capability + validation status, `checkCompatibility`, `validateArtifactRevision`), tables `artifacts` + `artifact_revisions` (migration `20261026153208_i13_artifacts`, CHECKs, immutability trigger), contracts `packages/contracts/src/artifacts`, `ArtifactsModule` (browse/search/filter, create, revise, rename, deactivate/reactivate, publish, duplicate, where-used, delete-if-unused, compatibility check, SVG preview), built-in library of 46 items synced at start, PDP scope hooks, `DesignReferencesService` (where-used + asset reference checks), web Library page with detail drawer and create/revise dialog.
+- Tests: garment-model 123, api unit 99, integration api 112 + worker 13, e2e 21. OpenAPI regenerated.
+- **Owner actions (Windows):**
+  1. `pnpm db:migrate` (adds `artifacts`, `artifact_revisions`). No new dependencies.
+  2. `pnpm dev` — the built-in library appears automatically on the first API start (log line "built-in artifact library synced"). Open **Library**.
+- **Next step:** I14 — design operation router (deterministic structured edits through `WorkingCopyService`).
+
 ### 2026-10-26 — I12 Designs, working copies & immutable revisions (session 1) — DONE
 
 - Built: tables `designs`, `working_copies`, `design_revisions` (migration `20261026145017_i12_designs` with CHECKs and the immutability trigger), contracts `packages/contracts/src/designs`, `DesignsModule` (create from template/blank with R001, list, get, working copy get/save, commit with lock + hash + refs + generated summary, history, revision by id with integrity check, compare, restore, duplicate, project dependents + duplication hook), PDP restriction inheritance + `PolicyEnforcer`, web Designs tab, new-design dialog and design page (draft JSON editor, history, compare, restore).
-- Tests: api unit 102, integration api 104 + worker 13, e2e 20. OpenAPI regenerated.
+- Tests: api unit 95, integration api 104 + worker 13, e2e 20. OpenAPI regenerated.
 - **Owner actions (Windows):**
   1. `pnpm install` (the API now depends on `@ai-designer/garment-model`).
   2. `pnpm db:migrate` (adds the three tables and the trigger).

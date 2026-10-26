@@ -83,15 +83,15 @@ Events: `ArtifactCreated`, `ArtifactRevisionCreated`, `ArtifactDeactivated`, `Ar
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Artifact schemas + compatibility rules in `garment-model` (pure, unit-tested).
-2. [ ] Models + migration + immutability trigger.
-3. [ ] Service: create, revise, lifecycle, duplicate, publish, delete-if-unreferenced.
-4. [ ] Scope-aware queries (platform + org + user) and authorization (use/edit/publish/delete separate).
-5. [ ] Where-used query against design revisions.
-6. [ ] Seed library + preview generation; idempotent re-run.
-7. [ ] Controllers/contracts; resolvers; isolation tests.
-8. [ ] Library UI.
-9. [ ] Update `PROGRESS.md`.
+1. [x] Artifact schemas + compatibility rules in `garment-model` (pure, unit-tested).
+2. [x] Models + migration + immutability trigger.
+3. [x] Service: create, revise, lifecycle, duplicate, publish, delete-if-unreferenced.
+4. [x] Scope-aware queries (platform + org + user) and authorization (use/edit/publish/delete separate).
+5. [x] Where-used query against design revisions.
+6. [x] Seed library + preview generation; idempotent re-run.
+7. [x] Controllers/contracts; resolvers; isolation tests.
+8. [x] Library UI.
+9. [x] Update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -101,13 +101,13 @@ Events: `ArtifactCreated`, `ArtifactRevisionCreated`, `ArtifactDeactivated`, `Ar
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Artifacts have stable identities and immutable revisions with parent links (ART-001…003; FR-053).
-- [ ] AC2 — Revising an artifact never alters existing design revisions (ART-005; FR-056; SPEC-003 AC-02).
-- [ ] AC3 — Platform, organization and user-private scopes with independent use/edit/publish/delete permissions (ART-006, 007; SEC-003; FR-SEC-114…118).
-- [ ] AC4 — Visual vs physical/manufacturing properties are distinguished; no artifact labelled production-validated without validation (ART-008, ART-014).
-- [ ] AC5 — Compatibility rules are machine-readable and evaluable (ART-012; FR-055).
-- [ ] AC6 — Deactivation preserves history; deletion respects references (ART-010, ART-011).
-- [ ] AC7 — Built-in library seeded for the initial categories (FR-050).
+- [x] AC1 — Artifacts have stable identities and immutable revisions with parent links (ART-001…003; FR-053).
+- [x] AC2 — Revising an artifact never alters existing design revisions (ART-005; FR-056; SPEC-003 AC-02).
+- [x] AC3 — Platform, organization and user-private scopes with independent use/edit/publish/delete permissions (ART-006, 007; SEC-003; FR-SEC-114…118).
+- [x] AC4 — Visual vs physical/manufacturing properties are distinguished; no artifact labelled production-validated without validation (ART-008, ART-014).
+- [x] AC5 — Compatibility rules are machine-readable and evaluable (ART-012; FR-055).
+- [x] AC6 — Deactivation preserves history; deletion respects references (ART-010, ART-011).
+- [x] AC7 — Built-in library seeded for the initial categories (FR-050).
 
 ## 10. Risks & notes
 
@@ -123,7 +123,14 @@ Events: `ArtifactCreated`, `ArtifactRevisionCreated`, `ArtifactDeactivated`, `Ar
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1
+- Deviations from plan (ADR-048):
+  - Built-in library synced at API start from code (`platform-library/`) instead of a seed script; previews are inline generated SVGs served by `GET …/artifact-revisions/:id/preview` (platform rows have no tenant to own assets).
+  - Exact revision route is `/v1/orgs/:orgId/artifact-revisions/:artifactRevisionId` (route rule).
+  - Scope enforcement added to the PDP (`platformAccess`, `privateOwnerOf` resolver hooks).
+  - Delete route declares `artifact.edit`; shared artifacts additionally need `artifact.delete` in the service. Deletion is logical.
+  - No `CompatibilityRule` table yet (optional in the plan) — backlog I20. Artifact refs in design revisions stay `text[]` (backlog I18).
+  - Also registered asset-reference checks for design revisions (`source_asset_refs`) and artifact previews.
+- Tests: garment-model 123, api unit 99 (library 4), integration api 112 (artifacts 8; security incl. artifact routes), e2e 21 (library spec).
+- Follow-ups added to backlog: see `09-backlog.md` "From I13".

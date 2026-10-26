@@ -73,14 +73,27 @@ export class AuthorizationService implements Authorizer {
     let restricted = false;
     // Where restriction and grants are evaluated: the resource itself, or its governing parent.
     let grantTarget = resource;
+    let platformPermissions: readonly string[] | null = null;
+    let privateOwner: string | null = null;
     if (resource) {
       const resolver = this.resolvers.get(resource.type);
       const owner = await resolver.organizationOf(resource.id);
-      if (!owner || (organizationId && owner !== organizationId)) {
+      if (!owner) {
+        // Shared platform resources are read/use-only from inside an organization.
+        if (
+          !organizationId ||
+          !resolver.platformAccess ||
+          !(await resolver.platformAccess.isPlatform(resource.id))
+        )
+          return deny('RESOURCE_NOT_IN_TENANT');
+        platformPermissions = resolver.platformAccess.permissions;
+      } else if (organizationId && owner !== organizationId) {
         return deny('RESOURCE_NOT_IN_TENANT');
+      } else {
+        organizationId = owner;
+        privateOwner = (await resolver.privateOwnerOf?.(resource.id)) ?? null;
       }
-      organizationId = owner;
-      const parent = (await resolver.governedBy?.(resource.id)) ?? null;
+      const parent = owner ? ((await resolver.governedBy?.(resource.id)) ?? null) : null;
       if (parent) {
         const parentResolver = this.resolvers.get(parent.type);
         if ((await parentResolver.organizationOf(parent.id)) !== owner) {
@@ -117,6 +130,12 @@ export class AuthorizationService implements Authorizer {
     const mfaVerified = session?.mfaVerified ?? false;
     // Organization-wide MFA requirement (FR-SEC-034).
     if (policy.requireMfa && !mfaVerified) return deny('MFA_REQUIRED', context);
+
+    // A user-private resource does not exist for anyone else (I13).
+    if (privateOwner && privateOwner !== principal.id) return deny('RESOURCE_RESTRICTED', context);
+    // Platform resources: only the read/use permissions the resolver lists.
+    if (platformPermissions && permission && !platformPermissions.includes(permission))
+      return deny('MISSING_PERMISSION', context);
 
     let reason: AuthzDecision['reasonCode'];
     // Restricted resources (projects and everything inside them): roles alone are not enough —

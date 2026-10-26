@@ -58,8 +58,8 @@ test.describe('M1 walking skeleton', () => {
   });
 
   test('placeholder pages explain when the feature arrives', async ({ page }) => {
-    await page.goto('/library');
-    await expect(page.getByText('This area is built in iteration I13')).toBeVisible();
+    await page.goto('/billing');
+    await expect(page.getByText('This area is built in iteration I30')).toBeVisible();
   });
 });
 

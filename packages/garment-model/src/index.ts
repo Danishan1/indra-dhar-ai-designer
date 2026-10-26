@@ -30,3 +30,4 @@ export * from './validation/structural.js';
 export * from './versioning/version.js';
 export * from './versioning/migrations.js';
 export * from './templates/index.js';
+export * from './artifacts/index.js';

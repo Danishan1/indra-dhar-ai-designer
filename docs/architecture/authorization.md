@@ -140,6 +140,8 @@ A resolver can implement `isRestricted(id)` (today only `project`, when `visibil
 
 **Children of restricted resources (I12, ADR-047).** A resolver may declare `governedBy(id)` (designs and revisions are governed by their project). The PDP then checks the parent exists in the same organization, applies the parent's restriction, and evaluates grants on the parent. A resolver may also declare `grantActionFor(permission)`: on projects, `design.view` is covered by a `project.view` grant and `design.create/edit/commit/restore` by `project.edit`; anything unmapped (approvals, AI generation, exports) can never come from a grant. Register new child types the same way — never re-implement restriction in a service.
 
+**Shared platform resources and private resources (I13, ADR-048).** A resolver may declare `platformAccess: { isPlatform, permissions }` for rows that belong to no organization (the built-in artifact library): they are reachable from any organization route but only for the listed permissions (view/use/copy); anything else is 403. `privateOwnerOf(id)` marks user-private rows: everyone but the owner gets 404. List queries must still filter with the module's visibility helper (`visibleArtifacts(ctx)`).
+
 **A second resource in the body.** When a request names another resource (e.g. the target project when duplicating a design), call `PolicyEnforcer.enforce(req, { organizationId, permission, resource, notFoundLabel })` from the service. It applies exactly the guard's rules, errors (404/403/MFA/step-up) and denial audit.
 
 ## Caching and revocation latency

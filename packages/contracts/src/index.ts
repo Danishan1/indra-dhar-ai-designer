@@ -17,3 +17,4 @@ export * from './permissions.js';
 export * from './queues.js';
 export * from './roles.js';
 export * from './value-status.js';
+export * from './artifacts/index.js';

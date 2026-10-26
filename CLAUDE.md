@@ -25,6 +25,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/architecture/projects.md` — **project lifecycle table, dependents/completion registry, restricted visibility.**
 - `packages/garment-model/README.md` — **the canonical design state (components, property values/status, units, hashing, diff, templates, migrations).** Read before touching anything about designs.
 - `docs/architecture/designs.md` — **designs, working copies (single writer, versioned saves) and immutable revisions (commit, restore, compare, integrity).**
+- `docs/architecture/artifacts.md` — **artifact registry: scopes (built-in/org/private), immutable revisions, compatibility, built-in library sync.**
 - `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)

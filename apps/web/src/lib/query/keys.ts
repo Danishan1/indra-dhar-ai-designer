@@ -36,6 +36,10 @@ export const queryKeys = {
       asset: (assetId: string) => [...all, 'asset', assetId] as const,
       projects: (params?: Record<string, unknown>) => [...all, 'projects', params ?? {}] as const,
       project: (projectId: string) => [...all, 'project', projectId] as const,
+      artifacts: (filters?: Record<string, unknown>) =>
+        [...all, 'artifacts', filters ?? {}] as const,
+      artifact: (artifactId: string) => [...all, 'artifact', artifactId] as const,
+      whereUsed: (artifactId: string) => [...all, 'artifact', artifactId, 'where-used'] as const,
       projectDesigns: (projectId: string) => [...all, 'project', projectId, 'designs'] as const,
       design: (designId: string) => [...all, 'design', designId] as const,
       workingCopy: (designId: string) => [...all, 'design', designId, 'working-copy'] as const,

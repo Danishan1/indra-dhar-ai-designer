@@ -134,5 +134,5 @@ Error codes: `CONCURRENT_MODIFICATION` (with current version), `REVISION_NOT_FOU
   - Added `semantic_hash` (revisions and working copies) and `has_uncommitted_changes`; NO_CHANGES compares semantic content, metadata-only edits do not count.
   - PDP extended: `governedBy` / `grantActionFor` (restriction inheritance) — not in the plan, needed for restricted projects.
   - Web: design detail at `/designs/[designId]` with a JSON draft editor, history, compare and restore (developer views).
-- Tests: api unit 102 (change summaries 7), integration api 104 (designs 15; security incl. design/revision routes), e2e 20 (designs spec).
+- Tests: api unit 95 (change summaries 7), integration api 104 (designs 15; security incl. design/revision routes), e2e 20 (designs spec).
 - Follow-ups added to backlog: see `09-backlog.md` "From I12".

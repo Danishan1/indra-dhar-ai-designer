@@ -286,30 +286,32 @@ model VerificationToken {
 
 /// Tenant boundary (FR-SEC-060/061). display_id ORG-000123 is platform-unique.
 model Organization {
-  id               String           @id @db.Uuid
-  displayId        String           @unique @map("display_id")
-  name             String
-  slug             String           @unique
+  id                String             @id @db.Uuid
+  displayId         String             @unique @map("display_id")
+  name              String
+  slug              String             @unique
   /// active | suspended | deleted
-  status           String           @default("active")
+  status            String             @default("active")
   /// Continuity rule (FR-SEC-079): at least one active owner at all times.
-  ownerPolicy      String           @default("at_least_one_owner") @map("owner_policy")
-  settings         Json             @default("{}")
-  createdBy        String           @map("created_by") @db.Uuid
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  workspaces       Workspace[]
-  memberships      Membership[]
+  ownerPolicy       String             @default("at_least_one_owner") @map("owner_policy")
+  settings          Json               @default("{}")
+  createdBy         String             @map("created_by") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspaces        Workspace[]
+  memberships       Membership[]
   /// Relations declared so Prisma keeps the FKs (rows owned by the authorization module).
-  customRoles      Role[]
-  projects         Project[]
-  designs          Design[]
-  workingCopies    WorkingCopy[]
-  designRevisions  DesignRevision[]
-  assets           Asset[]
-  resourceGrants   ResourceGrant[]
-  securityPolicies SecurityPolicy[]
-  invitations      Invitation[]
+  customRoles       Role[]
+  projects          Project[]
+  designs           Design[]
+  workingCopies     WorkingCopy[]
+  designRevisions   DesignRevision[]
+  assets            Asset[]
+  resourceGrants    ResourceGrant[]
+  securityPolicies  SecurityPolicy[]
+  invitations       Invitation[]
+  artifacts         Artifact[]
+  artifactRevisions ArtifactRevision[]
 
   @@map("organizations")
 }
@@ -664,4 +666,80 @@ model DesignRevision {
   @@unique([organizationId, displayId])
   @@index([organizationId])
   @@map("design_revisions")
+}
+
+/// Reusable artifact (SS-05, I13): sleeves, collars, fabrics, lace, buttons… Stable identity; the
+/// content lives in immutable revisions. `organization_id` is NULL for the built-in (platform)
+/// library, which every organization can read and use but never change (FR-SEC-115/116).
+model Artifact {
+  id                            String             @id @db.Uuid
+  /// NULL = platform library
+  organizationId                String?            @map("organization_id") @db.Uuid
+  /// platform | organization | user (project scope reserved)
+  ownerScope                    String             @map("owner_scope")
+  /// Owner of a user-private artifact (only they can see it until it is published).
+  ownerUserId                   String?            @map("owner_user_id") @db.Uuid
+  displayId                     String             @map("display_id")
+  /// sleeve | collar | cuff | pocket | placket | neckline | fabric | lace | trim | embroidery | button | artwork
+  category                      String
+  /// Finer kind inside the category (e.g. lace_border, solid_fabric)
+  artifactType                  String             @map("artifact_type")
+  name                          String
+  description                   String?
+  tags                          String[]           @default([])
+  currentRevisionId             String?            @map("current_revision_id") @db.Uuid
+  revisionCounter               Int                @default(0) @map("revision_counter")
+  /// active | deprecated | deactivated | deleted
+  lifecycleStatus               String             @default("active") @map("lifecycle_status")
+  /// Provenance of a copy (ART-009).
+  derivedFromArtifactRevisionId String?            @map("derived_from_artifact_revision_id") @db.Uuid
+  /// Stable key of a built-in artifact (idempotent library sync).
+  platformKey                   String?            @unique @map("platform_key")
+  version                       Int                @default(1)
+  createdBy                     String?            @map("created_by") @db.Uuid
+  publishedAt                   DateTime?          @map("published_at") @db.Timestamptz(6)
+  createdAt                     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                     DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                     DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  organization                  Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  revisions                     ArtifactRevision[] @relation("ArtifactRevisions")
+  currentRevision               ArtifactRevision?  @relation("CurrentRevision", fields: [currentRevisionId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([currentRevisionId])
+  @@index([organizationId, category, lifecycleStatus])
+  @@index([ownerScope, category])
+  @@map("artifacts")
+}
+
+/// Immutable artifact revision (ART-002). A trigger rejects UPDATE and DELETE.
+model ArtifactRevision {
+  id                 String        @id @db.Uuid
+  artifactId         String        @map("artifact_id") @db.Uuid
+  /// Copy of the artifact's organization (NULL for platform revisions).
+  organizationId     String?       @map("organization_id") @db.Uuid
+  displayId          String        @map("display_id")
+  revisionNumber     Int           @map("revision_number")
+  parentRevisionId   String?       @map("parent_revision_id") @db.Uuid
+  /// ArtifactDefinition (packages/garment-model/src/artifacts)
+  definition         Json
+  /// { visual: {key: PropertyValue}, physical: {key: PropertyValue} }
+  properties         Json
+  previewAssetId     String?       @map("preview_asset_id") @db.Uuid
+  /// G0 | G1 | G2
+  geometryCapability String        @map("geometry_capability")
+  /// unvalidated | design_asset_validated | production_validated (derived, never client-set)
+  validationStatus   String        @map("validation_status")
+  schemaVersion      String        @map("schema_version")
+  contentHash        String        @map("content_hash")
+  changeNote         String?       @map("change_note")
+  createdBy          String?       @map("created_by") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  artifact           Artifact      @relation("ArtifactRevisions", fields: [artifactId], references: [id], onDelete: Restrict)
+  currentOf          Artifact[]    @relation("CurrentRevision")
+  organization       Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([artifactId, revisionNumber])
+  @@index([organizationId])
+  @@map("artifact_revisions")
 }

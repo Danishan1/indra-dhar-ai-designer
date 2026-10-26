@@ -31,6 +31,8 @@ const OWNERS: Record<string, string | string[]> = {
   design: 'modules/designs',
   workingCopy: 'modules/designs',
   designRevision: 'modules/designs',
+  artifact: 'modules/artifacts',
+  artifactRevision: 'modules/artifacts',
 };
 
 const SRC = join(import.meta.dirname, '../..');

@@ -22,6 +22,14 @@ export interface ResourceResolver {
    * resource's own type map to themselves; unmapped permissions cannot be granted.
    */
   grantActionFor?(permission: string): string | null;
+  /**
+   * Shared platform resources (the built-in artifact library, I13) belong to no organization:
+   * `organizationOf` returns null for them. They are reachable from any organization route, but
+   * only for the listed permissions (read/use/copy) — never for writes (FR-SEC-115/116).
+   */
+  platformAccess?: { isPlatform(id: string): Promise<boolean>; permissions: readonly string[] };
+  /** User-private resources: their owner's user id (others get 404), or null when not private. */
+  privateOwnerOf?(id: string): Promise<string | null>;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 
+import { ArtifactsModule } from './modules/artifacts/artifacts.module.js';
 import { AssetsModule } from './modules/assets/assets.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthorizationModule } from './modules/authorization/authorization.module.js';
@@ -30,6 +31,7 @@ const FEATURE_MODULES: DynamicModule['imports'] = [
   AssetsModule,
   ProjectsModule,
   DesignsModule,
+  ArtifactsModule,
   OrganizationsModule,
 ];
 
