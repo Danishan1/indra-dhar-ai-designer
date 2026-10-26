@@ -11,6 +11,8 @@ export type JobStatus = z.infer<typeof jobStatusSchema>;
 export const JobKinds = {
   /** Test/diagnostic job that does nothing. */
   systemNoop: 'system.noop',
+  /** Check, scan and derive variants of an uploaded asset (I09). */
+  assetProcess: 'asset.process',
 } as const;
 export type JobKind = (typeof JobKinds)[keyof typeof JobKinds] | (string & {});
 

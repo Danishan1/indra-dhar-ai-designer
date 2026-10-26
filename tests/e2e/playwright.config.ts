@@ -49,6 +49,14 @@ export default defineConfig({
       cwd: '../..',
     },
     {
+      // Processes uploads (I09). Has no HTTP port, so it always starts; a second worker next to
+      // `pnpm dev` is harmless (jobs are claimed once).
+      command: 'pnpm --filter @ai-designer/worker dev',
+      wait: { stdout: /worker ready/ },
+      timeout: 120_000,
+      cwd: '../..',
+    },
+    {
       command: 'pnpm --filter @ai-designer/web dev',
       url: baseURL,
       reuseExistingServer: true,

@@ -32,6 +32,8 @@ export const queryKeys = {
       myPermissions: () => [...all, 'my-permissions'] as const,
       effectivePermissions: (membershipId: string) =>
         [...all, 'effective-permissions', membershipId] as const,
+      assets: (filters?: Record<string, unknown>) => [...all, 'assets', filters ?? {}] as const,
+      asset: (assetId: string) => [...all, 'asset', assetId] as const,
       projects: (params?: Record<string, unknown>) => [...all, 'projects', params ?? {}] as const,
       project: (projectId: string) => [...all, 'project', projectId] as const,
     };

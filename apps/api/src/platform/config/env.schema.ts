@@ -26,6 +26,8 @@ export const apiEnvSchema = z
     S3_ACCESS_KEY_ID: z.string().min(1),
     S3_SECRET_ACCESS_KEY: z.string().min(1),
     S3_FORCE_PATH_STYLE: booleanString.default(true),
+    /** Browser-reachable object-store URL used in signed download links (defaults to S3_ENDPOINT). */
+    S3_PUBLIC_ENDPOINT: z.url().optional(),
     S3_BUCKET_ORIGINALS: z.string().min(3).default('aid-assets-original'),
     S3_BUCKET_DERIVED: z.string().min(3).default('aid-assets-derived'),
     S3_BUCKET_EXPORTS: z.string().min(3).default('aid-exports'),
@@ -73,6 +75,14 @@ export const apiEnvSchema = z
     AUTH_TRUSTED_ORIGINS: z.string().optional(),
     /** Express `trust proxy` (who may set X-Forwarded-For): 'loopback', a CIDR list, or a hop count. */
     TRUST_PROXY: z.string().min(1).default('loopback'),
+
+    /** Upload limits (I09, AST-008). Sizes in MB; pixels = width × height of raster images. */
+    ASSET_MAX_IMAGE_MB: z.coerce.number().int().min(1).max(200).default(25),
+    ASSET_MAX_SVG_MB: z.coerce.number().int().min(1).max(20).default(2),
+    ASSET_MAX_DOCUMENT_MB: z.coerce.number().int().min(1).max(500).default(50),
+    ASSET_MAX_PIXELS: z.coerce.number().int().min(1_000_000).default(50_000_000),
+    /** Lifetime of signed download URLs (≤ 5 minutes, SEC-002). */
+    ASSET_URL_TTL_SECONDS: z.coerce.number().int().min(30).max(300).default(300),
 
     /** How long a stored Idempotency-Key response is replayed (I03). */
     IDEMPOTENCY_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),

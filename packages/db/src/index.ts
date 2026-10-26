@@ -1,6 +1,7 @@
 export * from './client.js';
 export { Prisma, PrismaClient } from './generated/prisma/client.js';
 export type {
+  Asset,
   AuditEvent,
   IdempotencyKey,
   IdSequence,

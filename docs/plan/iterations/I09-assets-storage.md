@@ -70,16 +70,16 @@ Events: `AssetUploaded`, `AssetReady`, `AssetRejected`, `AssetDerivativeCreated`
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Finish `ObjectStorage` S3 implementation + integration tests against compose store.
-2. [ ] `Asset` model + migration + resolver registration for authz.
-3. [ ] Upload create/complete flow; presigned PUT with content-length/type conditions.
-4. [ ] Sniffing, limits, SVG sanitizer (use a maintained sanitizer, e.g. DOMPurify with JSDOM in Node, plus custom external-ref stripping).
-5. [ ] Scanner port + status transitions.
-6. [ ] Worker derivatives processor (Sharp), storing derived assets with `parent_asset_id`.
-7. [ ] Signed download endpoint; ensure keys never exposed as public URLs.
-8. [ ] Reference registry + soft delete.
-9. [ ] Web upload hook/components.
-10. [ ] Isolation tests; update `PROGRESS.md`.
+1. [x] Finish `ObjectStorage` S3 implementation + integration tests against compose store.
+2. [x] `Asset` model + migration + resolver registration for authz.
+3. [x] Upload create/complete flow; presigned PUT with content-length/type conditions.
+4. [x] Sniffing, limits, SVG sanitizer (use a maintained sanitizer, e.g. DOMPurify with JSDOM in Node, plus custom external-ref stripping).
+5. [x] Scanner port + status transitions.
+6. [x] Worker derivatives processor (Sharp), storing derived assets with `parent_asset_id`.
+7. [x] Signed download endpoint; ensure keys never exposed as public URLs.
+8. [x] Reference registry + soft delete.
+9. [x] Web upload hook/components.
+10. [x] Isolation tests; update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -89,12 +89,12 @@ Events: `AssetUploaded`, `AssetReady`, `AssetRejected`, `AssetDerivativeCreated`
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Assets have stable IDs, access-controlled storage refs, format, provenance and checksum (AST-001…003).
-- [ ] AC2 — Source vs derived assets are distinguished; derived assets reference their parent (AST-005).
-- [ ] AC3 — Unsupported/malformed files are rejected or quarantined; SVGs are sanitized before use (AST-008; FR-RV-035, 036; FR-SEC-176).
-- [ ] AC4 — Private assets are only reachable through authorized short-lived URLs (SEC-002; FR-SEC-124).
-- [ ] AC5 — Tenant isolation holds across DB rows and object keys (FR-SEC-216; AST-009).
-- [ ] AC6 — Expensive processing runs in the worker, not in API requests (TECH §3.9).
+- [x] AC1 — Assets have stable IDs, access-controlled storage refs, format, provenance and checksum (AST-001…003).
+- [x] AC2 — Source vs derived assets are distinguished; derived assets reference their parent (AST-005).
+- [x] AC3 — Unsupported/malformed files are rejected or quarantined; SVGs are sanitized before use (AST-008; FR-RV-035, 036; FR-SEC-176).
+- [x] AC4 — Private assets are only reachable through authorized short-lived URLs (SEC-002; FR-SEC-124).
+- [x] AC5 — Tenant isolation holds across DB rows and object keys (FR-SEC-216; AST-009).
+- [x] AC6 — Expensive processing runs in the worker, not in API requests (TECH §3.9).
 
 ## 10. Risks & notes
 
@@ -109,7 +109,15 @@ Events: `AssetUploaded`, `AssetReady`, `AssetRejected`, `AssetDerivativeCreated`
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1 (spanning two days)
+- Deviations from plan (ADR-044):
+  - Uploads are proxied through the API (`PUT …/assets/:id/content`, streamed with a cap and sniffed) instead of presigned browser PUT + `/complete`; no bucket CORS or public write endpoint needed. `presignGet` is used for downloads; direct PUT is in the backlog.
+  - Validation/processing code lives in a new `packages/media` (sniffing, SVG sanitizer, Sharp derivatives, scanner port, `processAsset`, `storeGeneratedAsset`) shared by the worker and API tests, instead of `apps/api/src/modules/assets/validation/*` and `apps/worker/src/processors/asset-derivatives.ts`. The worker job kind is `asset.process` (durable job, `jobs/handlers.ts`).
+  - Sanitized SVG overwrites the stored original (metadata `svgSanitized`); the unsanitized bytes are never kept.
+  - Thumbnails stream same-origin through `GET …/content?variant=` (authorized per request, sandbox CSP) rather than signed URLs refreshed on expiry.
+  - The dev page is **Files** (`/files`, primary nav) — to be merged into project sources in I10. `projectId` on upload is refused until I10.
+  - Scanner: `none` (dev default) and `eicar-test` (tests); ClamAV in I47 (ADR-029 accepted for the hook).
+- Configured limits: images 25 MB, SVG 2 MB, PDF 50 MB, 50 MP pixel limit, signed URLs 300 s (`ASSET_*` in `.env.example`).
+- Tests: media unit 9, api unit 86, worker unit 8, integration api 79 (assets 8, security 28) + worker 13, e2e 18.
+- Follow-ups added to backlog: see `09-backlog.md` "From I09".

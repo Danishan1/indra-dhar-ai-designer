@@ -28,6 +28,7 @@
     "@ai-designer/contracts": "workspace:*",
     "@ai-designer/db": "workspace:*",
     "@ai-designer/logger": "workspace:*",
+    "@ai-designer/media": "workspace:*",
     "bullmq": "6.4.0",
     "ioredis": "6.0.0",
     "pino": "10.4.0",

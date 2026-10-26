@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   CreditCardIcon,
+  FileImageIcon,
   FolderKanbanIcon,
   HomeIcon,
   LibraryIcon,
@@ -21,6 +22,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon },
   { href: '/projects', label: 'Projects', icon: FolderKanbanIcon, arrives: 'I10' },
   { href: '/library', label: 'Library', icon: LibraryIcon, arrives: 'I13' },
+  // I09 dev page; merged into project sources in I10.
+  { href: '/files', label: 'Files', icon: FileImageIcon },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [

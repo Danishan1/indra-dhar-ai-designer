@@ -1,4 +1,5 @@
 import { createPrismaClient, type PrismaClient } from '@ai-designer/db';
+import { createScanner, S3ObjectStorage } from '@ai-designer/media';
 import type { Worker } from 'bullmq';
 import type { Logger } from 'pino';
 
@@ -45,11 +46,26 @@ export async function startWorker(
   const prisma = createPrismaClient(env.DATABASE_URL);
   const connection = createRedisConnection(env.REDIS_URL, `aid-worker-${env.WORKER_ID}`, logger);
   const producers = new QueueProducers(connection);
+  const storage = new S3ObjectStorage({
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    accessKeyId: env.S3_ACCESS_KEY_ID,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+  });
   const deps = {
     prisma,
     producers,
     consumers: [...platformConsumers, ...(options.consumers ?? [])],
-    handlers: createJobHandlers(),
+    handlers: createJobHandlers({
+      assets: {
+        prisma,
+        storage,
+        scanner: createScanner(env.ASSET_SCANNER),
+        buckets: { originals: env.S3_BUCKET_ORIGINALS, derived: env.S3_BUCKET_DERIVED },
+        maxPixels: env.ASSET_MAX_PIXELS,
+      },
+    }),
     workerId: env.WORKER_ID,
     logger,
   };
@@ -101,6 +117,7 @@ export async function startWorker(
       await Promise.all(workers.map((w) => w.close()));
       await producers.close();
       await closeRedisConnection(connection);
+      storage.destroy();
       await prisma.$disconnect();
       logger.info('worker stopped');
     },

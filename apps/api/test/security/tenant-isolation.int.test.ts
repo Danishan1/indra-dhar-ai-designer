@@ -24,6 +24,12 @@ const BODIES: Record<string, unknown> = {
     confirmOrganizationName: 'x',
   },
   'PUT /v1/orgs/:orgId/members/:membershipId/roles': { roles: ['viewer'] },
+  'POST /v1/orgs/:orgId/assets/uploads': {
+    assetType: 'source_image',
+    fileName: 'x.png',
+    mediaType: 'image/png',
+    sizeBytes: 10,
+  },
 };
 
 /**
@@ -37,12 +43,23 @@ describe('cross-tenant isolation', () => {
   let routes: RouteInfo[];
   let a: TenantFixture;
   let b: TenantFixture;
+  const assetIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
     membershipId: t.members['designer']?.membershipId ?? '',
     invitationId: t.pendingInvitationId,
+    assetId: assetIds.get(t.orgId) ?? '',
   });
+
+  async function startUpload(t: TenantFixture): Promise<void> {
+    const res = await t.owner.client.post(
+      `/v1/orgs/${t.orgId}/assets/uploads`,
+      BODIES['POST /v1/orgs/:orgId/assets/uploads'],
+    );
+    expect(res.status).toBe(201);
+    assetIds.set(t.orgId, ((await res.json()) as { asset: { id: string } }).asset.id);
+  }
 
   beforeAll(async () => {
     ({ app, baseUrl } = await startTestApp());
@@ -54,6 +71,8 @@ describe('cross-tenant isolation', () => {
     });
     a = await createTenant(fixtureDeps(baseUrl), 'Tenant A', ['designer']);
     b = await createTenant(fixtureDeps(baseUrl), 'Tenant B', ['designer']);
+    await startUpload(a);
+    await startUpload(b);
   }, 120_000);
 
   afterAll(async () => {
@@ -84,9 +103,9 @@ describe('cross-tenant isolation', () => {
     expect(failures).toEqual([]);
   });
 
-  it("mixing ids (own org, other tenant's member/invitation) is also 404", async () => {
+  it("mixing ids (own org, other tenant's member/invitation/asset) is also 404", async () => {
     const failures = await checkTenantIsolation({
-      routes: routes.filter((r) => /:membershipId|:invitationId/.test(r.path)),
+      routes: routes.filter((r) => /:membershipId|:invitationId|:assetId/.test(r.path)),
       attacker: b.owner.client,
       params: { ...paramsFor(a), orgId: b.orgId },
       bodies: BODIES,

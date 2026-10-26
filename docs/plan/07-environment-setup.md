@@ -110,3 +110,14 @@ pnpm clean && pnpm install
 1. Clone the repo and open it in Claude Code (or attach the folder in Cowork).
 2. Say: **"Read CLAUDE.md and continue with the next iteration."** (or `/next-iteration` in Claude Code).
 3. Claude follows `docs/plan/08-session-playbook.md` and will tell you if it needs Docker running or a decision from you.
+
+## Migrations created on a developer machine (2026-10-24)
+
+`pnpm db:migrate` runs `prisma migrate dev`, which **generates a new migration whenever the database
+differs from `schema.prisma`**. Hand-written SQL that the schema cannot express (CHECK constraints,
+partial indexes) is fine, but foreign keys and plain indexes must also be declared in the schema —
+otherwise the next `db:migrate` creates a migration that drops them (this happened in I07:
+`20261023054921` dropped three FKs, `20261023184251` re-added them after I08 declared the relations).
+Such generated migrations must be **committed unchanged** (renaming/editing breaks databases that
+already applied them). Before committing a schema change, run `pnpm db:migrate:fallback diff noop`
+(sandbox) or `prisma migrate diff` and expect "No schema changes".

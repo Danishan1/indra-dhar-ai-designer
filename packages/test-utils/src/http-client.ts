@@ -50,6 +50,17 @@ export class TestClient {
     return this.request('PUT', path, body, headers);
   }
 
+  /** PUT raw bytes (uploads), keeping cookies and the Origin header. */
+  async putBytes(
+    path: string,
+    bytes: Uint8Array,
+    contentType = 'application/octet-stream',
+  ): Promise<Response> {
+    const h: Record<string, string> = { 'content-type': contentType, origin: this.origin };
+    if (this.cookies.size) h.cookie = this.cookieHeader();
+    return fetch(`${this.baseUrl}${path}`, { method: 'PUT', headers: h, body: bytes });
+  }
+
   patch(path: string, body?: unknown, headers?: Record<string, string>) {
     return this.request('PATCH', path, body, headers);
   }

@@ -65,3 +65,12 @@ _(Append: date — source iteration — item — reason)_
 - Anomaly alerts on repeated denials / role escalation (FR-SEC-184). → I46.
 - Org admin "sign out this member everywhere" (today: suspend/revoke takes effect immediately for the org, FR-SEC-056). → if requested.
 - Idle-timeout precision is bounded by `SESSION_TOUCH_INTERVAL_MIN` (org idle minimum = touch + 5 min); a lighter last-seen tracker could lift that. → I46.
+
+## From I09 (2026-10-26)
+
+- Presigned direct browser → bucket PUT (`presignPut` + CORS on the bucket) for very large files; today uploads stream through the API (ADR-044). → when files > 50 MB are needed (I36 GLB?).
+- ClamAV adapter for the `Scanner` port and a `clamd` compose service (ADR-029). → I47.
+- Retention purge job: hard-delete soft-deleted assets after `retention_until`, orphaned `pending_upload` rows and objects. → I47.
+- Validate `projectId` on uploads and filter by project (upload currently refuses `projectId`). → I10.
+- Signed-URL thumbnails with refresh on expiry (today thumbnails stream same-origin through the API); revisit when a CDN/reverse proxy is in place. → I48.
+- Color-space/ICC metadata extraction and normalized previews for CMYK sources. → I23 (AI input preparation).

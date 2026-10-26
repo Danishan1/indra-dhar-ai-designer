@@ -35,3 +35,11 @@ describe('outboxBackoffMs', () => {
     expect(outboxBackoffMs(30)).toBe(300_000);
   });
 });
+
+describe('asset.process registration', () => {
+  it('is registered only when asset dependencies are given', () => {
+    expect(createJobHandlers().has('asset.process')).toBe(false);
+    const deps = {} as Parameters<typeof createJobHandlers>[0];
+    expect(createJobHandlers({ assets: deps as never }).has('asset.process')).toBe(true);
+  });
+});

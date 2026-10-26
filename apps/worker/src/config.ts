@@ -11,6 +11,20 @@ export const workerEnvSchema = z
     APP_VERSION: z.string().default('0.0.0'),
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }),
+    /** Object storage (I09: asset processing). Same values as the API. */
+    S3_ENDPOINT: z.url(),
+    S3_REGION: z.string().min(1).default('us-east-1'),
+    S3_ACCESS_KEY_ID: z.string().min(1),
+    S3_SECRET_ACCESS_KEY: z.string().min(1),
+    S3_FORCE_PATH_STYLE: z
+      .enum(['true', 'false', '1', '0'])
+      .transform((v) => v === 'true' || v === '1')
+      .default(true),
+    S3_BUCKET_ORIGINALS: z.string().min(3).default('aid-assets-original'),
+    S3_BUCKET_DERIVED: z.string().min(3).default('aid-assets-derived'),
+    ASSET_MAX_PIXELS: z.coerce.number().int().min(1_000_000).default(50_000_000),
+    /** Malware scanner for uploads (ADR-029): none until ClamAV in I47; eicar-test for tests. */
+    ASSET_SCANNER: z.enum(['none', 'eicar-test']).default('none'),
     WORKER_ID: z.string().min(1).default(`${hostname()}-${process.pid}`),
     WORKER_CONCURRENCY_SYSTEM: z.coerce.number().int().min(1).max(32).default(2),
     WORKER_CONCURRENCY_EVENTS: z.coerce.number().int().min(1).max(64).default(4),

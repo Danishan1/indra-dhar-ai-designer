@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I09 — Asset & storage service** (next)                                                             |
+| **Current iteration** | **I10 — Projects & lifecycle core** (next)                                                           |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-23 (I08 finished, M2 reached)                                                                |
+| Last updated          | 2026-10-26 (I09 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -28,7 +28,7 @@
 | I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                   |
 | I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md           |
 | I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                 |
-| I09 | Asset & storage service                               | 2     | todo   |            |            |          |                                                       |
+| I09 | Asset & storage service                               | 2     | done   | 2026-10-23 | 2026-10-26 | 1        | ADR-044; docs/architecture/assets.md                  |
 | I10 | Projects & lifecycle core                             | 2     | todo   |            |            |          |                                                       |
 | I11 | Canonical garment model package                       | 2     | todo   |            |            |          | Confirm ADR-008                                       |
 | I12 | Designs, working copies & immutable revisions         | 2     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-26 — I09 — API-proxied uploads, `packages/media`, SVG overwrite, thumbnails via streaming endpoint, `/files` dev page — ADR-044
 - 2026-10-23 — I08 — own TOTP + separate MFA tables, sensitive permissions require MFA (instead of blocking privileged roles), logout public — ADR-043
 - 2026-10-23 — I07 — global PEP + PDP, catalog synced from code at API start, matrix reading, delegation rule, test-utils package — ADR-042
 - 2026-10-23 — I06 — path-scoped org context (`@OrgAccess`), invitation tokens only in request bodies (`POST /v1/invitations/preview`), placeholder roles until I07 — ADR-041
@@ -118,6 +119,19 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-26 — I09 Asset & storage service (session 1) — DONE
+
+- Built: `assets` table (migration `…_i09_assets`, CHECKs incl. `org/{org}/` key prefix), contracts (`packages/contracts/src/assets`), new `packages/media` (S3 storage port, sniffing, SVG sanitizer, Sharp WebP derivatives, scanner port, `processAsset`, `storeGeneratedAsset`), API module `modules/assets` (create upload, PUT bytes, get/list, signed URL, streaming content, soft delete with reference registry, resolver `asset`), worker job `asset.process`, web `features/assets` (dropzone with progress, thumbnail, `useUpload`) and the **Files** dev page.
+- Tests: media 9, api unit 86, worker unit 8, integration api 79 (assets 8, security 28) + worker 13, e2e 18 (Playwright now also starts the worker).
+- Limits: images 25 MB, SVG 2 MB, PDF 50 MB, 50 MP, signed URLs 300 s (`ASSET_*`).
+- **Owner actions (Windows):**
+  1. `pnpm install` (new package `@ai-designer/media`, `sharp`, `dompurify`, `jsdom`, AWS SDK).
+  2. `pnpm db:migrate` (adds `assets`). Also commit the two device-made migrations `20261023054921` / `20261023184251` if not yet committed.
+  3. If the buckets don't exist yet: `pnpm --filter @ai-designer/api storage:init`.
+  4. `pnpm dev` — the **worker must run** for uploads to become ready. Try it on the new **Files** page.
+  5. Optional `.env`: `ASSET_MAX_*`, `ASSET_SCANNER=none`, and `S3_PUBLIC_ENDPOINT` if the browser reaches the object store under another host than the API does.
+- **Next step:** I10 — projects & lifecycle core (attach uploads to projects, move Files into project sources).
 
 ### 2026-10-23 — I08 MFA, step-up, sessions & security audit (session 1) — DONE, **M2 reached**
 

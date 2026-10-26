@@ -302,6 +302,7 @@ model Organization {
   memberships Membership[]
   /// Relations declared so Prisma keeps the FKs (rows owned by the authorization module).
   customRoles      Role[]
+  assets           Asset[]
   resourceGrants   ResourceGrant[]
   securityPolicies SecurityPolicy[]
   invitations Invitation[]
@@ -473,3 +474,53 @@ model Invitation {
   @@index([email, status])
   @@map("invitations")
 }
+
+/// Every stored file (SS-11, I09). Originals and derived variants are separate rows; derived rows
+/// point to their parent. Bytes live in object storage under `org/{orgId}/…` keys (AST-009).
+model Asset {
+  id               String    @id @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  displayId        String    @map("display_id")
+  /// source_image | sketch | fabric_image | artwork | document | generated_image | svg | texture | model_3d | export | mask
+  assetType        String    @map("asset_type")
+  /// pending_upload | quarantined | ready | rejected
+  status           String
+  bucket           String
+  storageKey       String    @map("storage_key")
+  /// Sniffed from the bytes (null until uploaded).
+  mediaType        String?   @map("media_type")
+  sizeBytes        BigInt?   @map("size_bytes")
+  checksumSha256   String?   @map("checksum_sha256")
+  /// Declared by the client at upload start; verified by processing.
+  declaredChecksum String?   @map("declared_checksum")
+  declaredSize     BigInt?   @map("declared_size")
+  dimensions       Json?
+  metadata         Json      @default("{}")
+  provenance       Json      @default("{}")
+  fileName         String?   @map("file_name")
+  isDerived        Boolean   @default(false) @map("is_derived")
+  parentAssetId    String?   @map("parent_asset_id") @db.Uuid
+  /// original | thumb_256 | preview_1024
+  variant          String    @default("original")
+  classification   String    @default("internal")
+  projectId        String?   @map("project_id") @db.Uuid
+  rejectionReason  String?   @map("rejection_reason")
+  createdBy        String?   @map("created_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  readyAt          DateTime? @map("ready_at") @db.Timestamptz(6)
+  retentionUntil   DateTime? @map("retention_until") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  parent           Asset?    @relation("AssetDerivatives", fields: [parentAssetId], references: [id], onDelete: Restrict)
+  derivatives      Asset[]   @relation("AssetDerivatives")
+
+  @@unique([organizationId, displayId])
+  @@unique([bucket, storageKey])
+  @@unique([parentAssetId, variant])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, projectId])
+  @@index([organizationId, status])
+  @@map("assets")
+}
+
