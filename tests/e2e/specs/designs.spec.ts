@@ -34,13 +34,18 @@ test('create a design from the shirt template, change it, save a revision, compa
   await expect(page.getByRole('heading', { level: 1, name: 'Oxford' })).toBeVisible();
   await expect(page.getByText('Same as the latest revision')).toBeVisible();
 
-  // Change the draft (developer JSON view) and save it.
-  const editor = page.getByLabel('Design state (JSON)');
-  const text = await editor.inputValue();
-  expect(text).toContain('"Shirt body"');
-  await editor.fill(text.replace('"Shirt body"', '"Main body"'));
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByText('Draft saved')).toBeVisible();
+  // Change the draft through a design operation (quick edit) — and undo/redo-safe.
+  await page.getByRole('combobox', { name: 'Component' }).click();
+  await page.getByRole('option', { name: 'Shirt body' }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Main body');
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await expect(page.getByText(/OPR-\d{6} applied/)).toBeVisible();
+  await expect(page.getByTestId('uncommitted')).toBeVisible();
+  // Undo, then do it again.
+  await page.getByRole('button', { name: 'Undo last change' }).click();
+  await expect(page.getByText('Same as the latest revision')).toBeVisible();
+  await page.getByLabel('Name', { exact: true }).fill('Main body');
+  await page.getByRole('button', { name: 'Rename' }).click();
   await expect(page.getByTestId('uncommitted')).toBeVisible();
 
   // Save it as revision R002.
@@ -64,5 +69,5 @@ test('create a design from the shirt template, change it, save a revision, compa
   await expect(page.getByTestId('revision-row')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Draft' }).click();
   await expect(page.getByText('Restored from an earlier revision')).toBeVisible();
-  expect(await page.getByLabel('Design state (JSON)').inputValue()).toContain('"Shirt body"');
+  await expect(page.getByLabel('Design state (JSON)')).toContainText('"Shirt body"');
 });

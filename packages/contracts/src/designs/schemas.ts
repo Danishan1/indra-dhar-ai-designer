@@ -96,11 +96,6 @@ export const workingCopySchema = z.object({
 });
 export type WorkingCopy = z.infer<typeof workingCopySchema>;
 
-export const saveWorkingCopyRequestSchema = z.object({
-  expectedVersion: z.number().int().min(1),
-  state: designStateJsonSchema,
-});
-
 // ── revisions ────────────────────────────────────────────────────────────────
 
 export const commitRevisionRequestSchema = z.object({

@@ -247,18 +247,21 @@ describe('artifact registry (integration)', () => {
     const wc = await json<WorkingCopy>(
       await designer.get(`${org()}/designs/${design.id}/working-copy`),
     );
-    const state = structuredClone(wc.state) as unknown as GarmentDesignState;
-    state.components.find(
+    const state = wc.state as unknown as GarmentDesignState;
+    const leftSleeve = state.components.find(
       (c) => c.componentType === 'sleeve' && c.side === 'left',
-    )!.artifactBindings = [
-      { bindingId: 'bnd_aaaaaaaaaaaa', artifactId: a.id, artifactRevisionId: r1, role: 'trim' },
-    ];
-    const saved = await json<WorkingCopy>(
-      await designer.put(`${org()}/designs/${design.id}/working-copy`, {
-        expectedVersion: wc.version,
-        state,
-      }),
-    );
+    )!;
+    const attached = await designer.post(`${org()}/designs/${design.id}/operations`, {
+      expectedVersion: wc.version,
+      operation: {
+        type: 'attach_artifact',
+        componentId: leftSleeve.componentId,
+        artifactRevisionId: r1,
+        placement: { region: 'hem' },
+      },
+    });
+    expect(attached.status).toBe(201);
+    const saved = (await json<{ workingCopy: { version: number } }>(attached)).workingCopy;
     // A draft reference already blocks deletion.
     expect((await designer.get(`${org()}/artifacts/${a.id}/where-used`)).status).toBe(200);
     expect(

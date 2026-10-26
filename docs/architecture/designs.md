@@ -4,8 +4,8 @@ A **design** lives in a project and has exactly one **working copy** (the mutabl
 
 ## Rules
 
-1. **Only `WorkingCopyService` writes working copies.** I14 (operations) must go through it and keep its versioning.
-2. **Saving never creates a revision.** `PUT …/working-copy` takes the full state + `expectedVersion`; identical content does not bump the version; a lost race gets `CONCURRENT_MODIFICATION` with `currentVersion`.
+1. **Only `WorkingCopyService` writes working copies**, and only the operations module calls its state writer (`writeOperationState`).
+2. **Draft changes are design operations (I14, `docs/architecture/operations.md`).** They never create revisions; the I12 full-state `PUT …/working-copy` was removed (full replacement is the internal `replace_state` operation).
 3. **Every saved or committed state is structurally validated** (`validateDesignState`). Errors → `VALIDATION_BLOCKED` (422) with `details.findings`; warnings come back on the working copy.
 4. **Committing** locks the working-copy row, checks the version, validates, diffs against the head (`NO_CHANGES` when nothing semantic changed), writes the revision (`DSN-000123-R004`, canonical snapshot, hashes, parent = head, pinned artifact revision and asset refs, generated change summary + diff counts, validation summary) and rebases the working copy — one transaction, plus audit + `designs.revision_committed`.
 5. **Revisions are immutable in the database** (trigger blocks UPDATE/DELETE). Every snapshot read re-hashes it; mismatch → `INTEGRITY_CHECK_FAILED` and an `alert: revision_integrity` log line.

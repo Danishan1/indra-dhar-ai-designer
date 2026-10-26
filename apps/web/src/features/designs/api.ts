@@ -5,6 +5,8 @@ import {
   createDesignRequestSchema,
   designListResponseSchema,
   designSchema,
+  operationListResponseSchema,
+  submitOperationResponseSchema,
   revisionListResponseSchema,
   workingCopySchema,
 } from '@ai-designer/contracts';
@@ -37,15 +39,22 @@ export const designsApi = {
       schema: workingCopySchema,
       ...withSignal(signal),
     }),
-  save: (
+  /** Every change to a draft is a design operation (I14). */
+  operate: (
     orgId: string,
     id: string,
-    body: { expectedVersion: number; state: Record<string, unknown> },
+    body: { expectedVersion: number; operation: Record<string, unknown> },
   ) =>
-    apiRequest(`${design(orgId, id)}/working-copy`, {
-      method: 'PUT',
+    apiRequest(`${design(orgId, id)}/operations`, {
+      method: 'POST',
       body,
-      schema: workingCopySchema,
+      schema: submitOperationResponseSchema,
+      idempotencyKey: newIdempotencyKey(),
+    }),
+  operations: (orgId: string, id: string, signal?: AbortSignal) =>
+    apiRequest(`${design(orgId, id)}/operations?limit=20`, {
+      schema: operationListResponseSchema,
+      ...withSignal(signal),
     }),
   commit: (
     orgId: string,

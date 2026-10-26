@@ -61,6 +61,16 @@ type ListQuery = z.output<typeof artifactListQuerySchema>;
 type Db = Prisma.TransactionClient | PrismaService;
 type WithCurrent = Artifact & { currentRevision: ArtifactRevision | null };
 
+/** Same shape as `ArtifactRevisionInfo` in design-operations (kept local to avoid the dependency). */
+export interface ArtifactRevisionInfoView {
+  artifactRevisionId: string;
+  artifactId: string;
+  category: string;
+  definition: ArtifactDefinition;
+  geometryCapability: GeometryCapability;
+  active: boolean;
+}
+
 /** What the built-in library allows from inside an organization: read, use, copy (FR-SEC-116). */
 export const PLATFORM_ARTIFACT_PERMISSIONS: readonly PermissionKey[] = [
   'artifact.view',
@@ -227,6 +237,33 @@ export class ArtifactsService implements OnModuleInit {
       region: body.region ?? null,
       existingUses: body.existingUses ?? 0,
     });
+  }
+
+  /**
+   * Artifact revisions an operation may use (I14): only those visible to the caller; unknown or
+   * hidden ids are simply absent (the operation then reports `operation.artifact_unknown`).
+   */
+  async revisionInfos(ctx: AuthzContext, revisionIds: readonly string[]) {
+    const ids = [...new Set(revisionIds)].filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    if (!ids.length) return new Map<string, ArtifactRevisionInfoView>();
+    const rows = await this.prisma.artifactRevision.findMany({
+      where: { id: { in: ids }, artifact: visibleArtifacts(ctx) },
+      include: { artifact: { select: { id: true, category: true, lifecycleStatus: true } } },
+    });
+    const out = new Map<string, ArtifactRevisionInfoView>();
+    for (const r of rows) {
+      const definition = validateArtifactRevision(r.definition, r.properties).definition;
+      if (!definition) continue;
+      out.set(r.id, {
+        artifactRevisionId: r.id,
+        artifactId: r.artifact.id,
+        category: r.artifact.category,
+        definition,
+        geometryCapability: r.geometryCapability as GeometryCapability,
+        active: r.artifact.lifecycleStatus === 'active',
+      });
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------- write

@@ -14,10 +14,9 @@ import {
   revisionListResponseSchema,
   revisionParamsSchema,
   revisionSchema,
-  saveWorkingCopyRequestSchema,
   workingCopySchema,
 } from '@ai-designer/contracts';
-import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import type { z } from 'zod';
 
@@ -120,24 +119,6 @@ export class DesignsController {
   })
   workingCopy(@Req() req: Request, @Param('designId') designId: string) {
     return this.workingCopies.get(authzContext(req), designId);
-  }
-
-  @Put('working-copy')
-  @RequirePermission('design.edit', { resource: DESIGN })
-  @Endpoint({
-    summary: 'SaveWorkingCopy: full state with expectedVersion; never creates a revision',
-    tags: ['designs'],
-    params: designParamsSchema,
-    body: saveWorkingCopyRequestSchema,
-    response: workingCopySchema,
-    errors: [...WRITE_ERRORS],
-  })
-  save(
-    @Req() req: Request,
-    @Param('designId') designId: string,
-    @Body() body: z.output<typeof saveWorkingCopyRequestSchema>,
-  ) {
-    return this.workingCopies.save(authzContext(req), designId, body);
   }
 
   @Post('revisions')

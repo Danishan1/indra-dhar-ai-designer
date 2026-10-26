@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I14 — Design operation router (deterministic)** (next)                                             |
+| **Current iteration** | **I15 — Editor shell, editor-core & autosave** (next)                                                |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-26 (I13 finished)                                                                            |
+| Last updated          | 2026-10-26 (I14 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -33,7 +33,7 @@
 | I11 | Canonical garment model package                       | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-046; ADR-008 default applied (owner to confirm)   |
 | I12 | Designs, working copies & immutable revisions         | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-047; docs/architecture/designs.md                 |
 | I13 | Artifact registry & built-in library                  | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-048; docs/architecture/artifacts.md               |
-| I14 | Design operation router (deterministic)               | 3     | todo   |            |            |          |                                                       |
+| I14 | Design operation router (deterministic)               | 3     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-049; docs/architecture/operations.md              |
 | I15 | Editor shell, editor-core & autosave                  | 3     | todo   |            |            |          |                                                       |
 | I16 | Parametric 2D garment renderer (SVG)                  | 3     | todo   |            |            |          |                                                       |
 | I17 | Hierarchy, selection & contextual properties          | 3     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-26 — I14 — org-scoped operation routes, server-side undo with stored inverses, PUT working-copy removed (internal `replace_state`), quick-edit panel — ADR-049
 - 2026-10-26 — I13 — built-in library synced at API start with inline SVG previews (no seed script), revision route by id, scope hooks in the PDP, no CompatibilityRule table yet — ADR-048
 - 2026-10-26 — I12 — revision route by id, `design.create` for create/duplicate, PDP restriction inheritance (`governedBy`), `PolicyEnforcer`, text[] refs until I13 — ADR-047
 - 2026-10-26 — I11 — ADR-008 default applied without owner confirmation; `semanticHash`, `cloneWithNewIds` added; coverage not measured — ADR-046
@@ -123,6 +124,17 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-26 — I14 Design operation router (session 1) — DONE
+
+- Built: pure package `packages/design-operations` (operation schemas, appliers, inverse, entity patches, strategy registry), table `design_operations` (migration `20261026161534_i14_design_operations`), contracts `packages/contracts/src/operations`, `OperationsModule` (submit / dry-run validate / history / detail, row-locked atomic apply, audit of rejections, server-side undo/redo, commit linking via `DesignCommitHooks`), `ArtifactsService.revisionInfos`, removal of `PUT …/working-copy`, design page quick-edit panel, `ops:demo` script.
+- Operation types: set_property, reset_property, set_property_status, add_component, remove_component, set_component_visibility, set_component_lock, rename_component, attach_artifact, replace_artifact, detach_artifact, update_placement, add_relationship, remove_relationship, batch, revert_operation; AI-only (refused until I25): regenerate_region, interpret_reference; internal: restore_entities, replace_state.
+- Tests: design-operations 18, api unit 101, integration api 121 + worker 13, e2e 21. OpenAPI regenerated.
+- **Owner actions (Windows):**
+  1. `pnpm install` (new package `@ai-designer/design-operations`).
+  2. `pnpm db:migrate` (adds `design_operations`).
+  3. `pnpm dev` → open a design: use **Quick edit** (rename, set a property, undo), then Save as revision. Optional: `pnpm --filter @ai-designer/api ops:demo -- <designId>`.
+- **Next step:** I15 — editor shell.
 
 ### 2026-10-26 — I13 Artifact registry & built-in library (session 1) — DONE
 

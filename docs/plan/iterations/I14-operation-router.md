@@ -70,16 +70,16 @@ None (consumed by I15+). Provide a dev-only script `pnpm --filter api ops:demo` 
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Define operation base schema (`OperationEnvelope`) with SPEC-004 §7.2 fields; per-type `requestedChanges` schemas.
-2. [ ] Implement appliers for each type against `GarmentDesignState`; ensure immutability (structural sharing, no mutation of input).
-3. [ ] Implement `invert()`; property tests: `apply(apply(s, op), invert(op, s)) ≡ s` for invertible ops.
-4. [ ] Implement compatibility checks using artifact revision `definition.compatible_target_types` + `preferred_placement_regions`; produce `requires_manual_review` when target geometry is absent (AC-05 of SPEC-003).
-5. [ ] Implement strategy registry + selector; record rationale string.
-6. [ ] Prisma model + migration; repository; display-id generation (ADR-001).
-7. [ ] Service: transaction with `SELECT … FOR UPDATE`, version check → 409 `CONCURRENT_MODIFICATION`, idempotency via platform `IdempotencyKey` (same key + same payload → same response; different payload → `IDEMPOTENCY_CONFLICT`).
-8. [ ] Controller + permissions + OpenAPI; tenant-isolation tests.
-9. [ ] Refactor I12 working-copy update path to go through operations.
-10. [ ] Update PROGRESS.md.
+1. [x] Define operation base schema (`OperationEnvelope`) with SPEC-004 §7.2 fields; per-type `requestedChanges` schemas.
+2. [x] Implement appliers for each type against `GarmentDesignState`; ensure immutability (structural sharing, no mutation of input).
+3. [x] Implement `invert()`; property tests: `apply(apply(s, op), invert(op, s)) ≡ s` for invertible ops.
+4. [x] Implement compatibility checks using artifact revision `definition.compatible_target_types` + `preferred_placement_regions`; produce `requires_manual_review` when target geometry is absent (AC-05 of SPEC-003).
+5. [x] Implement strategy registry + selector; record rationale string.
+6. [x] Prisma model + migration; repository; display-id generation (ADR-001).
+7. [x] Service: transaction with `SELECT … FOR UPDATE`, version check → 409 `CONCURRENT_MODIFICATION`, idempotency via platform `IdempotencyKey` (same key + same payload → same response; different payload → `IDEMPOTENCY_CONFLICT`).
+8. [x] Controller + permissions + OpenAPI; tenant-isolation tests.
+9. [x] Refactor I12 working-copy update path to go through operations.
+10. [x] Update PROGRESS.md.
 
 ## 8. Tests
 
@@ -89,14 +89,14 @@ None (consumed by I15+). Provide a dev-only script `pnpm --filter api ops:demo` 
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — No code path mutates `WorkingCopy.state` except `OperationsService` (grep/test assertion). (OPR-AI-001, FR-002 of SRS)
-- [ ] AC2 — Every committed operation records target, base working-copy version and resulting version. (OPR-001, OPR-004, FR-PRJ-041)
-- [ ] AC3 — Operations are validated before modifying state; invalid ops leave state untouched. (OPR-002, OPR-007, OPR-AI-003)
-- [ ] AC4 — Attaching a compatible lace artifact to a sleeve creates a queryable relationship with placement and the exact artifact revision. (SPEC-003 AC-04, ART-004)
-- [ ] AC5 — Placement on a component without boundary geometry is recorded with status `needs_review`/approximate, never silently "validated". (SPEC-003 AC-05, REL-008)
-- [ ] AC6 — Deterministic strategy is selected for all registered deterministic ops; rationale persisted. (STR-001, STR-005, SPEC-004 AC-02)
-- [ ] AC7 — Retrying with the same idempotency key produces no duplicate change. (OPR-008)
-- [ ] AC8 — Conflicting writes produce 409 with current version; nothing overwritten. (FR-PRJ-024, API-002)
+- [x] AC1 — No code path mutates `WorkingCopy.state` except `OperationsService` (grep/test assertion). (OPR-AI-001, FR-002 of SRS)
+- [x] AC2 — Every committed operation records target, base working-copy version and resulting version. (OPR-001, OPR-004, FR-PRJ-041)
+- [x] AC3 — Operations are validated before modifying state; invalid ops leave state untouched. (OPR-002, OPR-007, OPR-AI-003)
+- [x] AC4 — Attaching a compatible lace artifact to a sleeve creates a queryable relationship with placement and the exact artifact revision. (SPEC-003 AC-04, ART-004)
+- [x] AC5 — Placement on a component without boundary geometry is recorded with status `needs_review`/approximate, never silently "validated". (SPEC-003 AC-05, REL-008)
+- [x] AC6 — Deterministic strategy is selected for all registered deterministic ops; rationale persisted. (STR-001, STR-005, SPEC-004 AC-02)
+- [x] AC7 — Retrying with the same idempotency key produces no duplicate change. (OPR-008)
+- [x] AC8 — Conflicting writes produce 409 with current version; nothing overwritten. (FR-PRJ-024, API-002)
 
 ## 10. Risks & notes
 
@@ -112,7 +112,16 @@ None (consumed by I15+). Provide a dev-only script `pnpm --filter api ops:demo` 
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1
+- Deviations from plan (ADR-049):
+  - Routes are org-scoped: `/v1/orgs/:orgId/designs/:designId/operations` (+ `/validate`), `/v1/orgs/:orgId/operations/:operationId`.
+  - Undo is server-side (`revert_operation` applies the stored exact inverse, refused if the entities changed since); `invert(prev, next)` is still exported for client previews. Added internal types `restore_entities` / `replace_state` (never accepted from clients).
+  - Appliers clone the state once (no structural sharing).
+  - The I12 `PUT …/working-copy` route was removed; full replacement is the internal `replace_state` operation; the design page uses a quick-edit panel (rename, set property, undo) instead of the JSON editor.
+  - `idempotency_key` is indexed, not unique (the interceptor scopes keys per caller and route).
+  - `ops:demo` runs the compiled API (`nest build && node dist/scripts/ops-demo.js`) because `tsx` lacks decorator metadata.
+  - AI-only types registered: `regenerate_region`, `interpret_reference`.
+- Operation types: set_property, reset_property, set_property_status, add_component, remove_component, set_component_visibility, set_component_lock, rename_component, attach_artifact, replace_artifact, detach_artifact, update_placement, add_relationship, remove_relationship, batch, revert_operation (+ AI-only regenerate_region, interpret_reference; internal restore_entities, replace_state).
+- Tests: design-operations 18 (incl. property-based undo), api unit 101, integration api 121 (operations 9), e2e 21.
+- Follow-ups added to backlog: see `09-backlog.md` "From I14".

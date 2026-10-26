@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-designer/contracts": "workspace:*",
+    "@ai-designer/design-operations": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@hookform/resolvers": "5.9.1",
     "@tailwindcss/postcss": "4.3.3",

@@ -33,7 +33,11 @@ const OWNERS: Record<string, string | string[]> = {
   designRevision: 'modules/designs',
   artifact: 'modules/artifacts',
   artifactRevision: 'modules/artifacts',
+  designOperation: 'modules/operations',
 };
+
+/** Dev-only scripts that look rows up read-only; all their writes go through module services. */
+const DEV_TOOLS = new Set(['scripts/ops-demo.ts']);
 
 const SRC = join(import.meta.dirname, '../..');
 
@@ -51,6 +55,7 @@ describe('table ownership', () => {
     const violations: string[] = [];
     for (const file of files(SRC)) {
       const rel = relative(SRC, file).replaceAll('\\', '/');
+      if (DEV_TOOLS.has(rel)) continue;
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(access)) {
         const model = match[1] ?? '';

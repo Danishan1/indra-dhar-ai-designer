@@ -115,3 +115,12 @@ _(Append: date — source iteration — item — reason)_
 - Cross-organization sharing / marketplace (SPEC-003 open decision 6). → unscheduled.
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
+
+## From I14 (2026-10-26)
+
+- Client-side optimistic apply + command stack using `design-operations` in the browser. → I15.
+- AI strategies (`regenerate_region`, `interpret_reference`, …) with jobs (`job_id`), statuses requested/running/failed/cancelled. → I21/I25.
+- Operations for design-level fields (category change, metadata) and geometry (`vector_operation`). → I16/I17.
+- Preservation constraints are recorded but only trivially honoured by deterministic ops; enforce/verify them for AI results. → I25.
+- Structural sharing in appliers if states grow large (today one clone per operation). → when profiling says so.
+- Visual editor replaces the developer quick-edit panel on the design page. → I15–I19.

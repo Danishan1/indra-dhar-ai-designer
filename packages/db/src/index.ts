@@ -8,6 +8,7 @@ export type {
   DesignRevision,
   Artifact,
   ArtifactRevision,
+  DesignOperation,
   AuditEvent,
   IdempotencyKey,
   IdSequence,

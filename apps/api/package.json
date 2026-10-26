@@ -15,11 +15,13 @@
     "storage:init": "tsx src/scripts/init-storage.ts",
     "clean": "rimraf dist coverage .turbo",
     "dev:ping": "tsx src/scripts/enqueue-ping.ts",
-    "openapi:generate": "tsx src/scripts/generate-openapi.ts"
+    "openapi:generate": "tsx src/scripts/generate-openapi.ts",
+    "ops:demo": "nest build && node dist/scripts/ops-demo.js"
   },
   "dependencies": {
     "@ai-designer/contracts": "workspace:*",
     "@ai-designer/db": "workspace:*",
+    "@ai-designer/design-operations": "workspace:*",
     "@ai-designer/garment-model": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@ai-designer/media": "workspace:*",

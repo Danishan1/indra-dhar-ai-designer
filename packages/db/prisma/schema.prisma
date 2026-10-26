@@ -312,6 +312,7 @@ model Organization {
   invitations       Invitation[]
   artifacts         Artifact[]
   artifactRevisions ArtifactRevision[]
+  designOperations  DesignOperation[]
 
   @@map("organizations")
 }
@@ -573,30 +574,31 @@ model Asset {
 /// A garment design inside a project (SS-03, I12). Its state lives in exactly one working copy
 /// (mutable, optimistically versioned) and in immutable revisions (ADR-003, ADR-018).
 model Design {
-  id                     String           @id @db.Uuid
-  organizationId         String           @map("organization_id") @db.Uuid
-  projectId              String           @map("project_id") @db.Uuid
-  displayId              String           @map("display_id")
+  id                     String            @id @db.Uuid
+  organizationId         String            @map("organization_id") @db.Uuid
+  projectId              String            @map("project_id") @db.Uuid
+  displayId              String            @map("display_id")
   name                   String
-  garmentType            String           @map("garment_type")
-  garmentCategory        String?          @map("garment_category")
+  garmentType            String            @map("garment_type")
+  garmentCategory        String?           @map("garment_category")
   /// DRAFT | IN_REVIEW | APPROVED | CHANGES_REQUESTED (review states are driven by I28)
-  status                 String           @default("DRAFT")
+  status                 String            @default("DRAFT")
   /// Latest committed revision (no FK: revisions reference designs; integrity is kept by the service).
-  headRevisionId         String?          @map("head_revision_id") @db.Uuid
+  headRevisionId         String?           @map("head_revision_id") @db.Uuid
   /// Set only by approval (I28); never copied on duplication (FR-PRJ-007).
-  approvedRevisionId     String?          @map("approved_revision_id") @db.Uuid
+  approvedRevisionId     String?           @map("approved_revision_id") @db.Uuid
   /// Last used revision number (R001, R002 …).
-  revisionCounter        Int              @default(0) @map("revision_counter")
-  duplicatedFromDesignId String?          @map("duplicated_from_design_id") @db.Uuid
-  createdBy              String?          @map("created_by") @db.Uuid
-  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt              DateTime?        @map("deleted_at") @db.Timestamptz(6)
-  organization           Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  project                Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  revisionCounter        Int               @default(0) @map("revision_counter")
+  duplicatedFromDesignId String?           @map("duplicated_from_design_id") @db.Uuid
+  createdBy              String?           @map("created_by") @db.Uuid
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  organization           Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project                Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
   workingCopy            WorkingCopy?
   revisions              DesignRevision[]
+  operations             DesignOperation[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, projectId, updatedAt])
@@ -742,4 +744,52 @@ model ArtifactRevision {
   @@unique([artifactId, revisionNumber])
   @@index([organizationId])
   @@map("artifact_revisions")
+}
+
+/// A recorded design operation (SS-06, I14, SPEC-004 §7): every change to a working copy goes
+/// through one. Rejected operations are not stored (they are audited).
+model DesignOperation {
+  id                       String       @id @db.Uuid
+  organizationId           String       @map("organization_id") @db.Uuid
+  designId                 String       @map("design_id") @db.Uuid
+  displayId                String       @map("display_id")
+  operationType            String       @map("operation_type")
+  operationSchemaVersion   String       @map("operation_schema_version")
+  /// Head revision when the operation was prepared (OPR-AI-002).
+  baseRevisionId           String?      @map("base_revision_id") @db.Uuid
+  baseWorkingCopyVersion   Int          @map("base_working_copy_version")
+  resultWorkingCopyVersion Int?         @map("result_working_copy_version")
+  /// Set when a commit includes this operation (OPR-004).
+  resultRevisionId         String?      @map("result_revision_id") @db.Uuid
+  /// AI job (I21/I25); null for deterministic operations.
+  jobId                    String?      @map("job_id") @db.Uuid
+  targetEntities           Json         @map("target_entities")
+  /// The normalized operation (generated ids filled in).
+  requestedChanges         Json         @map("requested_changes")
+  preservationConstraints  Json         @map("preservation_constraints")
+  sourceRefs               Json         @map("source_refs")
+  executionPolicy          Json         @map("execution_policy")
+  executionStrategy        String       @map("execution_strategy")
+  strategyRationale        String       @map("strategy_rationale")
+  /// completed | reverted (requested/running/failed/cancelled arrive with AI jobs)
+  status                   String
+  findings                 Json         @default("[]")
+  /// Exact undo data (internal operation), null when not invertible.
+  inverse                  Json?
+  /// sha256 per changed entity after the operation (a revert refuses if they changed since).
+  resultEntityHashes       Json?        @map("result_entity_hashes")
+  revertsOperationId       String?      @map("reverts_operation_id") @db.Uuid
+  revertedByOperationId    String?      @map("reverted_by_operation_id") @db.Uuid
+  idempotencyKey           String?      @map("idempotency_key")
+  requestedBy              String       @map("requested_by") @db.Uuid
+  createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt              DateTime?    @map("completed_at") @db.Timestamptz(6)
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design                   Design       @relation(fields: [designId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, idempotencyKey])
+  @@index([organizationId, designId, createdAt])
+  @@index([designId, resultRevisionId])
+  @@map("design_operations")
 }

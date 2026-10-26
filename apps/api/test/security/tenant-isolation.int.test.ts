@@ -35,7 +35,14 @@ const BODIES: Record<string, unknown> = {
   },
   'POST /v1/orgs/:orgId/projects': { name: 'Isolation probe' },
   'POST /v1/orgs/:orgId/projects/:projectId/designs': { name: 'Probe design' },
-  'PUT /v1/orgs/:orgId/designs/:designId/working-copy': { expectedVersion: 1, state: {} },
+  'POST /v1/orgs/:orgId/designs/:designId/operations': {
+    expectedVersion: 1,
+    operation: { type: 'rename_component', componentId: 'cmp_000000000001', displayName: 'x' },
+  },
+  'POST /v1/orgs/:orgId/designs/:designId/operations/validate': {
+    expectedVersion: 1,
+    operation: { type: 'rename_component', componentId: 'cmp_000000000001', displayName: 'x' },
+  },
   'POST /v1/orgs/:orgId/designs/:designId/revisions': { expectedVersion: 1 },
   'POST /v1/orgs/:orgId/designs/:designId/restore': {
     revisionId: '0197b0a0-0000-7000-8000-000000000000',
@@ -80,6 +87,7 @@ describe('cross-tenant isolation', () => {
   const projectIds = new Map<string, string>();
   const designs = new Map<string, { id: string; headRevisionId: string }>();
   const artifacts = new Map<string, { id: string; currentRevisionId: string }>();
+  const operationIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -91,6 +99,7 @@ describe('cross-tenant isolation', () => {
     revisionId: designs.get(t.orgId)?.headRevisionId ?? '',
     artifactId: artifacts.get(t.orgId)?.id ?? '',
     artifactRevisionId: artifacts.get(t.orgId)?.currentRevisionId ?? '',
+    operationId: operationIds.get(t.orgId) ?? '',
   });
 
   async function startArtifact(t: TenantFixture): Promise<void> {
@@ -111,7 +120,21 @@ describe('cross-tenant isolation', () => {
       name: 'Probe design',
     });
     expect(d.status).toBe(201);
-    designs.set(t.orgId, (await d.json()) as { id: string; headRevisionId: string });
+    const design = (await d.json()) as { id: string; headRevisionId: string };
+    designs.set(t.orgId, design);
+    const wc = (await (
+      await t.owner.client.get(`/v1/orgs/${t.orgId}/designs/${design.id}/working-copy`)
+    ).json()) as { version: number; state: { components: { componentId: string }[] } };
+    const op = await t.owner.client.post(`/v1/orgs/${t.orgId}/designs/${design.id}/operations`, {
+      expectedVersion: wc.version,
+      operation: {
+        type: 'rename_component',
+        componentId: wc.state.components[0]!.componentId,
+        displayName: 'Probe body',
+      },
+    });
+    expect(op.status).toBe(201);
+    operationIds.set(t.orgId, ((await op.json()) as { operation: { id: string } }).operation.id);
   }
 
   async function startUpload(t: TenantFixture): Promise<void> {
@@ -172,7 +195,7 @@ describe('cross-tenant isolation', () => {
   it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
       routes: routes.filter((r) =>
-        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId/.test(
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId/.test(
           r.path,
         ),
       ),

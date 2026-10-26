@@ -2,11 +2,10 @@ import {
   type WorkingCopy as WorkingCopyView,
   RevisionCommittedEvent,
   RevisionRestoredToWorkingCopyEvent,
-  WorkingCopySavedEvent,
+  WorkingCopyUpdatedEvent,
 } from '@ai-designer/contracts';
 import { newId, type Design, type Prisma, type WorkingCopy } from '@ai-designer/db';
 import {
-  contentHash,
   GarmentModelError,
   readAnyVersion,
   semanticHash,
@@ -24,16 +23,16 @@ import { OutboxService } from '../../platform/outbox/outbox.service.js';
 import { PrismaService } from '../../platform/prisma/prisma.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
 
+import { DesignCommitHooks } from './commit-hooks.js';
 import { RevisionService } from './revision.service.js';
 
 /** At most this many findings travel back in an error or a response. */
 const MAX_FINDINGS = 50;
 
 /**
- * The single writer of `working_copies` (ADR-018, I12). Saves are optimistic (`expectedVersion`) and
- * never create revisions; commits lock the row, write an immutable revision and rebase the working
- * copy onto it; restores replace the state with an old revision without touching history. I14
- * routes structured operations through this service with the same versioning.
+ * The single writer of `working_copies` (ADR-018, I12). State changes come only from design
+ * operations (`writeOperationState`, I14) and never create revisions; commits lock the row, write an immutable revision and rebase the working
+ * copy onto it; restores replace the state with an old revision without touching history.
  */
 @Injectable()
 export class WorkingCopyService {
@@ -43,6 +42,7 @@ export class WorkingCopyService {
     private readonly outbox: OutboxService,
     private readonly revisions: RevisionService,
     private readonly projects: ProjectsService,
+    private readonly commitHooks: DesignCommitHooks,
   ) {}
 
   /** Parses (upgrading older schema versions) and validates a state; blocking findings throw. */
@@ -108,38 +108,57 @@ export class WorkingCopyService {
     return readAnyVersion(wc.state).state;
   }
 
-  /** Full-state save (temporary editor API until I14's operations). Never creates a revision. */
-  async save(
-    ctx: AuthzContext,
+  /**
+   * Opens an operation on the working copy (I14): locks the row, checks the project allows changes
+   * and the caller saw the current version, and returns the state upgraded for reading.
+   */
+  async lockForOperation(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
     designId: string,
-    body: { expectedVersion: number; state: Record<string, unknown> },
-  ): Promise<WorkingCopyView> {
-    const { state, findings } = this.validate(body.state);
-    const wc = await this.prisma.$transaction(async (tx) => {
-      const design = await this.design(tx, ctx.organizationId, designId);
-      await this.projects.requireWorkable(ctx.organizationId, design.projectId, tx);
-      const current = await this.find(tx, ctx.organizationId, designId);
-      assertVersion(body.expectedVersion, current.version, { designId });
-      // Same content → nothing to save (autosave can repeat itself freely).
-      if (contentHash(state) === contentHash(readAnyVersion(current.state).state)) return current;
-      const semantic = semanticHash(state);
-      const head = await this.revisions.headSemanticHash(tx, design);
-      const updated = await this.write(tx, current, {
-        state: state as unknown as Prisma.InputJsonValue,
-        schemaVersion: state.schemaVersion,
-        semanticHash: semantic,
-        hasUncommittedChanges: semantic !== head,
-        lastModifiedBy: ctx.userId,
-      });
-      await this.outbox.append(tx, WorkingCopySavedEvent, {
-        organizationId: ctx.organizationId,
-        projectId: design.projectId,
-        designId,
-        version: updated.version,
-      });
-      return updated;
+    expectedVersion: number,
+  ) {
+    await this.lock(tx, designId);
+    const design = await this.design(tx, organizationId, designId);
+    await this.projects.requireWorkable(organizationId, design.projectId, tx);
+    const wc = await this.find(tx, organizationId, designId);
+    assertVersion(expectedVersion, wc.version, { designId });
+    return { design, workingCopy: wc, state: readAnyVersion(wc.state).state };
+  }
+
+  /**
+   * The ONLY way a working copy's state changes outside commit/restore (AC1 of I14): called by the
+   * operations module inside the transaction opened with `lockForOperation`.
+   */
+  async writeOperationState(
+    tx: Prisma.TransactionClient,
+    design: Design,
+    current: WorkingCopy,
+    state: GarmentDesignState,
+    input: { userId: string; operationId: string },
+  ): Promise<WorkingCopy> {
+    const semantic = semanticHash(state);
+    const head = await this.revisions.headSemanticHash(tx, design);
+    const updated = await this.write(tx, current, {
+      state: state as unknown as Prisma.InputJsonValue,
+      schemaVersion: state.schemaVersion,
+      semanticHash: semantic,
+      hasUncommittedChanges: semantic !== head,
+      lastModifiedBy: input.userId,
     });
-    return this.toView(wc, state, findings, null);
+    await this.outbox.append(
+      tx,
+      WorkingCopyUpdatedEvent,
+      {
+        organizationId: design.organizationId,
+        projectId: design.projectId,
+        designId: design.id,
+        version: updated.version,
+        operationId: input.operationId,
+      },
+      { organizationId: design.organizationId },
+    );
+    return updated;
   }
 
   /**
@@ -174,7 +193,15 @@ export class WorkingCopyService {
             },
           );
       }
+      const revisionId = newId();
+      // Operations since the last commit now belong to this revision (OPR-004).
+      const operationIds = await this.commitHooks.run(tx, {
+        organizationId: ctx.organizationId,
+        designId,
+        revisionId,
+      });
       const revision = await this.revisions.insert(tx, {
+        id: revisionId,
         design,
         state,
         parent: head ? { id: head.row.id, state: head.state } : null,
@@ -182,6 +209,7 @@ export class WorkingCopyService {
         summaryText: body.summary,
         findings,
         createdBy: ctx.userId,
+        operationIds,
       });
       const rebased = await this.write(tx, wc, {
         state: state as unknown as Prisma.InputJsonValue,

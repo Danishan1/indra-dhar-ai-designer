@@ -10,10 +10,11 @@ export const DesignCreatedEvent = defineEvent(
   1,
   z.object({ ...ref, template: z.string(), duplicatedFromDesignId: z.uuid().optional() }),
 );
-export const WorkingCopySavedEvent = defineEvent(
-  'designs.working_copy_saved',
+/** The working copy changed (through a design operation, I14). */
+export const WorkingCopyUpdatedEvent = defineEvent(
+  'designs.working_copy_updated',
   1,
-  z.object({ ...ref, version: z.number().int() }),
+  z.object({ ...ref, version: z.number().int(), operationId: z.uuid() }),
 );
 export const RevisionCommittedEvent = defineEvent(
   'designs.revision_committed',

@@ -1,3 +1,4 @@
+import { ErrorHttpStatus } from '@ai-designer/contracts';
 import type {
   CompareResponse,
   Design,
@@ -12,6 +13,9 @@ import { type INestApplication } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { AuthorizationService } from '../../../src/modules/authorization/authorization.service.js';
+import { OperationsService } from '../../../src/modules/operations/operations.service.js';
+import { AppError } from '../../../src/platform/errors/app-error.js';
 import { PrismaService } from '../../../src/platform/prisma/prisma.service.js';
 import { REDIS } from '../../../src/platform/redis/redis.module.js';
 import { clearRateLimits, fixtureDeps, json } from '../../security/fixtures.js';
@@ -63,12 +67,39 @@ describe('designs: working copies and immutable revisions (integration)', () => 
   };
   const wcOf = async (d: { id: string }, client = designer) =>
     json<WorkingCopy>(await client.get(`${org()}/designs/${d.id}/working-copy`));
-  const save = (
+  /**
+   * Full-state replacement now exists only as an internal operation (I14); tests use it to set up
+   * arbitrary states. Returns a Response like the HTTP API would.
+   */
+  const save = async (
     d: { id: string },
     version: number,
     state: Record<string, unknown>,
     client = designer,
-  ) => client.put(`${org()}/designs/${d.id}/working-copy`, { expectedVersion: version, state });
+  ): Promise<Response> => {
+    const userId = (await json<{ id: string }>(await client.get('/v1/me'))).id;
+    const ctx = await app.get(AuthorizationService).contextFor(orgId, userId);
+    try {
+      await app
+        .get(OperationsService)
+        .applyInternal(ctx!, d.id, version, { type: 'replace_state', state });
+      return new Response(JSON.stringify(await wcOf(d, client)), { status: 200 });
+    } catch (e) {
+      if (!(e instanceof AppError)) throw e;
+      return new Response(
+        JSON.stringify({ error: { code: e.code, message: e.message, details: e.details } }),
+        {
+          status: ErrorHttpStatus[e.code],
+        },
+      );
+    }
+  };
+  const operate = (
+    d: { id: string },
+    version: number,
+    operation: Record<string, unknown>,
+    client = designer,
+  ) => client.post(`${org()}/designs/${d.id}/operations`, { expectedVersion: version, operation });
   const commit = (
     d: { id: string },
     version: number,
@@ -207,17 +238,16 @@ describe('designs: working copies and immutable revisions (integration)', () => 
       expect(saved.hasUncommittedChanges).toBe(true);
     }
     expect(await history(d)).toHaveLength(1);
-    // Saving the same content again does not bump the version.
-    const same = await json<WorkingCopy>(
-      await save(
-        d,
-        version,
-        edit(state, (s) => {
-          s.metadata = { n: 2 };
-        }),
-      ),
+    // An operation that changes nothing is refused and does not bump the version.
+    const same = await save(
+      d,
+      version,
+      edit(state, (s) => {
+        s.metadata = { n: 2 };
+      }),
     );
-    expect(same.version).toBe(version);
+    expect(same.status).toBe(409);
+    expect((await wcOf(d)).version).toBe(version);
 
     const res = await commit(d, version, { summary: 'Longer sleeves' });
     expect(res.status).toBe(201);
@@ -257,7 +287,7 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     expect(outbox.map((e) => e.type)).toEqual(
       expect.arrayContaining([
         'designs.design_created',
-        'designs.working_copy_saved',
+        'designs.working_copy_updated',
         'designs.revision_committed',
       ]),
     );
@@ -309,7 +339,7 @@ describe('designs: working copies and immutable revisions (integration)', () => 
       'property.unit_missing',
     );
     const garbage = await save(d, wc.version, { schemaVersion: '9.0.0' });
-    expect(garbage.status).toBe(400);
+    expect(garbage.status).toBe(422);
     const warned = await json<WorkingCopy>(
       await save(
         d,
@@ -532,7 +562,16 @@ describe('designs: working copies and immutable revisions (integration)', () => 
       (await owner.post(`${org()}/projects/${p.id}/archive`, {})).status,
     );
     const wc = await wcOf(d, owner);
-    const res = await save(d, wc.version, edit(wc.state, setLength(1)), owner);
+    const res = await operate(
+      d,
+      wc.version,
+      {
+        type: 'rename_component',
+        componentId: sleeve(wc.state as unknown as GarmentDesignState).componentId,
+        displayName: 'x',
+      },
+      owner,
+    );
     expect(res.status).toBe(409);
     expect((await code(res)).code).toBe('INVALID_STATE_TRANSITION');
     expect((await owner.get(`${org()}/designs/${d.id}`)).status).toBe(200);
@@ -558,15 +597,21 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     expect((await designer.get(`${org()}/designs/${d.id}`)).status).toBe(200);
     expect((await designer.get(`${org()}/revisions/${d.headRevisionId}`)).status).toBe(200);
     const wc = await wcOf(d);
-    expect((await save(d, wc.version, edit(wc.state, setLength(5)))).status).toBe(403);
+    const rename = {
+      type: 'rename_component',
+      componentId: sleeve(wc.state as unknown as GarmentDesignState).componentId,
+      displayName: 'Granted',
+    };
+    expect((await operate(d, wc.version, rename)).status).toBe(403);
     // Edit grant: edits and commits work.
     await owner.post(`${org()}/projects/${p.id}/grants`, {
       userId: designerUserId,
       actions: ['project.view', 'project.edit'],
     });
-    const saved = await save(d, wc.version, edit(wc.state, setLength(5)));
-    expect(saved.status).toBe(200);
-    expect((await commit(d, (await json<WorkingCopy>(saved)).version)).status).toBe(201);
+    const saved = await operate(d, wc.version, rename);
+    expect(saved.status).toBe(201);
+    const { workingCopy } = await json<{ workingCopy: { version: number } }>(saved);
+    expect((await commit(d, workingCopy.version)).status).toBe(201);
   });
 
   it('other tenants get 404 for designs and revisions', async () => {

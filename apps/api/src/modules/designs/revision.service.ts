@@ -37,6 +37,8 @@ import {
 type Db = Prisma.TransactionClient | PrismaService;
 
 export interface NewRevision {
+  /** Pre-allocated id (so commit hooks can reference it); generated when omitted. */
+  id?: string;
   design: Design;
   state: GarmentDesignState;
   /** Parent revision and its (read-upgraded) state; null for the first revision. */
@@ -46,6 +48,8 @@ export interface NewRevision {
   summaryText: string | undefined;
   findings: readonly ValidationFinding[];
   createdBy: string;
+  /** Design operations included in this revision (I14). */
+  operationIds?: string[];
 }
 
 /** Revision summary columns only — snapshots are never loaded for lists (TECH §9.1). */
@@ -96,7 +100,7 @@ export class RevisionService {
     const snapshot = JSON.parse(canonicalize(state)) as Prisma.InputJsonValue;
     const row = await tx.designRevision.create({
       data: {
-        id: newId(),
+        id: input.id ?? newId(),
         organizationId: design.organizationId,
         designId: design.id,
         displayId: formatRevisionId(design.displayId, number),
@@ -117,6 +121,7 @@ export class RevisionService {
           : { lines: [], counts: null }) as Prisma.InputJsonValue,
         validationSummary: validationSummaryOf(input.findings) as unknown as Prisma.InputJsonValue,
         createdBy: input.createdBy,
+        operationIds: input.operationIds ?? [],
       },
     });
     const { count } = await tx.design.updateMany({

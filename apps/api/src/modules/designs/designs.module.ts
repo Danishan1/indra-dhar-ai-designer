@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { IdentityModule } from '../identity/identity.module.js';
 
+import { DesignCommitHooks } from './commit-hooks.js';
 import { CompareService } from './compare.service.js';
 import {
   DesignsController,
@@ -26,7 +27,14 @@ import { WorkingCopyService } from './working-copy.service.js';
     RevisionService,
     CompareService,
     DesignReferencesService,
+    DesignCommitHooks,
   ],
-  exports: [DesignsService, WorkingCopyService, RevisionService, DesignReferencesService],
+  exports: [
+    DesignsService,
+    WorkingCopyService,
+    RevisionService,
+    DesignReferencesService,
+    DesignCommitHooks,
+  ],
 })
 export class DesignsModule {}
