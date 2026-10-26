@@ -76,18 +76,18 @@ None. (`ValueStatusBadge` from I04 maps to `ValueStatus`.)
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Confirm ADR-008 with owner (or record default); list categories in `registry/garment-categories.ts`.
-2. [ ] Status, source types, units with tests.
-3. [ ] PropertyValue schema + generic typed variants per data type.
-4. [ ] Component/relationship/placement/constraint/design-state schemas.
-5. [ ] Registries (component types, properties, relationships) with self-consistency tests (every property used by a component type is defined; every relationship type has endpoint rules).
-6. [ ] Structural validation.
-7. [ ] Canonicalization + hash (cross-runtime test: same hash in Node and jsdom/browser env).
-8. [ ] Structural diff.
-9. [ ] Versioning + migration framework (with a fake 0.9→1.0 migration test).
-10. [ ] Templates for shirt and T-shirt; validate they pass structural validation.
-11. [ ] README with examples; dependency-boundary lint confirms no React/Nest/Prisma imports.
-12. [ ] Update `PROGRESS.md`.
+1. [x] Confirm ADR-008 with owner (or record default); list categories in `registry/garment-categories.ts`.
+2. [x] Status, source types, units with tests.
+3. [x] PropertyValue schema + generic typed variants per data type.
+4. [x] Component/relationship/placement/constraint/design-state schemas.
+5. [x] Registries (component types, properties, relationships) with self-consistency tests (every property used by a component type is defined; every relationship type has endpoint rules).
+6. [x] Structural validation.
+7. [x] Canonicalization + hash (cross-runtime test: same hash in Node and jsdom/browser env).
+8. [x] Structural diff.
+9. [x] Versioning + migration framework (with a fake 0.9→1.0 migration test).
+10. [x] Templates for shirt and T-shirt; validate they pass structural validation.
+11. [x] README with examples; dependency-boundary lint confirms no React/Nest/Prisma imports.
+12. [x] Update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -96,14 +96,14 @@ None. (`ValueStatusBadge` from I04 maps to `ValueStatus`.)
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Every property supports value, unit, status, provenance and review info; status vocabulary matches SPEC-003 §9.2 exactly (PROP-001…006).
-- [ ] AC2 — Component catalog covers SPEC-003 §8.2 and is extensible without schema redesign (§4.4; CMP-015…018).
-- [ ] AC3 — Relationship registry covers §10.3 with endpoint/cardinality rules (REL-001…005).
-- [ ] AC4 — Artifact bindings always pin an explicit artifact revision (ART-004).
-- [ ] AC5 — Deterministic canonical hash and structural diff exist and are tested (DSN-010, DSN-011).
-- [ ] AC6 — Schema version recorded on every state; migrations deterministic and never promote unknown values (VER-001…003).
-- [ ] AC7 — Shirt and T-shirt templates produce valid states with no invented confirmed values (PROP-005, AC-06 SPEC-003).
-- [ ] AC8 — Package has zero dependencies on React, NestJS, Prisma or AI providers (TECH §4).
+- [x] AC1 — Every property supports value, unit, status, provenance and review info; status vocabulary matches SPEC-003 §9.2 exactly (PROP-001…006).
+- [x] AC2 — Component catalog covers SPEC-003 §8.2 and is extensible without schema redesign (§4.4; CMP-015…018).
+- [x] AC3 — Relationship registry covers §10.3 with endpoint/cardinality rules (REL-001…005).
+- [x] AC4 — Artifact bindings always pin an explicit artifact revision (ART-004).
+- [x] AC5 — Deterministic canonical hash and structural diff exist and are tested (DSN-010, DSN-011).
+- [x] AC6 — Schema version recorded on every state; migrations deterministic and never promote unknown values (VER-001…003).
+- [x] AC7 — Shirt and T-shirt templates produce valid states with no invented confirmed values (PROP-005, AC-06 SPEC-003).
+- [x] AC8 — Package has zero dependencies on React, NestJS, Prisma or AI providers (TECH §4).
 
 ## 10. Risks & notes
 
@@ -120,7 +120,12 @@ None. (`ValueStatusBadge` from I04 maps to `ValueStatus`.)
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1
+- Deviations from plan (ADR-046):
+  - ADR-008 was **not** confirmed by the owner; the documented default (woven shirt + knit T-shirt) was applied and flagged.
+  - Added `semanticHash` next to `contentHash` (hash ignoring editor flags/metadata/provenance/version) and `cloneWithNewIds` + `sequentialRandomBytes` (deterministic ids) in the public API.
+  - `constraints[]` added to the root state (shape from the plan, list was implied).
+  - Test count 114 (12 files). Coverage percentage not measured: the matching `@vitest/coverage-v8` is younger than the 2-week dependency rule (backlog).
+  - Cross-runtime hash test runs in jsdom (devDependency `jsdom` 29.1.1) plus Node `crypto` comparison and golden hashes.
+- Follow-ups added to backlog: see `09-backlog.md` "From I11".

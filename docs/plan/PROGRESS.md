@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I11 — Canonical garment model package** (next)                                                     |
+| **Current iteration** | **I12 — Designs, working copies & immutable revisions** (next)                                       |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-26 (I10 finished)                                                                            |
+| Last updated          | 2026-10-26 (I11 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -30,7 +30,7 @@
 | I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                 |
 | I09 | Asset & storage service                               | 2     | done   | 2026-10-23 | 2026-10-26 | 1        | ADR-044; docs/architecture/assets.md                  |
 | I10 | Projects & lifecycle core                             | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-045; docs/architecture/projects.md                |
-| I11 | Canonical garment model package                       | 2     | todo   |            |            |          | Confirm ADR-008                                       |
+| I11 | Canonical garment model package                       | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-046; ADR-008 default applied (owner to confirm)   |
 | I12 | Designs, working copies & immutable revisions         | 2     | todo   |            |            |          |                                                       |
 | I13 | Artifact registry & built-in library                  | 2     | todo   |            |            |          |                                                       |
 | I14 | Design operation router (deterministic)               | 3     | todo   |            |            |          |                                                       |
@@ -107,6 +107,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-26 — I11 — ADR-008 default applied without owner confirmation; `semanticHash`, `cloneWithNewIds` added; coverage not measured — ADR-046
 - 2026-10-26 — I10 — typed columns, restricted visibility in the PDP (404), grants revoked by `?userId=`, lifecycle registry — ADR-045
 - 2026-10-26 — I09 — API-proxied uploads, `packages/media`, SVG overwrite, thumbnails via streaming endpoint, `/files` dev page — ADR-044
 - 2026-10-23 — I08 — own TOTP + separate MFA tables, sensitive permissions require MFA (instead of blocking privileged roles), logout public — ADR-043
@@ -120,6 +121,14 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-26 — I11 Canonical garment model package (session 1) — DONE
+
+- Built: new pure package `packages/garment-model` (README inside): zod schemas (PropertyValue, DesignComponent, DesignRelationship, Placement, Constraint, ValidationFinding, GarmentDesignState), registries (20 component types, 27 property definitions, 13 relationship types, 2 categories) with `extendCatalog`, units (mm canonical), status rules + `promote`, structural validation, canonical JSON + `contentHash`/`semanticHash`, `diffDesignStates`, versioning/migration framework, `cloneWithNewIds`, templates `woven_shirt` and `knit_tshirt`.
+- Tests: 114 in the package (property-based canonicalization, jsdom hash, migration guard, registry self-consistency, dependency boundary).
+- **ADR-008 flagged:** default categories (woven shirt, knit T-shirt) applied without owner confirmation. Tell me if you want others (e.g. kurta, dress, trousers).
+- **Owner actions (Windows):** `pnpm install` (new package `@ai-designer/garment-model`; new deps `@noble/hashes`, `fast-check`, `jsdom` — all ≥ 2 weeks old). No migration, no `.env` change.
+- **Next step:** I12 — designs, working copies and immutable revisions (stores `GarmentDesignState`, uses `contentHash`/`diffDesignStates`).
 
 ### 2026-10-26 — I10 Projects & lifecycle core (session 1) — DONE
 

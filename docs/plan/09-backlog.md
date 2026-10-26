@@ -85,3 +85,12 @@ _(Append: date — source iteration — item — reason)_
 - Project thumbnails/cover image on cards. → I35.
 - Move the Files page into project Sources; wire `projectId` on uploads. → I12.
 - Bulk lifecycle actions and saved filters on the dashboard. → unscheduled.
+
+## From I11 (2026-10-26)
+
+- Coverage measurement for `garment-model` (target ≥ 90%): add `@vitest/coverage-v8` matching the Vitest version once it is ≥ 2 weeks old. → I12 (first consumer) or next dependency refresh.
+- More garment categories/templates (kurta, dress, trousers) once the owner names them (ADR-008). → unscheduled.
+- Property definitions for the production spec (POMs, tolerances, grading) live in `techpack-model`; reconcile `production.*` namespace keys. → I38.
+- Simulation parameter properties (`simulation.*`) for the 3D viewer. → I36.
+- Versioned business constraint sets and their evaluation (`Constraint.version` is the hook). → I20.
+- Optional `knownArtifactRevisions` resolver wiring (API passes a set from the artifact service). → I13/I14.
