@@ -4,7 +4,7 @@ import { AppError } from '../errors/app-error.js';
  * Optimistic concurrency (SPEC-006 API-003). Use with a `version` column:
  *
  * ```ts
- * const { count } = await tx.design.updateMany({ where: { id, version: expectedVersion }, data: { …, version: { increment: 1 } } });
+ * const { count } = await tx.widget.updateMany({ where: { id, version: expectedVersion }, data: { …, version: { increment: 1 } } });
  * assertUpdated(count, { id, expectedVersion });
  * ```
  */

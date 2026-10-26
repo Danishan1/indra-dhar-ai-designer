@@ -10,6 +10,18 @@ export interface ResourceResolver {
    * alone do not give access — the caller needs `<type>.manage_access` or an explicit grant.
    */
   isRestricted?(id: string): Promise<boolean>;
+  /**
+   * Child resources (designs, revisions) inherit their parent's restriction: the PDP checks the
+   * parent exists in the same tenant, asks the parent's `isRestricted`, and checks grants on the
+   * parent (I12, ADR-047).
+   */
+  governedBy?(id: string): Promise<{ type: string; id: string } | null>;
+  /**
+   * For restricted resources: the grant action that allows `permission` on this resource type
+   * (e.g. on a project, `design.edit` is allowed by a `project.edit` grant). Permissions of the
+   * resource's own type map to themselves; unmapped permissions cannot be granted.
+   */
+  grantActionFor?(permission: string): string | null;
 }
 
 /**

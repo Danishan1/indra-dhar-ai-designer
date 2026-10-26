@@ -28,6 +28,9 @@ const OWNERS: Record<string, string | string[]> = {
   auditEvent: ['platform/audit', 'modules/audit'],
   asset: 'modules/assets',
   project: 'modules/projects',
+  design: 'modules/designs',
+  workingCopy: 'modules/designs',
+  designRevision: 'modules/designs',
 };
 
 const SRC = join(import.meta.dirname, '../..');

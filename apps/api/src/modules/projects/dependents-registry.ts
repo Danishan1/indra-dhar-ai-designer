@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import type { AuthzContext } from '../../platform/authz/authorizer.js';
+
 export interface ProjectRef {
   id: string;
   organizationId: string;
@@ -11,17 +13,37 @@ export interface DependentCounter {
   count(project: ProjectRef): Promise<number>;
 }
 
+/** Copies a module's content from one project into its duplicate (runs after the copy exists). */
+export type ProjectDuplicator = (
+  ctx: AuthzContext,
+  source: ProjectRef,
+  target: ProjectRef,
+) => Promise<void>;
+
 /** Returns a reason when the project must not be completed yet (e.g. unresolved reviews), else null. */
 export type CompletionCheck = (project: ProjectRef) => Promise<string | null>;
 
 /**
  * Hooks other modules plug into the project lifecycle (module boundaries: projects never reads their
- * tables). I12 registers design counts, I28 completion checks for unresolved reviews, I42 deliverables.
+ * tables). I12 registers design counts and design duplication, I28 completion checks for unresolved reviews, I42 deliverables.
  */
 @Injectable()
 export class ProjectLifecycleRegistry {
   private readonly counters = new Map<string, DependentCounter>();
   private readonly checks = new Map<string, CompletionCheck>();
+  private readonly duplicators = new Map<string, ProjectDuplicator>();
+
+  registerDuplicator(name: string, duplicator: ProjectDuplicator): void {
+    this.duplicators.set(name, duplicator);
+  }
+
+  unregisterDuplicator(name: string): void {
+    this.duplicators.delete(name);
+  }
+
+  async runDuplicators(ctx: AuthzContext, source: ProjectRef, target: ProjectRef): Promise<void> {
+    for (const duplicate of this.duplicators.values()) await duplicate(ctx, source, target);
+  }
 
   registerDependents(type: string, counter: DependentCounter): void {
     this.counters.set(type, counter);

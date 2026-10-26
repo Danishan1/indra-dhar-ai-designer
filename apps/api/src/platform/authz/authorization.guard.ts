@@ -1,21 +1,12 @@
-import { isSensitivePermission } from '@ai-designer/contracts';
-import {
-  type CanActivate,
-  type ExecutionContext,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
-import { AuditService } from '../audit/audit.service.js';
 import { RequestContext } from '../context/request-context.js';
 import { AppError } from '../errors/app-error.js';
 
-import { AUTHORIZER, type Authorizer, type AuthzDecision } from './authorizer.js';
 import { AUTHZ_METADATA, type AuthzDeclaration } from './decorators.js';
-import '../auth/request-auth.js';
+import { PolicyEnforcer } from './policy-enforcer.js';
 import { ResourceResolverRegistry } from './resource-resolvers.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,9 +24,8 @@ export class AuthorizationGuard implements CanActivate {
 
   constructor(
     private readonly reflector: Reflector,
-    @Inject(AUTHORIZER) private readonly authorizer: Authorizer,
     private readonly resolvers: ResourceResolverRegistry,
-    private readonly audit: AuditService,
+    private readonly enforcer: PolicyEnforcer,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -78,106 +68,14 @@ export class AuthorizationGuard implements CanActivate {
     }
 
     const permission = decl.kind === 'permission' ? decl.permission : undefined;
-    const decision = await this.authorizer.authorize({
-      principal,
+    const authz = await this.enforcer.enforce(req, {
       organizationId: orgParam ?? null,
       ...(permission ? { permission } : {}),
       ...(resource ? { resource } : {}),
-      ...(req.auth
-        ? {
-            session: {
-              mfaVerified: req.auth.assurance === 'mfa_verified',
-              stepUpAt: req.auth.stepUpAt,
-              createdAt: req.auth.createdAt,
-              lastSeenAt: req.auth.lastSeenAt,
-            },
-          }
-        : {}),
+      notFoundLabel,
     });
-
-    if (decision.decision === 'allow' && decision.context && decision.obligations.length === 0) {
-      req.authz = decision.context;
-      RequestContext.patch({ organizationId: decision.context.organizationId });
-      return true;
-    }
-    if (decision.decision === 'allow') {
-      // Obligations must be met before the operation runs (FR-SEC-243). The client re-verifies
-      // (POST /v1/auth/step-up) and retries.
-      const stepUp = decision.obligations.find((o) => o.type === 'step_up');
-      throw new AppError('STEP_UP_REQUIRED', 'Confirm it is you to continue', {
-        reason: stepUp ? 'stale' : 'obligation',
-        method: 'totp',
-        ...(stepUp ? { maxAgeMinutes: stepUp.maxAgeMinutes } : {}),
-      });
-    }
-    await this.auditDenial(decision, permission, resource);
-    throw this.toError(decision, notFoundLabel, permission);
-  }
-
-  private toError(decision: AuthzDecision, notFoundLabel: string, permission?: string): AppError {
-    switch (decision.reasonCode) {
-      case 'NOT_AUTHENTICATED':
-      case 'ACCOUNT_INACTIVE':
-        return new AppError('UNAUTHENTICATED', 'Sign in to continue');
-      case 'NO_MEMBERSHIP':
-      case 'RESOURCE_NOT_IN_TENANT':
-      case 'RESOURCE_RESTRICTED':
-        // Never reveal whether another tenant's resource exists (FR-SEC-216/241).
-        return AppError.notFound(notFoundLabel);
-      case 'MEMBERSHIP_INACTIVE':
-        return new AppError(
-          'PERMISSION_DENIED',
-          'Your membership in this organization is suspended',
-          {
-            reason: 'membership_suspended',
-          },
-        );
-      case 'MFA_REQUIRED':
-        return new AppError(
-          'MFA_REQUIRED',
-          'Turn on two-step verification to do this in this organization',
-          { reason: 'mfa_required' },
-        );
-      case 'SESSION_POLICY_EXPIRED':
-        return new AppError('UNAUTHENTICATED', 'Your session expired. Sign in again.', {
-          reason: 'session_policy_expired',
-        });
-      case 'POLICY_UNAVAILABLE':
-        return new AppError(
-          'DEPENDENCY_UNAVAILABLE',
-          'Access could not be checked right now. Try again shortly.',
-        );
-      default:
-        return new AppError('PERMISSION_DENIED', 'You do not have permission to do that', {
-          reason: decision.reasonCode.toLowerCase(),
-          ...(permission ? { permission } : {}),
-        });
-    }
-  }
-
-  /** Denials of sensitive actions by members are audited (FR-SEC-178 context, §15.1). */
-  private async auditDenial(
-    decision: AuthzDecision,
-    permission: string | undefined,
-    resource: { type: string; id: string } | undefined,
-  ): Promise<void> {
-    if (!decision.context || !permission) return;
-    if (!isSensitivePermission(permission as Parameters<typeof isSensitivePermission>[0])) return;
-    try {
-      await this.audit.record(
-        {
-          eventType: 'authorization.denied',
-          action: permission,
-          outcome: 'denied',
-          reasonCode: decision.reasonCode,
-          policyVersion: decision.policyVersion,
-          ...(resource ? { resourceType: resource.type, resourceId: resource.id } : {}),
-        },
-        undefined,
-        { organizationId: decision.context.organizationId },
-      );
-    } catch (err) {
-      this.logger.warn({ err }, 'failed to audit authorization denial');
-    }
+    req.authz = authz;
+    RequestContext.patch({ organizationId: authz.organizationId });
+    return true;
   }
 }

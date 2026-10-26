@@ -138,6 +138,10 @@ must require `<resource>.manage_access` themselves.
 
 A resolver can implement `isRestricted(id)` (today only `project`, when `visibility = 'restricted'`). For a restricted resource the PDP ignores the role permission and requires an **active resource grant** for the action, unless the caller holds `<type>.manage_access`. Members without any grant get **404** (`RESOURCE_RESTRICTED`, indistinguishable from not found); a member with a grant for a different action gets 403. List endpoints must filter with `GrantsService.resourceIdsGrantedTo(...)` unless the caller manages access. See `docs/architecture/projects.md`.
 
+**Children of restricted resources (I12, ADR-047).** A resolver may declare `governedBy(id)` (designs and revisions are governed by their project). The PDP then checks the parent exists in the same organization, applies the parent's restriction, and evaluates grants on the parent. A resolver may also declare `grantActionFor(permission)`: on projects, `design.view` is covered by a `project.view` grant and `design.create/edit/commit/restore` by `project.edit`; anything unmapped (approvals, AI generation, exports) can never come from a grant. Register new child types the same way — never re-implement restriction in a service.
+
+**A second resource in the body.** When a request names another resource (e.g. the target project when duplicating a design), call `PolicyEnforcer.enforce(req, { organizationId, permission, resource, notFoundLabel })` from the service. It applies exactly the guard's rules, errors (404/403/MFA/step-up) and denial audit.
+
 ## Caching and revocation latency
 
 The PDP caches each membership (status + role ids) in Redis for **30 s**

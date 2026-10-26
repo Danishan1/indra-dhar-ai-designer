@@ -3,6 +3,9 @@ export { Prisma, PrismaClient } from './generated/prisma/client.js';
 export type {
   Asset,
   Project,
+  Design,
+  WorkingCopy,
+  DesignRevision,
   AuditEvent,
   IdempotencyKey,
   IdSequence,

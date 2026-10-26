@@ -1,12 +1,14 @@
 'use client';
 
+import { isEditable } from '@ai-designer/contracts';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftIcon, FileImageIcon, LayersIcon } from 'lucide-react';
+import { ArrowLeftIcon, FileImageIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states/states';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DesignsTab } from '@/features/designs/designs-tab';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { queryKeys } from '@/lib/query/keys';
 
@@ -16,7 +18,7 @@ import { LifecycleActions } from './lifecycle-actions';
 import { MetadataForm } from './metadata-form';
 import { ProjectStatusBadge } from './status-badge';
 
-/** Project overview: lifecycle actions, details, access; designs and sources arrive later. */
+/** Project overview: lifecycle actions, details, designs, access; sources arrive later. */
 export function ProjectOverview({ projectId }: { projectId: string }) {
   const { active, can } = useOrganization();
   const project = useQuery({
@@ -76,11 +78,7 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
             <MetadataForm project={p} />
           </TabsContent>
           <TabsContent value="designs" className="pt-4">
-            <EmptyState
-              icon={<LayersIcon />}
-              title="No designs yet"
-              description="Designs, revisions and approvals arrive in iteration I12."
-            />
+            <DesignsTab projectId={p.id} editable={isEditable(p.status)} />
           </TabsContent>
           <TabsContent value="sources" className="pt-4">
             <EmptyState

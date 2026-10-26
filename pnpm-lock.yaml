@@ -32,6 +32,9 @@ importers:
       '@ai-designer/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ai-designer/garment-model':
+        specifier: workspace:*
+        version: link:../../packages/garment-model
       '@ai-designer/logger':
         specifier: workspace:*
         version: link:../../packages/logger

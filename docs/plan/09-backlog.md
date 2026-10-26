@@ -94,3 +94,14 @@ _(Append: date — source iteration — item — reason)_
 - Simulation parameter properties (`simulation.*`) for the 3D viewer. → I36.
 - Versioned business constraint sets and their evaluation (`Constraint.version` is the hook). → I20.
 - Optional `knownArtifactRevisions` resolver wiring (API passes a set from the artifact service). → I13/I14.
+
+## From I12 (2026-10-26)
+
+- Restrict or remove the full-state `PUT …/working-copy` once operations exist (I14); keep it for system/import use only. → I14.
+- Pin artifact revision refs as `uuid[]` with FK checks once artifact revisions exist; pass `knownArtifactRevisions` to validation. → I13.
+- Design deletion/archival (logical) and its effect on project dependents. → I19 or I28.
+- Review status per revision in history (placeholder `reviewStatus: null`). → I28.
+- Visual compare (side by side renders) instead of the JSON diff view. → I19/I35.
+- Move uploads into project sources and allow `projectId` on uploads (carried from I10). → I26.
+- Branches (`branch_id` column reserved; ADR-018). → unscheduled.
+- Alerting pipeline for `alert: revision_integrity` log lines. → I46 (observability).

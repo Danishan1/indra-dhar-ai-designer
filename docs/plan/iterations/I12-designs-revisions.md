@@ -81,17 +81,17 @@ Error codes: `CONCURRENT_MODIFICATION` (with current version), `REVISION_NOT_FOU
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Confirm ADR-003/018.
-2. [ ] Models + migration + trigger; display id prefixes `DSN` and revision suffix `-Rnnn`.
-3. [ ] Design creation from `garment-model` templates (initial revision R001 committed automatically with summary "Created from template").
-4. [ ] Working copy save with optimistic concurrency + structural validation.
-5. [ ] Commit transaction (row lock, hash, extract refs, diff summary, outbox) + idempotency.
-6. [ ] History, get, compare, integrity check.
-7. [ ] Restore + commit-after-restore lineage.
-8. [ ] Duplication (no approvals copied).
-9. [ ] Dependents registry, resolvers, isolation tests.
-10. [ ] Minimal web views.
-11. [ ] Update `PROGRESS.md`.
+1. [x] Confirm ADR-003/018.
+2. [x] Models + migration + trigger; display id prefixes `DSN` and revision suffix `-Rnnn`.
+3. [x] Design creation from `garment-model` templates (initial revision R001 committed automatically with summary "Created from template").
+4. [x] Working copy save with optimistic concurrency + structural validation.
+5. [x] Commit transaction (row lock, hash, extract refs, diff summary, outbox) + idempotency.
+6. [x] History, get, compare, integrity check.
+7. [x] Restore + commit-after-restore lineage.
+8. [x] Duplication (no approvals copied).
+9. [x] Dependents registry, resolvers, isolation tests.
+10. [x] Minimal web views.
+11. [x] Update `PROGRESS.md`.
 
 ## 8. Tests
 
@@ -101,13 +101,13 @@ Error codes: `CONCURRENT_MODIFICATION` (with current version), `REVISION_NOT_FOU
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Working copy and revisions are separate; autosave never creates revisions (FR-PRJ-014, 020; SPEC-006 AC-002).
-- [ ] AC2 — Committed revisions are immutable at the DB level and reconstructable (DSN-008, DSN-010; FR-PRJ-026; AC-003).
-- [ ] AC3 — Each revision records parents, hash, schema version, artifact revision and source asset refs (FR-PRJ-027, 028; §6.4).
-- [ ] AC4 — Conflicting writes are detected and never silently overwrite (FR-PRJ-024, 025; API-002; AC-008).
-- [ ] AC5 — Restore creates new working state; commit creates a new revision; history intact (FR-PRJ-033, 034; AC-004).
-- [ ] AC6 — Structural comparison distinguishes components, properties, relationships, artifact references (DSN-011; AC-08 SPEC-003).
-- [ ] AC7 — Duplicates never inherit approval status (FR-PRJ-007).
+- [x] AC1 — Working copy and revisions are separate; autosave never creates revisions (FR-PRJ-014, 020; SPEC-006 AC-002).
+- [x] AC2 — Committed revisions are immutable at the DB level and reconstructable (DSN-008, DSN-010; FR-PRJ-026; AC-003).
+- [x] AC3 — Each revision records parents, hash, schema version, artifact revision and source asset refs (FR-PRJ-027, 028; §6.4).
+- [x] AC4 — Conflicting writes are detected and never silently overwrite (FR-PRJ-024, 025; API-002; AC-008).
+- [x] AC5 — Restore creates new working state; commit creates a new revision; history intact (FR-PRJ-033, 034; AC-004).
+- [x] AC6 — Structural comparison distinguishes components, properties, relationships, artifact references (DSN-011; AC-08 SPEC-003).
+- [x] AC7 — Duplicates never inherit approval status (FR-PRJ-007).
 
 ## 10. Risks & notes
 
@@ -124,7 +124,15 @@ Error codes: `CONCURRENT_MODIFICATION` (with current version), `REVISION_NOT_FOU
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-26
+- Sessions used: 1
+- Deviations from plan (ADR-047):
+  - Revision detail is `GET /v1/orgs/:orgId/revisions/:revisionId` (route rule: every path id must be the declared resource).
+  - Create design uses `design.create` (not `design.edit` + `project.edit`); the project must be ACTIVE/ON_HOLD. Duplicate uses `design.create` on the source design and, for another project, on the target project via the new `PolicyEnforcer`.
+  - No `working_copy_id` column on designs (the working copy points at its design, unique); no FK for `head_revision_id`.
+  - `artifact_revision_refs`/`source_asset_refs` are `text[]` until I13.
+  - Added `semantic_hash` (revisions and working copies) and `has_uncommitted_changes`; NO_CHANGES compares semantic content, metadata-only edits do not count.
+  - PDP extended: `governedBy` / `grantActionFor` (restriction inheritance) — not in the plan, needed for restricted projects.
+  - Web: design detail at `/designs/[designId]` with a JSON draft editor, history, compare and restore (developer views).
+- Tests: api unit 102 (change summaries 7), integration api 104 (designs 15; security incl. design/revision routes), e2e 20 (designs spec).
+- Follow-ups added to backlog: see `09-backlog.md` "From I12".

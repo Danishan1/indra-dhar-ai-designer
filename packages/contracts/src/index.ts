@@ -11,6 +11,7 @@ export * from './ids.js';
 export * from './jobs.js';
 export * from './organizations/index.js';
 export * from './projects/index.js';
+export * from './designs/index.js';
 export * from './pagination.js';
 export * from './permissions.js';
 export * from './queues.js';

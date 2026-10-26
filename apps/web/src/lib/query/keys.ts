@@ -36,6 +36,12 @@ export const queryKeys = {
       asset: (assetId: string) => [...all, 'asset', assetId] as const,
       projects: (params?: Record<string, unknown>) => [...all, 'projects', params ?? {}] as const,
       project: (projectId: string) => [...all, 'project', projectId] as const,
+      projectDesigns: (projectId: string) => [...all, 'project', projectId, 'designs'] as const,
+      design: (designId: string) => [...all, 'design', designId] as const,
+      workingCopy: (designId: string) => [...all, 'design', designId, 'working-copy'] as const,
+      revisions: (designId: string) => [...all, 'design', designId, 'revisions'] as const,
+      compare: (designId: string, from: string, to: string) =>
+        [...all, 'design', designId, 'compare', from, to] as const,
     };
   },
 };

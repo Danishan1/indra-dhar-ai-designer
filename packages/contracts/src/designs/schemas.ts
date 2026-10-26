@@ -1,0 +1,181 @@
+import { z } from 'zod';
+
+import { isoDateTimeSchema } from '../common.js';
+import { pageQuerySchema, pageSchema } from '../pagination.js';
+
+/**
+ * Designs, working copies and immutable revisions (I12, SPEC-006 §8.3–8.4, ADR-003/018).
+ * The garment state itself is defined by `@ai-designer/garment-model`; here it travels as JSON and
+ * the API validates it with that package.
+ */
+
+/** How a new design starts. Keys match `@ai-designer/garment-model` templates, plus `blank`. */
+export const DesignTemplates = ['woven_shirt', 'knit_tshirt', 'blank'] as const;
+export const designTemplateSchema = z.enum(DesignTemplates);
+export type DesignTemplate = z.infer<typeof designTemplateSchema>;
+
+/** Review/approval states arrive in I28; designs start as drafts. */
+export const DesignStatuses = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'CHANGES_REQUESTED'] as const;
+export const designStatusSchema = z.enum(DesignStatuses);
+export type DesignStatus = z.infer<typeof designStatusSchema>;
+
+const nameSchema = z.string().trim().min(1, { message: 'Enter a name' }).max(120);
+
+export const createDesignRequestSchema = z.object({
+  name: nameSchema,
+  template: designTemplateSchema.default('woven_shirt'),
+});
+export type CreateDesignRequest = z.input<typeof createDesignRequestSchema>;
+
+export const designSchema = z.object({
+  id: z.uuid(),
+  displayId: z.string(),
+  projectId: z.uuid(),
+  name: z.string(),
+  garmentType: z.string(),
+  garmentCategory: z.string().nullable(),
+  status: designStatusSchema,
+  headRevisionId: z.uuid().nullable(),
+  headRevisionNumber: z.number().int(),
+  approvedRevisionId: z.uuid().nullable(),
+  workingCopyVersion: z.number().int(),
+  /** The working copy differs (semantically) from the latest revision. */
+  hasUncommittedChanges: z.boolean(),
+  duplicatedFromDesignId: z.uuid().nullable(),
+  createdBy: z.uuid().nullable(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+export type Design = z.infer<typeof designSchema>;
+
+export const designListQuerySchema = pageQuerySchema;
+export const designListResponseSchema = pageSchema(designSchema);
+
+export const projectDesignsParamsSchema = z.object({ orgId: z.uuid(), projectId: z.uuid() });
+export const designParamsSchema = z.object({ orgId: z.uuid(), designId: z.uuid() });
+export const revisionParamsSchema = z.object({ orgId: z.uuid(), revisionId: z.uuid() });
+
+// ── validation findings (shape of garment-model ValidationFinding) ──────────
+
+export const designFindingSchema = z.object({
+  ruleId: z.string(),
+  outcome: z.enum(['valid', 'warning', 'error', 'not_evaluated', 'requires_manual_review']),
+  entity: z.object({ entityType: z.string(), entityId: z.string() }).nullable(),
+  path: z.string().nullable(),
+  message: z.string(),
+  resolution: z.string().nullable(),
+});
+export type DesignFinding = z.infer<typeof designFindingSchema>;
+
+export const validationSummarySchema = z.object({
+  errors: z.number().int(),
+  warnings: z.number().int(),
+  manualReview: z.number().int(),
+});
+export type ValidationSummary = z.infer<typeof validationSummarySchema>;
+
+// ── working copy ─────────────────────────────────────────────────────────────
+
+/** A garment design state (validated server-side by `@ai-designer/garment-model`). */
+export const designStateJsonSchema = z.record(z.string(), z.unknown());
+
+export const workingCopySchema = z.object({
+  designId: z.uuid(),
+  version: z.number().int(),
+  baseRevisionId: z.uuid().nullable(),
+  restoredFromRevisionId: z.uuid().nullable(),
+  schemaVersion: z.string(),
+  /** Set when the stored state was written by an older schema and was upgraded for reading. */
+  migratedFrom: z.string().nullable(),
+  state: designStateJsonSchema,
+  hasUncommittedChanges: z.boolean(),
+  /** Non-blocking findings of the structural validation (warnings, manual review). */
+  findings: z.array(designFindingSchema),
+  lastModifiedBy: z.uuid().nullable(),
+  updatedAt: isoDateTimeSchema,
+});
+export type WorkingCopy = z.infer<typeof workingCopySchema>;
+
+export const saveWorkingCopyRequestSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+  state: designStateJsonSchema,
+});
+
+// ── revisions ────────────────────────────────────────────────────────────────
+
+export const commitRevisionRequestSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+  summary: z.string().trim().max(500).optional(),
+  /** Commit even when nothing about the garment changed (metadata only). */
+  allowNoChanges: z.boolean().default(false),
+});
+
+export const revisionSummarySchema = z.object({
+  id: z.uuid(),
+  designId: z.uuid(),
+  displayId: z.string(),
+  revisionNumber: z.number().int(),
+  parentRevisionIds: z.array(z.uuid()),
+  restoredFromRevisionId: z.uuid().nullable(),
+  contentHash: z.string(),
+  schemaVersion: z.string(),
+  changeSummary: z.string(),
+  validationSummary: validationSummarySchema,
+  artifactRevisionRefs: z.array(z.string()),
+  sourceAssetRefs: z.array(z.string()),
+  createdBy: z.uuid().nullable(),
+  createdByName: z.string().nullable(),
+  createdAt: isoDateTimeSchema,
+  /** Review status of this revision — always null until reviews arrive (I28). */
+  reviewStatus: z.string().nullable(),
+});
+export type RevisionSummary = z.infer<typeof revisionSummarySchema>;
+
+export const revisionSchema = revisionSummarySchema.extend({
+  /** The snapshot exactly as committed (its schema version is `schemaVersion`). */
+  snapshot: designStateJsonSchema,
+  changeDiffSummary: z.record(z.string(), z.unknown()),
+  /** The stored hash was recomputed and matched (FR-PRJ-023). */
+  integrity: z.literal('verified'),
+});
+export type Revision = z.infer<typeof revisionSchema>;
+
+export const revisionListResponseSchema = pageSchema(revisionSummarySchema);
+
+export const commitRevisionResponseSchema = z.object({
+  revision: revisionSummarySchema,
+  workingCopyVersion: z.number().int(),
+});
+
+export const restoreRevisionRequestSchema = z.object({
+  revisionId: z.uuid(),
+  expectedVersion: z.number().int().min(1),
+});
+
+export const compareQuerySchema = z.object({
+  from: z.uuid(),
+  /** A revision id, or `working` for the current working copy. */
+  to: z.union([z.uuid(), z.literal('working')]),
+});
+
+const compareSideSchema = z.object({
+  kind: z.enum(['revision', 'working']),
+  id: z.uuid().nullable(),
+  label: z.string(),
+});
+
+export const compareResponseSchema = z.object({
+  from: compareSideSchema,
+  to: compareSideSchema,
+  /** Human-readable lines (same generator as revision change summaries). */
+  summary: z.array(z.string()),
+  /** Structural diff from `diffDesignStates` (components, properties, relationships, artifacts). */
+  diff: z.record(z.string(), z.unknown()),
+});
+export type CompareResponse = z.infer<typeof compareResponseSchema>;
+
+export const duplicateDesignRequestSchema = z.object({
+  /** Project to copy into (same organization); defaults to the source design's project. */
+  targetProjectId: z.uuid().optional(),
+  name: nameSchema.optional(),
+});

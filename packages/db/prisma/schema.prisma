@@ -188,25 +188,25 @@ model User {
 /// Browser session. `token` is the opaque session id; the cookie carries it HMAC-signed with
 /// BETTER_AUTH_SECRET, so a leaked table alone cannot be replayed (ADR-006).
 model Session {
-  id                String   @id @db.Uuid
-  token             String   @unique
-  userId            String   @map("user_id") @db.Uuid
+  id                String    @id @db.Uuid
+  token             String    @unique
+  userId            String    @map("user_id") @db.Uuid
   /// Idle expiry (sliding, refreshed at most once per SESSION_TOUCH_INTERVAL).
-  expiresAt         DateTime @map("expires_at") @db.Timestamptz(6)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
   /// Absolute expiry; never extended.
-  absoluteExpiresAt DateTime @map("absolute_expires_at") @db.Timestamptz(6)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
   /// password | mfa_pending (password ok, second factor outstanding) | mfa_verified (I08)
-  authAssurance     String   @default("password") @map("auth_assurance")
+  authAssurance     String    @default("password") @map("auth_assurance")
   /// When this session last completed a second factor.
   mfaVerifiedAt     DateTime? @map("mfa_verified_at") @db.Timestamptz(6)
   /// Last re-verification (login, MFA or step-up); step-up actions need it to be recent (FR-SEC-040).
   stepUpAt          DateTime? @map("step_up_at") @db.Timestamptz(6)
   /// HMAC of the client IP (never the raw address).
-  ipAddress         String?  @map("ip_hash")
-  userAgent         String?  @map("user_agent_summary")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress         String?   @map("ip_hash")
+  userAgent         String?   @map("user_agent_summary")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sessions")
@@ -286,27 +286,30 @@ model VerificationToken {
 
 /// Tenant boundary (FR-SEC-060/061). display_id ORG-000123 is platform-unique.
 model Organization {
-  id          String         @id @db.Uuid
-  displayId   String         @unique @map("display_id")
-  name        String
-  slug        String         @unique
+  id               String           @id @db.Uuid
+  displayId        String           @unique @map("display_id")
+  name             String
+  slug             String           @unique
   /// active | suspended | deleted
-  status      String         @default("active")
+  status           String           @default("active")
   /// Continuity rule (FR-SEC-079): at least one active owner at all times.
-  ownerPolicy String         @default("at_least_one_owner") @map("owner_policy")
-  settings    Json           @default("{}")
-  createdBy   String         @map("created_by") @db.Uuid
-  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  workspaces  Workspace[]
-  memberships Membership[]
+  ownerPolicy      String           @default("at_least_one_owner") @map("owner_policy")
+  settings         Json             @default("{}")
+  createdBy        String           @map("created_by") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspaces       Workspace[]
+  memberships      Membership[]
   /// Relations declared so Prisma keeps the FKs (rows owned by the authorization module).
   customRoles      Role[]
-  projects       Project[]
+  projects         Project[]
+  designs          Design[]
+  workingCopies    WorkingCopy[]
+  designRevisions  DesignRevision[]
   assets           Asset[]
   resourceGrants   ResourceGrant[]
   securityPolicies SecurityPolicy[]
-  invitations Invitation[]
+  invitations      Invitation[]
 
   @@map("organizations")
 }
@@ -379,19 +382,19 @@ model RolePermission {
 /// Explicit resource-level share (FR-SEC-094…100), evaluated by the PDP after role permissions.
 /// Creation endpoints arrive with shareable resources (projects I10, tech packs I43).
 model ResourceGrant {
-  id             String    @id @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  resourceType   String    @map("resource_type")
-  resourceId     String    @map("resource_id") @db.Uuid
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  resourceType   String       @map("resource_type")
+  resourceId     String       @map("resource_id") @db.Uuid
   /// user | external (I43)
-  recipientType  String    @map("recipient_type")
-  recipientId    String    @map("recipient_id") @db.Uuid
+  recipientType  String       @map("recipient_type")
+  recipientId    String       @map("recipient_id") @db.Uuid
   actions        String[]
-  grantedBy      String    @map("granted_by") @db.Uuid
-  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
-  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
-  revokedBy      String?   @map("revoked_by") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  grantedBy      String       @map("granted_by") @db.Uuid
+  expiresAt      DateTime?    @map("expires_at") @db.Timestamptz(6)
+  revokedAt      DateTime?    @map("revoked_at") @db.Timestamptz(6)
+  revokedBy      String?      @map("revoked_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, recipientType, recipientId])
@@ -401,12 +404,12 @@ model ResourceGrant {
 
 /// Versioned organization security policy (defaults created with the org; used by I08/I28).
 model SecurityPolicy {
-  id             String   @id @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
   version        Int
-  config         Json     @default("{}")
-  createdBy      String?  @map("created_by") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  config         Json         @default("{}")
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, version])
@@ -478,35 +481,36 @@ model Invitation {
 
 /// Garment project (SS-02, I10). Lifecycle per SPEC-006 §7.5; status is independent of design status.
 model Project {
-  id               String    @id @db.Uuid
-  organizationId   String    @map("organization_id") @db.Uuid
-  displayId        String    @map("display_id")
+  id               String       @id @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  displayId        String       @map("display_id")
   name             String
   description      String?
   /// ACTIVE | ON_HOLD | COMPLETED | ARCHIVED | DELETED (logical; erasure is I47)
-  status           String    @default("ACTIVE")
+  status           String       @default("ACTIVE")
   /// organization | restricted (restricted: members need a grant or project.manage_access)
-  visibility       String    @default("organization")
-  productCategory  String?   @map("product_category")
+  visibility       String       @default("organization")
+  productCategory  String?      @map("product_category")
   season           String?
   brand            String?
-  targetMarket     String?   @map("target_market")
-  styleNumber      String?   @map("style_number")
-  tags             String[]  @default([])
+  targetMarket     String?      @map("target_market")
+  styleNumber      String?      @map("style_number")
+  tags             String[]     @default([])
   /// Set by the designs module (I12); no FK until then.
-  defaultDesignId  String?   @map("default_design_id") @db.Uuid
+  defaultDesignId  String?      @map("default_design_id") @db.Uuid
   /// Reason of the last hold / reopen / archive / delete.
-  statusReason     String?   @map("status_reason")
+  statusReason     String?      @map("status_reason")
   /// Source project of a duplicate (metadata only; approvals are never copied).
-  duplicatedFromId String?   @map("duplicated_from_id") @db.Uuid
-  version          Int       @default(1)
-  createdBy        String?   @map("created_by") @db.Uuid
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
-  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(6)
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  duplicatedFromId String?      @map("duplicated_from_id") @db.Uuid
+  version          Int          @default(1)
+  createdBy        String?      @map("created_by") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt      DateTime?    @map("completed_at") @db.Timestamptz(6)
+  archivedAt       DateTime?    @map("archived_at") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  designs          Design[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, status, updatedAt])
@@ -518,42 +522,42 @@ model Project {
 /// Every stored file (SS-11, I09). Originals and derived variants are separate rows; derived rows
 /// point to their parent. Bytes live in object storage under `org/{orgId}/…` keys (AST-009).
 model Asset {
-  id               String    @id @db.Uuid
-  organizationId   String    @map("organization_id") @db.Uuid
-  displayId        String    @map("display_id")
+  id               String       @id @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  displayId        String       @map("display_id")
   /// source_image | sketch | fabric_image | artwork | document | generated_image | svg | texture | model_3d | export | mask
-  assetType        String    @map("asset_type")
+  assetType        String       @map("asset_type")
   /// pending_upload | quarantined | ready | rejected
   status           String
   bucket           String
-  storageKey       String    @map("storage_key")
+  storageKey       String       @map("storage_key")
   /// Sniffed from the bytes (null until uploaded).
-  mediaType        String?   @map("media_type")
-  sizeBytes        BigInt?   @map("size_bytes")
-  checksumSha256   String?   @map("checksum_sha256")
+  mediaType        String?      @map("media_type")
+  sizeBytes        BigInt?      @map("size_bytes")
+  checksumSha256   String?      @map("checksum_sha256")
   /// Declared by the client at upload start; verified by processing.
-  declaredChecksum String?   @map("declared_checksum")
-  declaredSize     BigInt?   @map("declared_size")
+  declaredChecksum String?      @map("declared_checksum")
+  declaredSize     BigInt?      @map("declared_size")
   dimensions       Json?
-  metadata         Json      @default("{}")
-  provenance       Json      @default("{}")
-  fileName         String?   @map("file_name")
-  isDerived        Boolean   @default(false) @map("is_derived")
-  parentAssetId    String?   @map("parent_asset_id") @db.Uuid
+  metadata         Json         @default("{}")
+  provenance       Json         @default("{}")
+  fileName         String?      @map("file_name")
+  isDerived        Boolean      @default(false) @map("is_derived")
+  parentAssetId    String?      @map("parent_asset_id") @db.Uuid
   /// original | thumb_256 | preview_1024
-  variant          String    @default("original")
-  classification   String    @default("internal")
-  projectId        String?   @map("project_id") @db.Uuid
-  rejectionReason  String?   @map("rejection_reason")
-  createdBy        String?   @map("created_by") @db.Uuid
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  readyAt          DateTime? @map("ready_at") @db.Timestamptz(6)
-  retentionUntil   DateTime? @map("retention_until") @db.Timestamptz(6)
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  variant          String       @default("original")
+  classification   String       @default("internal")
+  projectId        String?      @map("project_id") @db.Uuid
+  rejectionReason  String?      @map("rejection_reason")
+  createdBy        String?      @map("created_by") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  readyAt          DateTime?    @map("ready_at") @db.Timestamptz(6)
+  retentionUntil   DateTime?    @map("retention_until") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  parent           Asset?    @relation("AssetDerivatives", fields: [parentAssetId], references: [id], onDelete: Restrict)
-  derivatives      Asset[]   @relation("AssetDerivatives")
+  parent           Asset?       @relation("AssetDerivatives", fields: [parentAssetId], references: [id], onDelete: Restrict)
+  derivatives      Asset[]      @relation("AssetDerivatives")
 
   @@unique([organizationId, displayId])
   @@unique([bucket, storageKey])
@@ -564,3 +568,100 @@ model Asset {
   @@map("assets")
 }
 
+/// A garment design inside a project (SS-03, I12). Its state lives in exactly one working copy
+/// (mutable, optimistically versioned) and in immutable revisions (ADR-003, ADR-018).
+model Design {
+  id                     String           @id @db.Uuid
+  organizationId         String           @map("organization_id") @db.Uuid
+  projectId              String           @map("project_id") @db.Uuid
+  displayId              String           @map("display_id")
+  name                   String
+  garmentType            String           @map("garment_type")
+  garmentCategory        String?          @map("garment_category")
+  /// DRAFT | IN_REVIEW | APPROVED | CHANGES_REQUESTED (review states are driven by I28)
+  status                 String           @default("DRAFT")
+  /// Latest committed revision (no FK: revisions reference designs; integrity is kept by the service).
+  headRevisionId         String?          @map("head_revision_id") @db.Uuid
+  /// Set only by approval (I28); never copied on duplication (FR-PRJ-007).
+  approvedRevisionId     String?          @map("approved_revision_id") @db.Uuid
+  /// Last used revision number (R001, R002 …).
+  revisionCounter        Int              @default(0) @map("revision_counter")
+  duplicatedFromDesignId String?          @map("duplicated_from_design_id") @db.Uuid
+  createdBy              String?          @map("created_by") @db.Uuid
+  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime?        @map("deleted_at") @db.Timestamptz(6)
+  organization           Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project                Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  workingCopy            WorkingCopy?
+  revisions              DesignRevision[]
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, projectId, updatedAt])
+  @@map("designs")
+}
+
+/// The single mutable state of a design (ADR-018). `version` guards every write (API-002).
+model WorkingCopy {
+  id                     String          @id @db.Uuid
+  organizationId         String          @map("organization_id") @db.Uuid
+  designId               String          @unique @map("design_id") @db.Uuid
+  /// Revision this state was derived from (the head after a commit, R after a restore).
+  baseRevisionId         String?         @map("base_revision_id") @db.Uuid
+  restoredFromRevisionId String?         @map("restored_from_revision_id") @db.Uuid
+  /// GarmentDesignState (packages/garment-model)
+  state                  Json
+  schemaVersion          String          @map("schema_version")
+  /// semanticHash(state) — compared with the head revision to know about uncommitted changes.
+  semanticHash           String          @map("semantic_hash")
+  hasUncommittedChanges  Boolean         @default(false) @map("has_uncommitted_changes")
+  version                Int             @default(1)
+  lastModifiedBy         String?         @map("last_modified_by") @db.Uuid
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design                 Design          @relation(fields: [designId], references: [id], onDelete: Restrict)
+  baseRevision           DesignRevision? @relation("WorkingCopyBase", fields: [baseRevisionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([baseRevisionId])
+  @@map("working_copies")
+}
+
+/// Immutable design revision (DSN-008, FR-PRJ-026). A trigger rejects every UPDATE and DELETE.
+model DesignRevision {
+  id                     String        @id @db.Uuid
+  organizationId         String        @map("organization_id") @db.Uuid
+  designId               String        @map("design_id") @db.Uuid
+  displayId              String        @map("display_id")
+  revisionNumber         Int           @map("revision_number")
+  /// Reserved for branches (ADR-018: deferred); always null today.
+  branchId               String?       @map("branch_id") @db.Uuid
+  parentRevisionIds      String[]      @map("parent_revision_ids") @db.Uuid
+  restoredFromRevisionId String?       @map("restored_from_revision_id") @db.Uuid
+  /// Canonical JSON of the GarmentDesignState as committed (ADR-003).
+  snapshot               Json
+  /// sha256 of the canonical snapshot ("sha256:…").
+  contentHash            String        @map("content_hash")
+  semanticHash           String        @map("semantic_hash")
+  schemaVersion          String        @map("schema_version")
+  /// Pinned artifact revision ids used by the snapshot (FR-PRJ-028). Text until I13 defines them.
+  artifactRevisionRefs   String[]      @map("artifact_revision_refs")
+  /// Asset ids referenced by components (sources, renders…).
+  sourceAssetRefs        String[]      @map("source_asset_refs")
+  changeSummary          String        @map("change_summary")
+  changeDiffSummary      Json          @map("change_diff_summary")
+  validationSummary      Json          @map("validation_summary")
+  /// Operations that produced this revision (I14).
+  operationIds           String[]      @default([]) @map("operation_ids") @db.Uuid
+  createdBy              String?       @map("created_by") @db.Uuid
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization           Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design                 Design        @relation(fields: [designId], references: [id], onDelete: Restrict)
+  workingCopies          WorkingCopy[] @relation("WorkingCopyBase")
+
+  @@unique([designId, revisionNumber])
+  @@unique([organizationId, displayId])
+  @@index([organizationId])
+  @@map("design_revisions")
+}

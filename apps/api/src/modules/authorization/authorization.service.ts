@@ -71,6 +71,8 @@ export class AuthorizationService implements Authorizer {
 
     let organizationId = request.organizationId;
     let restricted = false;
+    // Where restriction and grants are evaluated: the resource itself, or its governing parent.
+    let grantTarget = resource;
     if (resource) {
       const resolver = this.resolvers.get(resource.type);
       const owner = await resolver.organizationOf(resource.id);
@@ -78,7 +80,17 @@ export class AuthorizationService implements Authorizer {
         return deny('RESOURCE_NOT_IN_TENANT');
       }
       organizationId = owner;
-      restricted = (await resolver.isRestricted?.(resource.id)) ?? false;
+      const parent = (await resolver.governedBy?.(resource.id)) ?? null;
+      if (parent) {
+        const parentResolver = this.resolvers.get(parent.type);
+        if ((await parentResolver.organizationOf(parent.id)) !== owner) {
+          return deny('RESOURCE_NOT_IN_TENANT');
+        }
+        grantTarget = parent;
+        restricted = (await parentResolver.isRestricted?.(parent.id)) ?? false;
+      } else {
+        restricted = (await resolver.isRestricted?.(resource.id)) ?? false;
+      }
     }
     if (!organizationId) throw new Error('authorization request without organization');
 
@@ -107,21 +119,28 @@ export class AuthorizationService implements Authorizer {
     if (policy.requireMfa && !mfaVerified) return deny('MFA_REQUIRED', context);
 
     let reason: AuthzDecision['reasonCode'];
-    // Restricted resources (projects): roles alone are not enough — the caller needs
-    // `<type>.manage_access` or an explicit grant; without any grant it does not exist for them.
+    // Restricted resources (projects and everything inside them): roles alone are not enough —
+    // the caller needs `<type>.manage_access` or an explicit grant on the restricted resource;
+    // without any grant it does not exist for them.
     const managesAccess =
-      resource !== undefined &&
-      context.permissions.has(`${resource.type}.manage_access` as PermissionKey);
-    if (permission && resource && restricted && !managesAccess) {
-      if (await this.grants.hasActiveGrant(organizationId, principal.id, resource, permission))
+      grantTarget !== undefined &&
+      context.permissions.has(`${grantTarget.type}.manage_access` as PermissionKey);
+    const grantAction =
+      permission && grantTarget ? this.grantActionFor(grantTarget.type, permission) : null;
+    if (permission && grantTarget && restricted && !managesAccess) {
+      if (
+        grantAction &&
+        (await this.grants.hasActiveGrant(organizationId, principal.id, grantTarget, grantAction))
+      )
         reason = 'ALLOWED_BY_GRANT';
-      else if (await this.grants.hasAnyActiveGrant(organizationId, principal.id, resource))
+      else if (await this.grants.hasAnyActiveGrant(organizationId, principal.id, grantTarget))
         return deny('MISSING_PERMISSION', context);
       else return deny('RESOURCE_RESTRICTED', context);
     } else if (!permission || context.permissions.has(permission)) reason = 'ALLOWED_BY_ROLE';
     else if (
-      resource &&
-      (await this.grants.hasActiveGrant(organizationId, principal.id, resource, permission))
+      grantTarget &&
+      grantAction &&
+      (await this.grants.hasActiveGrant(organizationId, principal.id, grantTarget, grantAction))
     )
       reason = 'ALLOWED_BY_GRANT';
     else return deny('MISSING_PERMISSION', context);
@@ -144,6 +163,17 @@ export class AuthorizationService implements Authorizer {
       obligations,
       context,
     };
+  }
+
+  /**
+   * Grant action on `targetType` that covers `permission`: own-type permissions map to themselves;
+   * types with a mapping (projects) use it; other types accept a grant of the permission itself.
+   */
+  private grantActionFor(targetType: string, permission: PermissionKey): PermissionKey | null {
+    if (permission.startsWith(`${targetType}.`)) return permission;
+    const resolver = this.resolvers.get(targetType);
+    if (!resolver.grantActionFor) return permission;
+    return resolver.grantActionFor(permission) as PermissionKey | null;
   }
 
   private async access(organizationId: string, userId: string): Promise<MembershipAccess | null> {

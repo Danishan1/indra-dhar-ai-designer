@@ -69,6 +69,14 @@ const METADATA_FIELDS = [
 
 const MANAGE_ACCESS: PermissionKey = 'project.manage_access';
 
+const PROJECT_GRANT_ACTIONS: Partial<Record<string, PermissionKey>> = {
+  'design.view': 'project.view',
+  'design.create': 'project.edit',
+  'design.edit': 'project.edit',
+  'design.commit': 'project.edit',
+  'design.restore': 'project.edit',
+};
+
 /**
  * Project lifecycle core (SS-02, I10). Owns the `projects` table. Every change keeps state, audit
  * record and domain event in one transaction; transitions follow the shared table in
@@ -105,6 +113,9 @@ export class ProjectsService implements OnModuleInit {
             select: { visibility: true },
           })
         )?.visibility === 'restricted',
+      // On restricted projects, a view grant covers reading its designs and an edit grant covers
+      // working on them (ADR-047). Approvals, AI generation and exports are never granted this way.
+      grantActionFor: (permission) => PROJECT_GRANT_ACTIONS[permission] ?? null,
     });
   }
 
@@ -415,7 +426,7 @@ export class ProjectsService implements OnModuleInit {
 
   // ---------------------------------------------------------------- duplicate
 
-  /** Metadata-only copy (FR-PRJ-007). Designs are copied from I12; approvals never are. */
+  /** Copy of the metadata plus, through registered duplicators, each design's latest revision (FR-PRJ-007). */
   async duplicate(ctx: AuthzContext, projectId: string, name?: string): Promise<ProjectView> {
     const source = await this.findInTenant(ctx.organizationId, projectId);
     if (source.visibility === 'restricted' && !ctx.permissions.has(MANAGE_ACCESS))
@@ -424,7 +435,7 @@ export class ProjectsService implements OnModuleInit {
         'Only people who manage project access can copy a restricted project',
         { permission: MANAGE_ACCESS },
       );
-    return this.create(
+    const copy = await this.create(
       ctx,
       {
         name: (name ?? `Copy of ${source.name}`).slice(0, 120),
@@ -440,6 +451,13 @@ export class ProjectsService implements OnModuleInit {
       },
       source.id,
     );
+    // Designs (I12) copy their latest revision; approvals are never copied (FR-PRJ-007).
+    await this.lifecycle.runDuplicators(
+      ctx,
+      { id: source.id, organizationId: source.organizationId },
+      { id: copy.id, organizationId: ctx.organizationId },
+    );
+    return this.get(ctx, copy.id);
   }
 
   // ---------------------------------------------------------------- grants (restricted projects)
@@ -513,6 +531,40 @@ export class ProjectsService implements OnModuleInit {
     for (const g of active.filter((x) => x.recipientId === userId))
       revoked = (await this.grants.revoke(ctx.organizationId, g.id, ctx.userId)) || revoked;
     return revoked;
+  }
+
+  // ---------------------------------------------------------------- for other modules (designs)
+
+  /**
+   * The project, if work inside it may change: designs in completed or archived projects are
+   * read-only until the project is reopened/restored (SPEC-006 §7.5). Deleted → not found.
+   */
+  async requireWorkable(
+    organizationId: string,
+    projectId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProjectView> {
+    const project = await this.findInTenant(organizationId, projectId, tx);
+    if (!isEditable(project.status as ProjectStatus))
+      throw new AppError(
+        'INVALID_STATE_TRANSITION',
+        `This project is ${project.status.toLowerCase().replace('_', ' ')}; its designs are read-only`,
+        { projectStatus: project.status },
+      );
+    return toView(project);
+  }
+
+  /** Points the project at its first design (FR-PRJ-003); no-op when one is already set. */
+  async setDefaultDesignIfUnset(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    projectId: string,
+    designId: string,
+  ): Promise<void> {
+    await tx.project.updateMany({
+      where: { id: projectId, organizationId, defaultDesignId: null },
+      data: { defaultDesignId: designId },
+    });
   }
 
   // ---------------------------------------------------------------- helpers

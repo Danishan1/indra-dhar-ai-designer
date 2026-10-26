@@ -6,6 +6,7 @@ import { CsrfMiddleware } from './auth/csrf.middleware.js';
 import { AccessCache } from './authz/access-cache.js';
 import { AuthorizationGuard } from './authz/authorization.guard.js';
 import { MembershipDirectoryRegistry } from './authz/membership-directory.js';
+import { PolicyEnforcer } from './authz/policy-enforcer.js';
 import { ResourceResolverRegistry } from './authz/resource-resolvers.js';
 import { RequestContextMiddleware } from './context/request-context.middleware.js';
 import { AllExceptionsFilter } from './errors/all-exceptions.filter.js';
@@ -27,6 +28,7 @@ import { SecretsService } from './secrets/secrets.service.js';
     { provide: APP_GUARD, useClass: AuthorizationGuard },
     ResourceResolverRegistry,
     MembershipDirectoryRegistry,
+    PolicyEnforcer,
     AccessCache,
     IdSequenceService,
     AuditService,
@@ -44,6 +46,7 @@ import { SecretsService } from './secrets/secrets.service.js';
     IdempotencyInterceptor,
     ResourceResolverRegistry,
     MembershipDirectoryRegistry,
+    PolicyEnforcer,
     AccessCache,
   ],
 })

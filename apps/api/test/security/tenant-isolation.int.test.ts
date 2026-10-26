@@ -34,6 +34,14 @@ const BODIES: Record<string, unknown> = {
     actions: ['project.view'],
   },
   'POST /v1/orgs/:orgId/projects': { name: 'Isolation probe' },
+  'POST /v1/orgs/:orgId/projects/:projectId/designs': { name: 'Probe design' },
+  'PUT /v1/orgs/:orgId/designs/:designId/working-copy': { expectedVersion: 1, state: {} },
+  'POST /v1/orgs/:orgId/designs/:designId/revisions': { expectedVersion: 1 },
+  'POST /v1/orgs/:orgId/designs/:designId/restore': {
+    revisionId: '0197b0a0-0000-7000-8000-000000000000',
+    expectedVersion: 1,
+  },
+  'POST /v1/orgs/:orgId/designs/:designId/duplicate': {},
   'POST /v1/orgs/:orgId/assets/uploads': {
     assetType: 'source_image',
     fileName: 'x.png',
@@ -55,6 +63,7 @@ describe('cross-tenant isolation', () => {
   let b: TenantFixture;
   const assetIds = new Map<string, string>();
   const projectIds = new Map<string, string>();
+  const designs = new Map<string, { id: string; headRevisionId: string }>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -62,12 +71,20 @@ describe('cross-tenant isolation', () => {
     invitationId: t.pendingInvitationId,
     assetId: assetIds.get(t.orgId) ?? '',
     projectId: projectIds.get(t.orgId) ?? '',
+    designId: designs.get(t.orgId)?.id ?? '',
+    revisionId: designs.get(t.orgId)?.headRevisionId ?? '',
   });
 
   async function startProject(t: TenantFixture): Promise<void> {
     const res = await t.owner.client.post(`/v1/orgs/${t.orgId}/projects`, { name: 'Probe' });
     expect(res.status).toBe(201);
-    projectIds.set(t.orgId, ((await res.json()) as { id: string }).id);
+    const projectId = ((await res.json()) as { id: string }).id;
+    projectIds.set(t.orgId, projectId);
+    const d = await t.owner.client.post(`/v1/orgs/${t.orgId}/projects/${projectId}/designs`, {
+      name: 'Probe design',
+    });
+    expect(d.status).toBe(201);
+    designs.set(t.orgId, (await d.json()) as { id: string; headRevisionId: string });
   }
 
   async function startUpload(t: TenantFixture): Promise<void> {
@@ -123,9 +140,11 @@ describe('cross-tenant isolation', () => {
     expect(failures).toEqual([]);
   });
 
-  it("mixing ids (own org, other tenant's member/invitation/asset) is also 404", async () => {
+  it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
-      routes: routes.filter((r) => /:membershipId|:invitationId|:assetId|:projectId/.test(r.path)),
+      routes: routes.filter((r) =>
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId/.test(r.path),
+      ),
       attacker: b.owner.client,
       params: { ...paramsFor(a), orgId: b.orgId },
       bodies: BODIES,
