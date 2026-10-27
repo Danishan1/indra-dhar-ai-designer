@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I17 — Hierarchy, selection & contextual properties** (next)                                        |
+| **Current iteration** | **I18 — Artifact browser & structured attachment** (next)                                            |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I16 finished)                                                                            |
+| Last updated          | 2026-10-27 (I17 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -36,7 +36,7 @@
 | I14 | Design operation router (deterministic)               | 3     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-049; docs/architecture/operations.md                |
 | I15 | Editor shell, editor-core & autosave                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-015 (default), ADR-050; docs/architecture/editor.md |
 | I16 | Parametric 2D garment renderer (SVG)                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-024, ADR-051; packages/garment-render/README.md     |
-| I17 | Hierarchy, selection & contextual properties          | 3     | todo   |            |            |          |                                                         |
+| I17 | Hierarchy, selection & contextual properties          | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-052; docs/architecture/editor.md                    |
 | I18 | Artifact browser & structured attachment              | 3     | todo   |            |            |          |                                                         |
 | I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                         |
 | I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                    |
@@ -108,6 +108,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I17 — dependency rules added to garment-model, lock/visibility stay component flags (UI-enforced lock), read-only design panel, debug panel removed — ADR-052
 - 2026-10-27 — I16 — kebab-case files grouped by concern, viewport logic in the editor store, `artifacts/render-info` endpoint, golden SVGs instead of pixel screenshots, Node perf check — ADR-051
 - 2026-10-27 — I15 — org-scoped editor-state route with PDP capability flags, editor in the `(editor)` group, slot-based workspace layout + status bar, ids generated in the browser, no IndexedDB snapshot / conflict diff yet — ADR-050
 - 2026-10-26 — I14 — org-scoped operation routes, server-side undo with stored inverses, PUT working-copy removed (internal `replace_state`), quick-edit panel — ADR-049
@@ -127,6 +128,17 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I17 Hierarchy, selection & contextual properties (session 1) — DONE
+
+- Plan: property metadata + dependency rules in garment-model → hierarchy tree → schema-driven properties panel (controls, units, validation, status/provenance, review actions, rules, bulk edit) → store refusals → tests → docs.
+- Built: `garment-model` `ui.advanced` + `evaluatePropertyRules`; editor hierarchy (ARIA tree, keyboard, show/hide, lock, rename, add/remove components); properties panel (design summary, type-specific grouped properties, unit preference mm/cm/in, enum/number/colour/boolean/text/composition controls, provenance popover with Confirm / Needs review / Not applicable / Clear, conflicts with Clear, multi-select bulk edit with scope confirmation, inline refusals); "Updating drawing…" indicator; dev debug panel removed.
+- Tests: garment-model 127, web unit 72, api unit 101, integration api 123 + worker 13, e2e 26.
+- **Owner actions (Windows):**
+  1. `pnpm install` (no new packages, but the workspace changed).
+  2. No migration.
+  3. `pnpm dev` → open a design: pick parts in the hierarchy or the drawing, edit properties (lengths in cm by default — switch unit at the top of the panel), click a status badge to confirm a value, select both sleeves with Ctrl+click and use "Edit all 2".
+- **Next step:** I18 — artifact browser & structured attachment.
 
 ### 2026-10-27 — I16 Parametric 2D garment renderer (session 1) — DONE
 

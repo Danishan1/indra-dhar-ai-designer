@@ -78,12 +78,13 @@ const { state: current } = readAnyVersion(row.snapshot);
 
 ## Public API
 
-Schemas and inferred types · `templates.create` · registries and `extendCatalog` · `validateDesignState(state, catalog?, { knownArtifactRevisions? })` · `canonicalize`, `canonicalJson`, `contentHash`, `semanticHash`, `sha256Hex` · `diffDesignStates` · `cloneWithNewIds`, `createComponentId` and friends · `SCHEMA_VERSION`, `MIGRATIONS`, `migrateToLatest`, `readAnyVersion` · unit helpers · `promote`, `isConfirmed`.
+Schemas and inferred types · `templates.create` · registries and `extendCatalog` · `validateDesignState(state, catalog?, { knownArtifactRevisions? })` · `canonicalize`, `canonicalJson`, `contentHash`, `semanticHash`, `sha256Hex` · `diffDesignStates` · `cloneWithNewIds`, `createComponentId` and friends · `SCHEMA_VERSION`, `MIGRATIONS`, `migrateToLatest`, `readAnyVersion` · unit helpers · `promote`, `isConfirmed` · `evaluatePropertyRules` / `PROPERTY_RULES` (dependency rules: which properties do not apply, and conflicting values still set — I17).
 
 ## Extending
 
 - **New garment category:** add to `registry/garment-categories.ts`, add a template under `templates/`, register it in `templates/index.ts`. Add component types/properties in the registries (or at runtime with `extendCatalog`). No schema change.
-- **New property:** add a `PropertyDefinition`; set `manufacturingCritical` honestly. Enum values can grow additively.
+- **New property:** add a `PropertyDefinition`; set `manufacturingCritical` honestly; `ui.advanced` puts it under "More" in the editor. Enum values can grow additively. The editor builds its controls from these definitions — no UI code per property.
+- **New dependency rule:** add a `PropertyRule` to `registry/property-rules.ts` (disables properties with a reason; values still set become conflicts — never changed automatically).
 - **Schema change:** additive → bump the minor version only. Breaking → bump major, add a `Migration` (with `renamedProperties` when keys move) and a test; never edit a released shape in place.
 - Hashes depend on the canonical form: changing `canonicalize` changes every stored hash — treat as a major change.
 

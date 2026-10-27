@@ -20,7 +20,7 @@ import { useEditor, useEditorStore } from '../store-context';
 
 import { CapabilityBadge } from './capability-badge';
 import { componentIdFromTarget, selectModeFor } from './hit-test';
-import { useScene } from './scene-context';
+import { useScene, useScenePending } from './scene-context';
 import { PatternDefs, SceneElementPath } from './scene-svg';
 import { ViewTabs } from './view-tabs';
 
@@ -42,6 +42,7 @@ interface Drag {
 export function GarmentCanvas() {
   const store = useEditorStore();
   const scene = useScene();
+  const pending = useScenePending();
   const viewMode = useEditor((s) => s.viewMode);
   const layers = useEditor((s) => s.layers);
   const viewport = useEditor((s) => s.viewport);
@@ -245,6 +246,14 @@ export function GarmentCanvas() {
           <CapabilityBadge />
         </div>
       </div>
+      {pending ? (
+        <span
+          role="status"
+          className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md border bg-panel/95 px-2 py-0.5 text-[11px] text-muted-foreground"
+        >
+          Updating drawing…
+        </span>
+      ) : null}
       <ZoomControls label={zoomLabel(viewport)} />
       <ScaleHint zoom={viewport.zoom} />
     </div>

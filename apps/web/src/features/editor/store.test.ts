@@ -322,6 +322,53 @@ describe('editor store (I15 save pipeline)', () => {
     expect(nameShown()).toBe(sleeveOf(server.state).displayName);
   });
 
+  it('keeps refusals next to the property until it is changed again', async () => {
+    const sleeve = sleeveOf(server.state);
+    const key = `${sleeve.componentId}|dimension.sleeve_length`;
+    server.failures.push(
+      new ApiError('VALIDATION_BLOCKED', 'Blocked', 422, null, {
+        findings: [{ message: 'Too long for this size' }],
+      }),
+    );
+    s().apply(
+      {
+        type: 'set_property',
+        componentId: sleeve.componentId,
+        key: 'dimension.sleeve_length',
+        value: 900,
+        unit: 'mm',
+      },
+      { label: 'Set sleeve length' },
+    );
+    await settle();
+    expect(s().refusals[key]).toEqual(['Too long for this size']);
+    s().apply(
+      {
+        type: 'set_property',
+        componentId: sleeve.componentId,
+        key: 'dimension.sleeve_length',
+        value: 600,
+        unit: 'mm',
+      },
+      { label: 'Set sleeve length' },
+    );
+    expect(s().refusals[key]).toBeUndefined();
+    // A locally impossible change is refused inline too, without a request.
+    s().apply(
+      {
+        type: 'set_property',
+        componentId: sleeve.componentId,
+        key: 'dimension.collar_height',
+        value: 40,
+        unit: 'mm',
+      },
+      { label: 'x' },
+    );
+    expect(s().refusals[`${sleeve.componentId}|dimension.collar_height`]?.[0]).toMatch(
+      /does not apply/,
+    );
+  });
+
   it('waits while offline and sends when back online', async () => {
     online = false;
     s().setOnline(false);

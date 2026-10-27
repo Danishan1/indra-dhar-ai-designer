@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { createVerifiedAccount, resetRateLimits } from '../support/accounts.js';
+import { setLength } from '../support/editor.js';
 import { createOrganizationInOnboarding, submitSignIn } from '../support/ui.js';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -66,8 +67,10 @@ test('the 2D flat is component-aware: click selects, edits redraw, zoom changes 
   expect(at).not.toBeNull();
   await page.mouse.click(at!.x, at!.y);
   await expect(
-    page.getByRole('list', { name: 'Components' }).getByRole('button', { name: 'Left sleeve' }),
-  ).toHaveAttribute('aria-pressed', 'true');
+    page
+      .getByRole('tree', { name: 'Components' })
+      .getByRole('treeitem', { name: 'Left sleeve', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
   await expect(
     canvas
       .locator(`[data-highlight="selected"][data-component-id-highlight="${componentId}"]`)
@@ -98,13 +101,7 @@ test('the 2D flat is component-aware: click selects, edits redraw, zoom changes 
 
   // A property change redraws the flat deterministically, without AI (AC2).
   const d0 = await sleeve.getAttribute('d');
-  const panel = page.getByRole('region', { name: 'Debug operations' });
-  await panel.getByRole('combobox', { name: 'Debug component' }).click();
-  await page.getByRole('option', { name: 'Left sleeve' }).click();
-  await panel.getByRole('combobox', { name: 'Debug property' }).click();
-  await page.getByRole('option', { name: 'sleeve length' }).click();
-  await panel.getByLabel('Debug value').fill('300');
-  await panel.getByRole('button', { name: 'Apply operation' }).click();
+  await setLength(page, 'Left sleeve', 'Sleeve length', '30');
   await expect.poll(() => sleeve.getAttribute('d')).not.toBe(d0);
   await expect(page.locator('[data-save-status]')).toHaveAttribute('data-save-status', 'saved');
 });

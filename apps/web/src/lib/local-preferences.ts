@@ -10,6 +10,8 @@ export const PreferenceKeys = {
   activeOrganization: 'aid.activeOrg',
   /** Projects dashboard layout: grid | list. */
   projectsView: 'aid.projects.view',
+  /** Unit for showing lengths in the editor: mm | cm | in (values are always stored in mm). */
+  lengthUnit: 'aid.units.length',
 } as const;
 
 export function readPreference(key: string): string | null {

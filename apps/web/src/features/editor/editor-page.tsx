@@ -39,11 +39,12 @@ import { editorApi } from './api';
 import { GarmentCanvas } from './canvas/garment-canvas';
 import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
-import { DebugPanel } from './components/debug-panel';
 import { SaveStatusChip } from './components/save-status';
-import { Placeholder, ToolButton, ValueStatusLegend, WorkspaceLayout } from './editor-workspace';
+import { Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
+import { HierarchyPanel } from './hierarchy/hierarchy-panel';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
+import { PropertiesPanel } from './properties/properties-panel';
 import {
   createEditorStore,
   type EditorStore,
@@ -54,8 +55,6 @@ import {
   selectUndoLabel,
 } from './store';
 import { EditorStoreProvider, useEditor, useEditorStore } from './store-context';
-
-const SHOW_DEBUG = process.env.NODE_ENV !== 'production';
 
 const revLabel = (r: RevisionSummary | null) =>
   r ? `R${String(r.revisionNumber).padStart(3, '0')}` : null;
@@ -126,7 +125,7 @@ function Editor() {
       <WorkspaceLayout
         header={<EditorHeader />}
         tools={<EditorTools />}
-        hierarchy={<HierarchyList />}
+        hierarchy={<HierarchyPanel />}
         viewport={<GarmentCanvas />}
         properties={<PropertiesPanel />}
         operations={<HistoryList />}
@@ -318,48 +317,6 @@ function EditorTools() {
 }
 
 // ── panels ───────────────────────────────────────────────────────────────────
-
-function HierarchyList() {
-  const components = useEditor((s) => s.display.components);
-  const selected = useEditor((s) => s.selection.ids);
-  const select = useEditor((s) => s.select);
-  return (
-    <ul aria-label="Components" className="flex flex-col py-1 text-[13px]">
-      {components
-        .map(({ componentId: id, displayName: name }) => ({ id, name }))
-        .map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              aria-pressed={selected.includes(c.id)}
-              className={cn(
-                'w-full truncate px-3 py-1 text-left hover:bg-accent',
-                selected.includes(c.id) && 'bg-accent text-accent-foreground',
-              )}
-              onClick={(e) =>
-                select(c.id, e.shiftKey ? 'add' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace')
-              }
-            >
-              {c.name}
-            </button>
-          </li>
-        ))}
-    </ul>
-  );
-}
-
-function PropertiesPanel() {
-  const canEdit = useEditor((s) => s.meta.capabilities.canEdit);
-  return (
-    <div className="flex flex-col text-[13px]">
-      <p className="p-3 text-muted-foreground">Contextual properties of the selection (I17).</p>
-      {SHOW_DEBUG && canEdit ? <DebugPanel /> : null}
-      <div className="p-3">
-        <ValueStatusLegend />
-      </div>
-    </div>
-  );
-}
 
 function HistoryList() {
   const history = useEditor((s) => s.history);

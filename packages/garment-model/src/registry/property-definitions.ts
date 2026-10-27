@@ -16,7 +16,13 @@ export interface PropertyDefinition {
   max?: number;
   /** Wrong or invented values here can cause bad garments: they keep evidence and review status (PROP-006). */
   manufacturingCritical: boolean;
-  ui: { control: PropertyControl; group: string; hint?: string };
+  ui: {
+    control: PropertyControl;
+    group: string;
+    hint?: string;
+    /** Shown under "More" (progressive disclosure, SPEC-007 §3.6). */
+    advanced?: boolean;
+  };
 }
 
 const def = (
@@ -158,7 +164,7 @@ export const PROPERTY_DEFINITIONS: readonly PropertyDefinition[] = Object.freeze
     unitKind: null,
     enumValues: ['plain', 'flat_felled', 'french', 'overlock', 'coverstitch'],
     manufacturingCritical: true,
-    ui: select('Construction'),
+    ui: { control: 'select', group: 'Construction', advanced: true },
   }),
   // dimension
   def({
@@ -239,7 +245,7 @@ export const PROPERTY_DEFINITIONS: readonly PropertyDefinition[] = Object.freeze
     dataType: 'dimension',
     unitKind: 'length',
     manufacturingCritical: true,
-    ui: { control: 'dimension', group: 'Dimensions' },
+    ui: { control: 'dimension', group: 'Dimensions', advanced: true },
   }),
   // material
   def({
@@ -256,7 +262,7 @@ export const PROPERTY_DEFINITIONS: readonly PropertyDefinition[] = Object.freeze
     dataType: 'composition',
     unitKind: null,
     manufacturingCritical: true,
-    ui: { control: 'composition', group: 'Material' },
+    ui: { control: 'composition', group: 'Material', advanced: true },
   }),
   def({
     key: 'material.gsm',
@@ -266,7 +272,7 @@ export const PROPERTY_DEFINITIONS: readonly PropertyDefinition[] = Object.freeze
     min: 20,
     max: 1000,
     manufacturingCritical: true,
-    ui: { control: 'number', group: 'Material' },
+    ui: { control: 'number', group: 'Material', advanced: true },
   }),
   // placement
   def({

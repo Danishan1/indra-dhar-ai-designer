@@ -155,6 +155,11 @@ export interface EditorStoreState {
   conflict: EditorConflict | null;
   /** Non-blocking findings returned with the last acknowledged change. */
   findings: DesignFinding[];
+  /**
+   * Why the last change to a property was refused (locally or by the server), keyed
+   * `componentId|key` — shown inline next to the field (FR-EDT-030). Cleared by a new change there.
+   */
+  refusals: Record<string, string[]>;
   /** An undo / redo is running. */
   historyBusy: boolean;
   lastOperation: { id: string; displayId: string; label: string } | null;
@@ -196,6 +201,15 @@ const defaultTimers: EditorTimers = {
   set: (fn, ms) => globalThis.setTimeout(fn, ms),
   clear: (h) => globalThis.clearTimeout(h as ReturnType<typeof setTimeout>),
 };
+
+/** `componentId|key` for property operations (inline refusal messages), else null. */
+export function refusalKey(op: {
+  type: string;
+  componentId?: string;
+  key?: string;
+}): string | null {
+  return op.componentId && op.key ? `${op.componentId}|${op.key}` : null;
+}
 
 const isRetryable = (e: ApiError) => e.status === 0 || e.status >= 500;
 
@@ -261,6 +275,7 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
     findings: wc.findings,
     historyBusy: false,
     lastOperation: null,
+    refusals: {},
 
     apply(input, options) {
       const s = getState();
@@ -278,10 +293,10 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
       });
       const serverOnly = SERVER_ONLY_PREVIEW.has(op.type);
       if (!local.ok && !serverOnly) {
-        notify.error(
-          'This change is not possible',
-          local.findings.map((f) => f.message),
-        );
+        const messages = local.findings.map((f) => f.message);
+        const key = refusalKey(op);
+        if (key) set({ refusals: { ...getState().refusals, [key]: messages } });
+        else notify.error('This change is not possible', messages);
         return false;
       }
       if (local.ok && local.changed.length === 0) return false;
@@ -292,9 +307,16 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
         groupId: options.groupId ?? null,
       });
       const display = local.ok ? local.state : s.display;
+      const key = refusalKey(op);
+      let refusals = s.refusals;
+      if (key && refusals[key]) {
+        refusals = { ...refusals };
+        delete refusals[key];
+      }
       set({
         queue,
         display,
+        refusals,
         selection: pruneSelection(s.selection, componentExists(display)),
         save: saveReducer(s.save, { type: 'changed' }),
       });
@@ -620,8 +642,15 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
       return;
     }
     const queue = dropBatch(s.queue, batch.batchId);
+    const refusals = { ...s.refusals };
+    const messages = findingMessages(err);
+    for (const o of batch.ops) {
+      const key = refusalKey(o.operation);
+      if (key) refusals[key] = messages.length ? messages : [err.message];
+    }
     set({
       queue,
+      refusals,
       display: displayOf(s.server.state, queue),
       save: saveReducer(s.save, { type: 'discarded', pending: hasPending(queue) }),
     });

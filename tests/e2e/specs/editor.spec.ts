@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { createVerifiedAccount, resetRateLimits } from '../support/accounts.js';
+import { selectInTree, setLength } from '../support/editor.js';
 import { createOrganizationInOnboarding, submitSignIn } from '../support/ui.js';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -11,16 +12,9 @@ test.beforeEach(async () => {
 
 const saveStatus = (page: Page) => page.locator('[data-save-status]');
 
-/** Debug panel (dev builds): one `set_property` through the real save pipeline. */
-async function setSleeveLength(page: Page, mm: string) {
-  const panel = page.getByRole('region', { name: 'Debug operations' });
-  await panel.getByRole('combobox', { name: 'Debug component' }).click();
-  await page.getByRole('option', { name: 'Left sleeve' }).click();
-  await panel.getByRole('combobox', { name: 'Debug property' }).click();
-  await page.getByRole('option', { name: 'sleeve length' }).click();
-  await panel.getByLabel('Debug value').fill(mm);
-  await panel.getByRole('button', { name: 'Apply operation' }).click();
-}
+/** One `set_property` through the properties panel and the real save pipeline (cm). */
+const setSleeveLength = (page: Page, cm: string) =>
+  setLength(page, 'Left sleeve', 'Sleeve length', cm);
 
 test('editor: autosave, undo/redo through the server and conflict handling (I15)', async ({
   page,
@@ -60,7 +54,7 @@ test('editor: autosave, undo/redo through the server and conflict handling (I15)
   const acked = page.waitForResponse(
     (r) => r.url().endsWith('/operations') && r.request().method() === 'POST',
   );
-  await setSleeveLength(page, '640');
+  await setSleeveLength(page, '64');
   expect((await acked).status()).toBe(201);
   await expect(saveStatus(page)).toHaveAttribute('data-save-status', 'saved');
   await expect(page.getByTestId('working-copy-badge')).toHaveText('Working copy · v2 · changed');
@@ -77,8 +71,13 @@ test('editor: autosave, undo/redo through the server and conflict handling (I15)
   await expect(page.getByTestId('latest-revision-badge')).toHaveText('Latest R001');
 
   // Shortcuts do not fire while typing (AC7): Ctrl+Z in a field does not undo.
-  await page.getByLabel('Debug value').fill('650');
-  await page.getByLabel('Debug value').press('Control+Z');
+  await selectInTree(page, 'Left sleeve');
+  const field = page
+    .getByTestId('component-properties')
+    .getByRole('textbox', { name: 'Sleeve length', exact: true });
+  await field.fill('65');
+  await field.press('Control+Z');
+  await field.press('Escape');
   await page.waitForTimeout(300);
   await expect(page.getByTestId('working-copy-badge')).toHaveText('Working copy · v4 · changed');
 
@@ -87,10 +86,10 @@ test('editor: autosave, undo/redo through the server and conflict handling (I15)
   const page2 = await other.newPage();
   await page2.goto(page.url());
   await expect(page2.getByTestId('working-copy-badge')).toHaveText('Working copy · v4 · changed');
-  await setSleeveLength(page, '700');
+  await setSleeveLength(page, '70');
   await expect(page.getByTestId('working-copy-badge')).toHaveText('Working copy · v5 · changed');
 
-  await setSleeveLength(page2, '720');
+  await setSleeveLength(page2, '72');
   const conflict = page2.getByRole('dialog', { name: 'This design changed elsewhere' });
   await expect(conflict).toBeVisible();
   await expect(saveStatus(page2)).toHaveAttribute('data-save-status', 'conflict');
@@ -133,6 +132,11 @@ test('designs of archived projects open read-only in the editor', async ({ page 
 
   await page.goto(editorUrl!);
   await expect(page.getByTestId('read-only-badge')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Debug operations' })).toHaveCount(0);
+  await page.getByRole('treeitem', { name: 'Left sleeve', exact: true }).click();
+  await expect(
+    page
+      .getByTestId('component-properties')
+      .getByRole('textbox', { name: 'Sleeve length', exact: true }),
+  ).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
 });

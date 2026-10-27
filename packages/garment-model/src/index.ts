@@ -22,6 +22,7 @@ export * from './registry/property-definitions.js';
 export * from './registry/component-types.js';
 export * from './registry/relationship-types.js';
 export * from './registry/catalog.js';
+export * from './registry/property-rules.js';
 
 export * from './canonical/canonicalize.js';
 export * from './canonical/hash.js';

@@ -69,10 +69,31 @@ mouse/Pan tool to pan, `=`/`-` zoom, Shift+1 fit, Shift+0 100 %. Clicks select b
 and `CapabilityBadge` (G2 + components drawn with defaults) sit on the canvas. The canvas fits the
 garment automatically until the person zooms or pans. Dev gallery: `/dev/garment-gallery`.
 
+## Hierarchy and properties (I17)
+
+- `hierarchy/` — `HierarchyPanel` is an ARIA tree (`role="tree"`, `treeitem` with `aria-level`, `aria-selected`,
+  `aria-expanded`); arrows/Home/End move, Enter/Space select (Shift adds, Ctrl/Cmd toggles), F2 renames. Row
+  actions: show/hide and lock/unlock (`set_component_visibility` / `set_component_lock` — editor flags excluded
+  from semantic diffs and hashes), rename, add a child (only types the catalog allows; repeatability respected),
+  remove (cascade confirmed). `use-hierarchy.ts` builds the ordered tree (catalog type order, left before right).
+- `properties/` — `PropertiesPanel` shows the design summary when nothing is selected, else the selected
+  component(s): only properties allowed for the type (intersection for mixed selections), grouped by
+  definition group, advanced ones under "More". `controls.tsx` maps definitions to controls (enum select, number
+  with unit, colour picker + code, checkbox, text, composition rows, references read-only until I18).
+  `value-input.ts` formats/validates before anything is sent; lengths are shown in mm/cm/in (preference
+  `aid.units.length`) and sent with their unit (the server stores mm).
+- Status badge (icon + text) opens a provenance popover: source, confidence, confirmed by/at, evidence count, and
+  the review actions Confirm / Needs review / Not applicable / Clear (`set_property_status`, `reset_property`).
+- Dependency rules from `garment-model` (`evaluatePropertyRules`) disable properties with a reason; values still
+  set there are listed as conflicts with a Clear action.
+- Refusals (local or server) are stored per `componentId|key` in the store (`refusals`) and shown under the field.
+- Multi-select: the scope is shown and must be confirmed ("Edit all N"); a change is applied to each target with a
+  shared group id (one undo step). Locked components disable editing.
+- The canvas shows "Updating drawing…" while the deferred scene lags behind the latest change.
+
 ## Rules for later iterations
 
 - **Never** put selection, viewport or tool state into the design (SPEC-007 §20); they live in the store.
 - Subscribe narrowly: `useEditor((s) => s.display.components)` — never return a fresh object/array from
   a selector without `useShallow` (React would re-render forever).
-- I17 replaces the hierarchy list and the debug panel with real panels that call `apply`.
 - Capabilities in `meta.capabilities` are cosmetic; the API still authorizes each operation.

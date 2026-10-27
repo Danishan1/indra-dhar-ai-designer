@@ -73,14 +73,14 @@ Uses `POST /v1/designs/{id}/operations` (I14) and `.../operations/validate`. No 
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Hierarchy shows all components incl. repeated ones; selection syncs across tree, canvas and panel. (FR-EDT-018…020, CMP-017)
-- [ ] AC2 — Properties panel shows only properties valid for the selected component/garment type. (FR-EDT-028, FR-042)
-- [ ] AC3 — Invalid values are rejected before submission; server findings shown inline. (FR-EDT-030, PROP-002)
-- [ ] AC4 — Statuses confirmed/inferred/proposed/missing/needs_review/n.a. are visible and distinguishable without color. (FR-EDT-034, FR-EDT-129, FR-032)
-- [ ] AC5 — Confirming a value is an explicit, attributed operation; AI-origin values are never auto-confirmed. (PROP-006, SPEC-003 AC-06)
-- [ ] AC6 — Property change does not trigger any AI call. (FR-EDT-032, AC-EDT-001/002)
-- [ ] AC7 — Visibility/lock are distinct from design properties and do not modify geometry. (FR-EDT-023, 024)
-- [ ] AC8 — Unsupported operation on a selection is explained, never applied to another component. (FR-EDT-027)
+- [x] AC1 — Hierarchy shows all components incl. repeated ones; selection syncs across tree, canvas and panel. (FR-EDT-018…020, CMP-017)
+- [x] AC2 — Properties panel shows only properties valid for the selected component/garment type. (FR-EDT-028, FR-042)
+- [x] AC3 — Invalid values are rejected before submission; server findings shown inline. (FR-EDT-030, PROP-002)
+- [x] AC4 — Statuses confirmed/inferred/proposed/missing/needs_review/n.a. are visible and distinguishable without color. (FR-EDT-034, FR-EDT-129, FR-032)
+- [x] AC5 — Confirming a value is an explicit, attributed operation; AI-origin values are never auto-confirmed. (PROP-006, SPEC-003 AC-06)
+- [x] AC6 — Property change does not trigger any AI call. (FR-EDT-032, AC-EDT-001/002)
+- [x] AC7 — Visibility/lock are distinct from design properties and do not modify geometry. (FR-EDT-023, 024)
+- [x] AC8 — Unsupported operation on a selection is explained, never applied to another component. (FR-EDT-027)
 
 ## 10. Risks & notes
 
@@ -94,7 +94,16 @@ Uses `POST /v1/designs/{id}/operations` (I14) and `.../operations/validate`. No 
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-052):
+  - Files are kebab-case: `hierarchy/{hierarchy-panel.tsx, use-hierarchy.ts}` (tree rows inside the panel file), `properties/{properties-panel.tsx, property-row.tsx (+ provenance popover), controls.tsx, value-input.ts}`; bulk edit is part of the panel (scope box + "Edit all N"), not a separate `BulkEditBar`. `ValueStatusBadge` already existed (I04) and is reused. New shared `components/ui/popover.tsx`.
+  - Property definitions gained `ui.advanced` only (label, group, control, min/max, unit kind and `manufacturingCritical` already existed); no schema version bump (registry metadata, not stored data).
+  - Visibility/lock stay `visible`/`locked` component fields (already excluded from semantic diff/hash since I11) — no `editorHints` namespace. Lock is enforced in the UI only.
+  - Dependency rules are a new `garment-model` module (none existed): sleeveless, short sleeve → no cuff, zip/no closure → no button count, no placket/pocket/collar → dependent values. The example "cuff hidden when sleeve short" is shown as disabled-with-reason (and a conflict when a value is still set) rather than hidden, so nothing silently disappears.
+  - Design-level panel is read-only (no operation for design name/category/metadata yet).
+  - Colour reference code: the hex code field doubles as the code; a separate colour-standard reference (Pantone etc.) needs a property → backlog.
+  - Render-pending indicator uses React `useDeferredValue` ("Updating drawing…").
+  - The dev debug panel was removed; e2e specs now edit through the properties panel.
+- Tests: garment-model 127 (+4 rules), web unit 72 (+value input, hierarchy, property row, store refusals), e2e 26 (+1 I17 journey: tree ↔ canvas ↔ panel sync, type-specific properties, invalid value not submitted, redraw + undo, confirm with provenance, dependency conflict, keyboard navigation, lock without geometry change, bulk edit with scope, no non-operation writes).
+- Follow-ups added to backlog: see "From I17".

@@ -116,6 +116,15 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I17 (2026-10-27)
+
+- Operations for design-level fields (name, category, target market metadata) so the design panel becomes editable. → with I19 (commit/history) or a design-settings iteration.
+- Colour standard reference (e.g. Pantone/TCX code) as its own property next to `appearance.color`. → I18/I24 (materials & colour).
+- Server-side enforcement of component lock (today UI-only). → if collaboration needs it.
+- Renderer: skip drawing a cuff on short sleeves to match the `cuff.short_sleeve` rule (today the cuff component is still drawn). → I18 polish.
+- Show who confirmed a value by name (needs a members lookup in the editor). → I19/I28.
+- Hierarchy drag-and-drop re-parenting (needs a `move_component` operation). → backlog.
+
 ## From I16 (2026-10-27)
 
 - More render templates/categories (dress, trousers, jacket…) and component types (hood, waistband, gusset, decorative regions). → with ADR-008 extensions.
