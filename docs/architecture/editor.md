@@ -126,6 +126,12 @@ garment automatically until the person zooms or pans. Dev gallery: `/dev/garment
   reloads and the next commit records "restored from".
 - Panel tabs share `components/panel-tabs.tsx` (`createTabStore`, `PanelTabs`, `PanelTabContent`).
 
+## Validation (I20)
+
+`ValidationProvider` (inside `SceneProvider`) keeps the working copy's design-structure validation current;
+see `docs/architecture/validation.md` for the panel, inline findings, tree icons and canvas badges. The store's
+`findings` (warnings returned with the last saved change) are no longer shown on their own.
+
 ## Rules for later iterations
 
 - **Never** put selection, viewport or tool state into the design (SPEC-007 §20); they live in the store.

@@ -25,6 +25,7 @@ import {
 } from '../artifacts/attach';
 import { useAttachArtifact } from '../artifacts/use-attach';
 import { useEditor, useEditorStore } from '../store-context';
+import { CanvasFindingMarkers } from '../validation/canvas-markers';
 
 import { CapabilityBadge } from './capability-badge';
 import { componentIdFromTarget, selectModeFor } from './hit-test';
@@ -245,6 +246,7 @@ export function GarmentCanvas() {
                   {g.view}
                 </text>
               ) : null}
+              <CanvasFindingMarkers elements={g.elements} zoom={viewport.zoom} />
               {/* Hover / selection overlay: never part of the drawing (FR-EDT-021). */}
               <g pointerEvents="none">
                 {g.elements.filter(highlight).map((e) => {

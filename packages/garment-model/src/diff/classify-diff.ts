@@ -218,7 +218,7 @@ export function classifyDiff(
   const relLabel = (type: string, targetId: string | null) =>
     `${catalog.relationshipTypes.get(type)?.label ?? humanField(type)}${targetId ? ` · ${nameOf(targetId)}` : ''}`;
   const targetOf = (r: { target: { entityType: string; entityId: string } }) =>
-    r.target.entityType === 'component' ? r.target.entityId : null;
+    r.target.entityType === 'design_component' ? r.target.entityId : null;
   for (const r of diff.relationships.added)
     out.push(
       entry({

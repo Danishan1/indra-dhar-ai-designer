@@ -29,6 +29,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/architecture/operations.md` + `packages/design-operations/README.md` — **every draft change is a design operation (types, router, undo, single writer).**
 - `docs/architecture/editor.md` + `packages/editor-core/README.md` — **the editor workspace: Zustand store, optimistic changes (`apply`), autosave batches, conflicts, server-side undo/redo.**
 - `packages/garment-render/README.md` — **the 2D technical-flat renderer: coordinates (mm, origin CF neck), property→geometry mapping, placeholders, trims, `sceneToSvg`.**
+- `docs/architecture/validation.md` — **design-structure validation: engine and constraint sets in garment-model, runs/findings API, staleness, editor panel. Never production readiness.**
 - `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)

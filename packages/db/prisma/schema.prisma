@@ -313,6 +313,8 @@ model Organization {
   artifacts         Artifact[]
   artifactRevisions ArtifactRevision[]
   designOperations  DesignOperation[]
+  validationRuns    ValidationRun[]
+  validationFindings ValidationFinding[]
 
   @@map("organizations")
 }
@@ -599,6 +601,7 @@ model Design {
   workingCopy            WorkingCopy?
   revisions              DesignRevision[]
   operations             DesignOperation[]
+  validationRuns         ValidationRun[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, projectId, updatedAt])
@@ -792,4 +795,87 @@ model DesignOperation {
   @@index([organizationId, designId, createdAt])
   @@index([designId, resultRevisionId])
   @@map("design_operations")
+}
+
+/// A versioned set of design-structure rules (SS-12, I20). The rules themselves are code in
+/// `@ai-designer/garment-model` (`design-structure@1.0.0`); this row records which version existed
+/// and what it contained, so every run can name exactly what it was checked against (CST-004).
+/// Platform-wide (no organization); synced from code at API start, never edited.
+model ConstraintSet {
+  id           String          @id @db.Uuid
+  key          String
+  version      String
+  label        String
+  /// Garment types it covers (`*` = all).
+  garmentTypes String[]        @map("garment_types")
+  /// `id@version` of every rule, in evaluation order.
+  rules        String[]
+  /// Dimension ranges per garment type (mm).
+  ranges       Json
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  runs         ValidationRun[]
+
+  @@unique([key, version])
+  @@map("constraint_sets")
+}
+
+/// One evaluation of a working copy (at a version) or a revision against a constraint set (I20).
+/// Immutable once written; a working-copy run is stale when the working copy moved on (FR-EDT-121).
+model ValidationRun {
+  id                  String              @id @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  designId            String              @map("design_id") @db.Uuid
+  /// working_copy | revision
+  targetType          String              @map("target_type")
+  /// Revision id for revision runs; null for the working copy.
+  revisionId          String?             @map("revision_id") @db.Uuid
+  /// Working-copy version, or the revision number.
+  targetVersion       Int                 @map("target_version")
+  /// Semantic hash of the evaluated state (equal hash + equal set ⇒ equal findings).
+  stateHash           String              @map("state_hash")
+  constraintSetId     String              @map("constraint_set_id") @db.Uuid
+  /// `design-structure@1.0.0`
+  constraintSetRef    String              @map("constraint_set_ref")
+  /// completed (async runs arrive with jobs)
+  status              String
+  counts              Json
+  requestedBy         String?             @map("requested_by") @db.Uuid
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design              Design              @relation(fields: [designId], references: [id], onDelete: Restrict)
+  constraintSet       ConstraintSet       @relation(fields: [constraintSetId], references: [id], onDelete: Restrict)
+  findings            ValidationFinding[]
+
+  @@index([organizationId, designId, targetType, createdAt])
+  @@index([constraintSetId])
+  @@map("validation_runs")
+}
+
+/// A finding of a run (CST-002): rule, affected entity, explanation, recommended resolution.
+model ValidationFinding {
+  id             String        @id @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  runId          String        @map("run_id") @db.Uuid
+  /// Stable across runs: same rule + entity + path ⇒ same id.
+  findingId      String        @map("finding_id")
+  /// Order within the run (severity, rule, id).
+  position       Int
+  ruleId         String        @map("rule_id")
+  ruleVersion    String        @map("rule_version")
+  category       String
+  /// blocking | warning | info
+  severity       String
+  /// valid | warning | error | not_evaluated | requires_manual_review
+  outcome        String
+  entityType     String?       @map("entity_type")
+  entityId       String?       @map("entity_id")
+  path           String?
+  message        String
+  resolution     String?
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run            ValidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, findingId])
+  @@index([organizationId])
+  @@map("validation_findings")
 }

@@ -34,6 +34,9 @@ const OWNERS: Record<string, string | string[]> = {
   artifact: 'modules/artifacts',
   artifactRevision: 'modules/artifacts',
   designOperation: 'modules/operations',
+  constraintSet: 'modules/validation',
+  validationRun: 'modules/validation',
+  validationFinding: 'modules/validation',
 };
 
 /** Dev-only scripts that look rows up read-only; all their writes go through module services. */

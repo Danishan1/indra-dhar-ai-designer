@@ -16,6 +16,7 @@ import { PreferenceKeys, readPreference, writePreference } from '@/lib/local-pre
 
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
+import { ComponentFindings } from '../validation/component-findings';
 
 import { ArtifactsSection } from './artifacts-section';
 import { PropertyRow } from './property-row';
@@ -281,6 +282,7 @@ function ComponentProperties({
         </div>
       ) : null}
 
+      {multi ? null : <ComponentFindings componentId={first.componentId} />}
       {multi ? null : <ArtifactsSection component={first} />}
 
       {groups.map(([group, list]) => {

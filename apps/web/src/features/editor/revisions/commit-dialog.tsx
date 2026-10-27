@@ -21,6 +21,7 @@ import { queryKeys } from '@/lib/query/keys';
 
 import { selectHasUnsavedWork } from '../store';
 import { useEditor, useEditorStore } from '../store-context';
+import { useValidation } from '../validation/validation-context';
 
 import { shortLabel } from './history-panel';
 import { useRevisionsApi } from './use-revisions';
@@ -60,7 +61,6 @@ function CommitDialog({ onClose }: { onClose: () => void }) {
   const api = useRevisionsApi();
   const designId = useEditor((s) => s.meta.design.id);
   const head = useEditor((s) => s.meta.headRevision);
-  const findings = useEditor((s) => s.findings);
   const [ready, setReady] = useState(false);
   const [description, setDescription] = useState('');
   const [key] = useState(() => globalThis.crypto.randomUUID());
@@ -111,8 +111,8 @@ function CommitDialog({ onClose }: { onClose: () => void }) {
   const unsaved = useEditor(selectHasUnsavedWork);
   const lines = changes.data?.summary ?? [];
   const semantic = changes.data?.entries.filter((e) => e.semantic).length ?? null;
-  const warnings = findings.filter((f) => f.outcome === 'warning').length;
-  const review = findings.filter((f) => f.outcome === 'requires_manual_review').length;
+  const validation = useValidation();
+  const counts = validation.run?.counts ?? null;
   const error = commit.error ? toApiError(commit.error) : null;
 
   return (
@@ -174,8 +174,11 @@ function CommitDialog({ onClose }: { onClose: () => void }) {
             />
           </FormField>
           <p className="text-[12px] text-muted-foreground" data-testid="commit-validation">
-            Validation snapshot: {warnings} warnings, {review} to review manually. Full rule checks
-            arrive with the validation panel.
+            Design structure validation
+            {counts
+              ? `${validation.stale ? ' (updating)' : ''}: ${counts.errors} blocking, ${counts.warnings} warnings, ${counts.manualReview} to review.`
+              : ': not checked yet.'}{' '}
+            The revision records it with its constraint set. Not production readiness.
           </p>
           {noChanges ? (
             <div role="alert" className="rounded-md border p-2 text-[12px]">

@@ -119,7 +119,7 @@ export class RevisionService {
         changeDiffSummary: (diff
           ? { lines, counts: diffCounts(diff) }
           : { lines: [], counts: null }) as Prisma.InputJsonValue,
-        validationSummary: validationSummaryOf(input.findings) as unknown as Prisma.InputJsonValue,
+        validationSummary: validationSummaryOf(state) as unknown as Prisma.InputJsonValue,
         createdBy: input.createdBy,
         operationIds: input.operationIds ?? [],
       },

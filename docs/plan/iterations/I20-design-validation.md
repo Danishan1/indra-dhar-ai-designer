@@ -59,14 +59,14 @@ Validation panel (bottom/side), inline markers, canvas badges, stale indicator, 
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Rule interface and engine with deterministic ordering & stable finding ids (hash of rule+entity).
-2. [ ] Implement initial rules + per-template ranges.
-3. [ ] Seed constraint set v1.0.0 per garment type.
-4. [ ] Backend module, persistence, staleness computation.
-5. [ ] Hook into commit (store summary) and into operation validator.
-6. [ ] Editor UI: panel, inline, canvas markers, navigation.
-7. [ ] Tests; Playwright: create invalid state (cuff without sleeve) → blocking finding → fix → finding disappears.
-8. [ ] Update PROGRESS.md.
+1. [x] Rule interface and engine with deterministic ordering & stable finding ids (hash of rule+entity).
+2. [x] Implement initial rules + per-template ranges.
+3. [x] Seed constraint set v1.0.0 per garment type.
+4. [x] Backend module, persistence, staleness computation.
+5. [x] Hook into commit (store summary) and into operation validator.
+6. [x] Editor UI: panel, inline, canvas markers, navigation.
+7. [x] Tests; Playwright: create invalid state (cuff without sleeve) → blocking finding → fix → finding disappears.
+8. [x] Update PROGRESS.md.
 
 ## 8. Tests
 
@@ -75,13 +75,13 @@ Validation panel (bottom/side), inline markers, canvas badges, stale indicator, 
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Findings identify affected entity, rule, explanation, recommended resolution. (CST-002, FR-EDT-122)
-- [ ] AC2 — Blocking errors, warnings and info are distinguishable (text+icon). (CST-003, FR-EDT-119)
-- [ ] AC3 — Validation is repeatable against a specific revision and constraint-set version. (CST-004)
-- [ ] AC4 — Changes to dependent components trigger revalidation; old results marked stale. (CST-005, FR-EDT-121)
-- [ ] AC5 — Passing design validation is never presented as production readiness. (CST-006, FR-EDT-124, AC-EDT-013)
-- [ ] AC6 — Findings navigable to the component in canvas/tree. (FR-EDT-120)
-- [ ] AC7 — `requires_manual_review` findings remain visible until resolved/accepted. (§15.3)
+- [x] AC1 — Findings identify affected entity, rule, explanation, recommended resolution. (CST-002, FR-EDT-122)
+- [x] AC2 — Blocking errors, warnings and info are distinguishable (text+icon). (CST-003, FR-EDT-119)
+- [x] AC3 — Validation is repeatable against a specific revision and constraint-set version. (CST-004)
+- [x] AC4 — Changes to dependent components trigger revalidation; old results marked stale. (CST-005, FR-EDT-121)
+- [x] AC5 — Passing design validation is never presented as production readiness. (CST-006, FR-EDT-124, AC-EDT-013)
+- [x] AC6 — Findings navigable to the component in canvas/tree. (FR-EDT-120)
+- [x] AC7 — `requires_manual_review` findings remain visible until resolved/accepted. (§15.3)
 
 ## 10. Risks & notes
 
@@ -95,7 +95,14 @@ Validation panel (bottom/side), inline markers, canvas badges, stale indicator, 
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-055):
+  - One authoritative pass on the server, re-run 1.2 s after each saved change, instead of a separate client-side "cheap rules" pass; results are the same engine either way.
+  - The operation router does not call the engine (findings never block saving); artifact-dependent checks (allowed regions, compatibility) stay in the router at change time, so engine results depend only on the design state (repeatable).
+  - Routes are org-scoped (`/v1/orgs/:orgId/designs/:designId/validation-runs`, `…/latest`, `/v1/orgs/:orgId/validation-runs/:runId`); revisions are validated on request (and summarised at commit) rather than stored as a run at commit time.
+  - `ConstraintSet` stores rule refs and ranges; the rules are code. Only the newest 5 working-copy runs per design are kept.
+  - Files are kebab-case (`validation/{validation-context.tsx, validation-panel.tsx, component-findings.tsx, canvas-markers.tsx, severity.tsx, api.ts}`); inline findings live in the property rows and a per-component list.
+  - Fixed on the way: `classifyDiff` read relationship targets as `component` instead of `design_component` (I19 highlights for relationship changes).
+- Tests: garment-model 140 (+9 engine), web unit 84 (+3), api integration 132 (+4 validation; tenant isolation covers `validation-runs/:runId`), e2e 29 (+1 sleeveless sleeve with cuff → blocking finding → Show → remove cuff → gone).
+- Follow-ups added to backlog: see "From I20".

@@ -3,7 +3,7 @@
 import type { ValueStatus } from '@ai-designer/contracts';
 import type { PropertyDefinition, PropertyValue } from '@ai-designer/garment-model';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { ValueStatusBadge } from '@/components/value-status-badge';
 import { cn } from '@/lib/utils';
 
 import { useEditor } from '../store-context';
+import { FindingKindIcon, KIND_CLASS, KIND_LABELS, kindOf } from '../validation/severity';
+import { usePropertyFindings } from '../validation/validation-context';
 
 import { PropertyControl } from './controls';
 import type { DisplayLengthUnit } from './value-input';
@@ -67,16 +69,9 @@ export function PropertyRow({
   const refusals = useEditor(
     useShallow((s) => targets.flatMap((t) => s.refusals[`${t.componentId}|${def.key}`] ?? [])),
   );
-  const warnings = useEditor(
-    useShallow((s) =>
-      s.findings.filter(
-        (f) =>
-          f.outcome !== 'valid' &&
-          targets.some((t) => f.entity?.entityId === t.componentId) &&
-          (f.path?.includes(def.key) ?? false),
-      ),
-    ),
-  );
+  const targetIds = useMemo(() => targets.map((t) => t.componentId), [targets]);
+  // Design-structure findings about this property (inline, FR-EDT-117).
+  const warnings = usePropertyFindings(targetIds, def.key);
   const [invalid, setInvalid] = useState<string | null>(null);
   const messageId = useId();
   const status = (pv?.status ?? 'missing') as ValueStatus;
@@ -142,12 +137,18 @@ export function PropertyRow({
             <AlertTriangleIcon className="size-3" aria-hidden /> {m}
           </span>
         ))}
-        {warnings.map((w, i) => (
+        {warnings.map((w) => (
           <span
-            key={`${w.ruleId}-${String(i)}`}
-            className="flex items-center gap-1 text-status-needs-review"
+            key={w.findingId}
+            className="flex items-start gap-1"
+            data-testid="inline-finding"
+            data-kind={kindOf(w)}
           >
-            <AlertTriangleIcon className="size-3" aria-hidden /> {w.message}
+            <FindingKindIcon kind={kindOf(w)} />
+            <span className={KIND_CLASS[kindOf(w)]}>
+              <span className="sr-only">{KIND_LABELS[kindOf(w)]}: </span>
+              {w.message}
+            </span>
           </span>
         ))}
       </div>

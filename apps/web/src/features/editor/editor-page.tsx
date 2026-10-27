@@ -39,17 +39,15 @@ import { editorApi } from './api';
 import { GarmentCanvas } from './canvas/garment-canvas';
 import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
-import { createTabStore, PanelTabContent, PanelTabs } from './components/panel-tabs';
 import { SaveStatusChip } from './components/save-status';
 import { Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
 import { LeftPanelContent, LeftPanelTabs } from './library/left-panel';
-import { PropertiesPanel } from './properties/properties-panel';
 import { CommitButton } from './revisions/commit-dialog';
-import { HistoryPanel } from './revisions/history-panel';
 import { RevisionInspector } from './revisions/revision-inspector';
 import { useRevisionSnapshot } from './revisions/use-revisions';
+import { RightPanelContent, RightPanelTabs } from './right-panel';
 import {
   createEditorStore,
   type EditorStore,
@@ -60,6 +58,8 @@ import {
   selectUndoLabel,
 } from './store';
 import { EditorStoreProvider, useEditor, useEditorStore } from './store-context';
+import { ValidationProvider } from './validation/validation-context';
+import { ValidationPanel, ValidationTabCount } from './validation/validation-panel';
 
 const revLabel = (r: RevisionSummary | null) =>
   r ? `R${String(r.revisionNumber).padStart(3, '0')}` : null;
@@ -116,29 +116,11 @@ function EditorSession({ orgId, initial }: { orgId: string; initial: EditorState
   return (
     <EditorStoreProvider store={store}>
       <SceneProvider>
-        <Editor />
+        <ValidationProvider>
+          <Editor />
+        </ValidationProvider>
       </SceneProvider>
     </EditorStoreProvider>
-  );
-}
-
-const useRightTab = createTabStore<'properties' | 'history'>('properties');
-const RIGHT_TABS = [
-  { id: 'properties', label: 'Properties' },
-  { id: 'history', label: 'History' },
-] as const;
-
-function RightPanelTabs() {
-  return <PanelTabs name="right" label="Right panel" tabs={RIGHT_TABS} store={useRightTab} />;
-}
-
-function RightPanelContent() {
-  return (
-    <PanelTabContent
-      name="right"
-      store={useRightTab}
-      render={(tab) => (tab === 'properties' ? <PropertiesPanel /> : <HistoryPanel />)}
-    />
   );
 }
 
@@ -158,7 +140,8 @@ function Editor() {
         propertiesHeader={<RightPanelTabs />}
         takeover={inspect ? <RevisionInspector inspect={inspect} /> : undefined}
         operations={<HistoryList />}
-        validation={<FindingsList />}
+        validation={<ValidationPanel />}
+        validationBadge={<ValidationTabCount />}
         jobs={<Placeholder>Generation jobs (I21).</Placeholder>}
         statusBar={<StatusBar />}
       />
@@ -389,20 +372,6 @@ function HistoryList() {
         </p>
       ) : null}
     </div>
-  );
-}
-
-function FindingsList() {
-  const findings = useEditor((s) => s.findings);
-  if (!findings.length) return <Placeholder>No findings for the last change.</Placeholder>;
-  return (
-    <ul aria-label="Findings" className="flex flex-col gap-1 p-2 text-[12px]">
-      {findings.map((f, i) => (
-        <li key={`${f.ruleId}-${String(i)}`}>
-          <span className="font-medium">{f.outcome.replaceAll('_', ' ')}</span> · {f.message}
-        </li>
-      ))}
-    </ul>
   );
 }
 

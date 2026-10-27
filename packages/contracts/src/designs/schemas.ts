@@ -72,6 +72,10 @@ export const validationSummarySchema = z.object({
   errors: z.number().int(),
   warnings: z.number().int(),
   manualReview: z.number().int(),
+  /** Informative notes (I20); absent on revisions committed before I20. */
+  info: z.number().int().optional(),
+  /** Constraint set the summary was computed with, e.g. `design-structure@1.0.0` (I20, CST-004). */
+  constraintSet: z.string().optional(),
 });
 export type ValidationSummary = z.infer<typeof validationSummarySchema>;
 

@@ -47,6 +47,8 @@ export const queryKeys = {
       workingCopy: (designId: string) => [...all, 'design', designId, 'working-copy'] as const,
       revisions: (designId: string) => [...all, 'design', designId, 'revisions'] as const,
       revision: (revisionId: string) => [...all, 'revision', revisionId] as const,
+      validation: (designId: string, target: string) =>
+        [...all, 'design', designId, 'validation', target] as const,
       operations: (designId: string) => [...all, 'design', designId, 'operations'] as const,
       editorState: (designId: string) => [...all, 'design', designId, 'editor-state'] as const,
       compare: (designId: string, from: string, to: string) =>

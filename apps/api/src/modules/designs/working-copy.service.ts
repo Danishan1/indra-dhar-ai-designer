@@ -102,6 +102,20 @@ export class WorkingCopyService {
     );
   }
 
+  /** Current working state with its version (validation runs, I20). */
+  async currentSnapshot(
+    organizationId: string,
+    designId: string,
+  ): Promise<{ state: GarmentDesignState; version: number }> {
+    const wc = await this.find(this.prisma, organizationId, designId);
+    return { state: readAnyVersion(wc.state).state, version: wc.version };
+  }
+
+  /** Current version only (staleness of validation runs). */
+  async currentVersion(organizationId: string, designId: string): Promise<number> {
+    return (await this.find(this.prisma, organizationId, designId)).version;
+  }
+
   /** Current working state, upgraded for reading (used by compare). */
   async currentState(organizationId: string, designId: string): Promise<GarmentDesignState> {
     const wc = await this.find(this.prisma, organizationId, designId);

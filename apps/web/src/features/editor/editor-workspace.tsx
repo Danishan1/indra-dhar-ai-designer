@@ -148,6 +148,8 @@ export interface WorkspaceSlots {
   takeover?: ReactNode;
   operations: ReactNode;
   validation: ReactNode;
+  /** Shown next to the "Validation" tab label (finding count, I20). */
+  validationBadge?: ReactNode;
   jobs: ReactNode;
   statusBar?: ReactNode;
 }
@@ -163,6 +165,7 @@ function Workspace({
   takeover,
   operations: operationsContent,
   validation,
+  validationBadge,
   jobs,
   statusBar,
 }: WorkspaceSlots) {
@@ -295,6 +298,7 @@ function Workspace({
                         </TabsTrigger>
                         <TabsTrigger value="validation" className="text-xs">
                           Validation
+                          {validationBadge}
                         </TabsTrigger>
                         <TabsTrigger value="jobs" className="text-xs">
                           Jobs

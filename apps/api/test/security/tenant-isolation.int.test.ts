@@ -88,6 +88,7 @@ describe('cross-tenant isolation', () => {
   const designs = new Map<string, { id: string; headRevisionId: string }>();
   const artifacts = new Map<string, { id: string; currentRevisionId: string }>();
   const operationIds = new Map<string, string>();
+  const runIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -100,6 +101,7 @@ describe('cross-tenant isolation', () => {
     artifactId: artifacts.get(t.orgId)?.id ?? '',
     artifactRevisionId: artifacts.get(t.orgId)?.currentRevisionId ?? '',
     operationId: operationIds.get(t.orgId) ?? '',
+    runId: runIds.get(t.orgId) ?? '',
   });
 
   async function startArtifact(t: TenantFixture): Promise<void> {
@@ -135,6 +137,12 @@ describe('cross-tenant isolation', () => {
     });
     expect(op.status).toBe(201);
     operationIds.set(t.orgId, ((await op.json()) as { operation: { id: string } }).operation.id);
+    const run = await t.owner.client.post(
+      `/v1/orgs/${t.orgId}/designs/${design.id}/validation-runs`,
+      {},
+    );
+    expect(run.status).toBe(201);
+    runIds.set(t.orgId, ((await run.json()) as { id: string }).id);
   }
 
   async function startUpload(t: TenantFixture): Promise<void> {
@@ -195,7 +203,7 @@ describe('cross-tenant isolation', () => {
   it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
       routes: routes.filter((r) =>
-        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId/.test(
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId/.test(
           r.path,
         ),
       ),

@@ -116,6 +116,14 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I20 (2026-10-27)
+
+- Accept/acknowledge a manual-review or warning finding with a reason (kept per finding id). → I28 (review) / I41 (exceptions).
+- Push validation updates to other open editors (SSE on `validation.findings_updated`). → I21 (job progress/SSE).
+- Organization constraint sets (custom ranges per brand/size range). → I41.
+- Validate AI-applied changes before applying (Level 3 consistency). → I25.
+- Show validation of any revision in History/compare (API exists: `target=revision`). → backlog.
+
 ## From I19 (2026-10-27)
 
 - Show artifact names/revision ids (not raw ids) in diff entries and commit summaries. → with I20 or a summary polish pass.

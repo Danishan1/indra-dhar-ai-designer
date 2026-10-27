@@ -41,6 +41,8 @@ import { cn } from '@/lib/utils';
 import { selectModeFor } from '../canvas/hit-test';
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
+import { FindingKindIcon, KIND_LABELS, KIND_ORDER, kindOf } from '../validation/severity';
+import { useComponentFindings } from '../validation/validation-context';
 
 import { canSaveAsArtifact, SaveArtifactDialog } from './save-artifact-dialog';
 import { addableChildren, flattenTree, type TreeNode, useTree } from './use-hierarchy';
@@ -280,6 +282,11 @@ function TreeRow({
   const select = useEditor((s) => s.select);
   const c = row.component;
   const Icon = ICONS[c.componentType] ?? CircleIcon;
+  const findings = useComponentFindings(c.componentId);
+  const worst = findings
+    .map(kindOf)
+    .filter((k) => k !== 'info')
+    .sort((a, b) => KIND_ORDER[a] - KIND_ORDER[b])[0];
   const addable = canEdit && !c.locked ? addableChildren(c, components) : [];
   return (
     <div
@@ -348,6 +355,15 @@ function TreeRow({
         </span>
       ) : null}
       {c.locked ? <LockIcon className="size-3 text-muted-foreground" aria-label="Locked" /> : null}
+      {worst ? (
+        <span
+          title={`${KIND_LABELS[worst]}: ${findings.find((f) => kindOf(f) === worst)?.message ?? ''}`}
+          data-testid="tree-finding"
+          data-kind={worst}
+        >
+          <FindingKindIcon kind={worst} />
+        </span>
+      ) : null}
       {canEdit ? (
         <span className="flex items-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-aria-selected:opacity-100">
           <IconToggle

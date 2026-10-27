@@ -3,7 +3,6 @@ import {
   sequentialRandomBytes,
   templates,
   userValue,
-  validateDesignState,
   type GarmentDesignState,
 } from '@ai-designer/garment-model';
 import { describe, expect, it } from 'vitest';
@@ -168,10 +167,12 @@ describe('extractRefs', () => {
       status: 'proposed',
       provenanceRefs: [],
     });
-    expect(validationSummaryOf(validateDesignState(s).findings)).toEqual({
+    expect(validationSummaryOf(s)).toEqual({
       errors: 0,
       warnings: 0,
       manualReview: 1,
+      info: expect.any(Number),
+      constraintSet: 'design-structure@1.0.0',
     });
   });
 });

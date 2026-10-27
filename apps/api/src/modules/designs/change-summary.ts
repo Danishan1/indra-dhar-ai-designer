@@ -1,10 +1,11 @@
 import type { ValidationSummary } from '@ai-designer/contracts';
 import {
+  constraintSetFor,
   defaultCatalog,
   type DesignDiff,
   type GarmentDesignState,
   type PropertyChange,
-  type ValidationFinding,
+  runDesignValidation,
 } from '@ai-designer/garment-model';
 
 /** Upper bound on auto-generated lines kept in a revision summary (the full diff is stored too). */
@@ -143,10 +144,12 @@ export function extractRefs(state: GarmentDesignState): {
   return { artifactRevisionRefs: sort(artifacts), sourceAssetRefs: sort(assets) };
 }
 
-export function validationSummaryOf(findings: readonly ValidationFinding[]): ValidationSummary {
-  return {
-    errors: findings.filter((f) => f.outcome === 'error').length,
-    warnings: findings.filter((f) => f.outcome === 'warning').length,
-    manualReview: findings.filter((f) => f.outcome === 'requires_manual_review').length,
-  };
+/**
+ * Validation summary recorded on a revision (I20): counts of the design-structure validation of the
+ * snapshot, with the constraint-set version that produced them (CST-004). Structural findings are
+ * part of the run. Never a production-readiness statement (CST-006).
+ */
+export function validationSummaryOf(state: GarmentDesignState): ValidationSummary {
+  const report = runDesignValidation(state, constraintSetFor(state.garmentType));
+  return { ...report.counts, constraintSet: report.constraintSetRef };
 }

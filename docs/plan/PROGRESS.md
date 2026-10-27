@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I20 — Design validation engine & findings UI** (next)                                              |
+| **Current iteration** | **I21 — Generation job management & progress (SSE)** (next)                                          |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I19 finished)                                                                            |
+| Last updated          | 2026-10-27 (I20 finished, M3 reached)                                                                |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -39,7 +39,7 @@
 | I17 | Hierarchy, selection & contextual properties          | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-052; docs/architecture/editor.md                    |
 | I18 | Artifact browser & structured attachment              | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-053; docs/architecture/editor.md, artifacts.md      |
 | I19 | Revision history, commit & comparison UI              | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-054; docs/architecture/editor.md                    |
-| I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                    |
+| I20 | Design validation engine & findings UI                | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | → M3 reached; ADR-055; docs/architecture/validation.md  |
 | I21 | Generation job management & progress (SSE)            | 4     | todo   |            |            |          |                                                         |
 | I22 | AI provider registry, credentials & adapters          | 4     | todo   |            |            |          | Decide ADR-009                                          |
 | I23 | Prompt & request compilation, routing                 | 4     | todo   |            |            |          |                                                         |
@@ -76,7 +76,7 @@
 | --------------------------- | ------ | ---------- | --------------------- |
 | M1 Walking skeleton         | done   | 2026-10-22 | `m1-walking-skeleton` |
 | M2 Secure multi-tenant base | done   | 2026-10-23 | `m2-secure-base`      |
-| M3 Structured editor alpha  | todo   |            | `m3-editor-alpha`     |
+| M3 Structured editor alpha  | done   | 2026-10-27 | `m3-editor-alpha`     |
 | M4 AI-assisted design alpha | todo   |            | `m4-ai-alpha`         |
 | M5 Review workflow          | todo   |            | `m5-review`           |
 | M6 Commercial beta          | todo   |            | `m6-commercial-beta`  |
@@ -108,6 +108,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I20 — server-run validation after each save (no separate client pass), operation router does not call the engine, findings never block, org-scoped routes, 5 working-copy runs kept — ADR-055
 - 2026-10-27 — I19 — I12 APIs reused (change list from compare head→working), `classifyDiff` in garment-model, inspector as a workspace takeover, history as a right-panel tab — ADR-054
 - 2026-10-27 — I18 — web-side compatibility hints, Parts/Library tabs only, component values proposed on attach, placement patch with rotation/scale, inline SVG previews for saved components — ADR-053
 - 2026-10-27 — I17 — dependency rules added to garment-model, lock/visibility stay component flags (UI-enforced lock), read-only design panel, debug panel removed — ADR-052
@@ -130,6 +131,18 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I20 Design validation engine & findings UI (session 1) — DONE, **M3 reached**
+
+- Plan: engine + rules + `design-structure@1.0.0` in garment-model → `validation` module (tables, runs, staleness, reuse, pruning, event) → commit summary from the engine → editor panel, inline findings, tree icons, canvas badges, auto re-run → tests → docs.
+- Built: design-structure validation (required parts, cuff needs a sleeve, pairs, collar vs hood, conflicting values, dimension ranges, defining options, trims on knits, approximate placements, unconfirmed critical values); Validation tab with counts/filters/Show/Re-run and "not production readiness" label; stale marking; revision validation summaries record the constraint set.
+- Tests: garment-model 140, design-operations 22, garment-render 22, web unit 84, api unit 101, integration api 132 + worker 13, e2e 29.
+- **Owner actions (Windows):**
+  1. `pnpm install` (no new packages).
+  2. **`pnpm db:migrate`** — new migration `…_i20_validation` (tables `constraint_sets`, `validation_runs`, `validation_findings`).
+  3. `pnpm dev` → open a design, open the **Validation** tab at the bottom; set a sleeve to "Sleeveless" to see a blocking finding, click **Show**, remove the cuff to clear it.
+  4. Tag the milestone after pushing: `git tag m3-editor-alpha && git push origin m3-editor-alpha`.
+- **Next step:** I21 — generation job management & progress (SSE).
 
 ### 2026-10-27 — I19 Revision history, commit & comparison UI (session 1) — DONE
 
