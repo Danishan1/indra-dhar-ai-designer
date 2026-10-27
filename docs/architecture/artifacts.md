@@ -35,8 +35,25 @@ Creating directly in the organization library needs `artifact.publish`. Copying 
 
 ## API (`/v1/orgs/:orgId/…`)
 
-`GET/POST artifacts` · `POST artifacts/compatibility-check` · `GET/PATCH/DELETE artifacts/:artifactId` · `POST artifacts/:artifactId/{revisions,deactivate,reactivate,publish,duplicate}` · `GET artifacts/:artifactId/where-used` · `GET artifact-revisions/:artifactRevisionId` (+ `/preview`).
+`GET/POST artifacts` · `POST artifacts/compatibility-check` · `GET/PATCH/DELETE artifacts/:artifactId` · `POST artifacts/:artifactId/{revisions,deactivate,reactivate,publish,duplicate}` · `GET artifacts/:artifactId/where-used` · `GET artifact-revisions/:artifactRevisionId` (+ `/preview`) ·
+`GET artifacts/render-info?ids=` (pins, current revision, lifecycle, regions — what the editor draws and shows) ·
+`POST artifacts/from-component` (I18: save a design component as an artifact; `artifact.create`, organization scope
+needs `artifact.publish`; preview cut from the flat).
 
 ## Web
 
 `apps/web/src/features/library/` — Library page (categories, search, owner and compatibility filters, deactivated toggle), detail drawer (visual vs physical properties, revisions, where used, actions), create / new-revision dialog with preview upload.
+
+## Using artifacts in designs (I18, ADR-053)
+
+- Operations `attach_artifact` / `replace_artifact` / `detach_artifact` / `update_placement` (design-operations). They
+  need `design.edit`; attach/replace also `artifact.use` — which grants nothing on the artifact itself.
+- A binding pins an **exact revision**. New revisions are shown as "Update to Rn" and applied only by an explicit
+  `replace_artifact` (ART-005). Unavailable or deactivated artifacts keep their pin and show a warning.
+- Component artifacts propose their visual values on the component (status `proposed`, source `artifact_revision`);
+  confirmed values stay. Fabrics also set `material.fabric_ref`. Values are per component (two sleeves can share an
+  artifact and differ).
+- Trims/lace/artwork get a relationship with a placement in `component_local` space (region, offset mm, scale,
+  rotation); without boundary geometry it is approximate and needs review.
+- In the editor: left panel **Library** tab (`features/editor/library/`), properties **Artifacts** section
+  (`properties/artifacts-section.tsx`), hierarchy "Save as artifact…" (`hierarchy/save-artifact-dialog.tsx`).

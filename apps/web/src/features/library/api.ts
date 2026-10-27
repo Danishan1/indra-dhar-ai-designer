@@ -3,6 +3,7 @@ import {
   type ArtifactListQuery,
   artifactListResponseSchema,
   compatibilityCheckResponseSchema,
+  type CreateArtifactFromComponentRequest,
   type CreateArtifactRequest,
   type CreateArtifactRevisionRequest,
   whereUsedResponseSchema,
@@ -63,6 +64,18 @@ export const libraryApi = {
     apiRequest(`${one(orgId, id)}/where-used`, {
       schema: whereUsedResponseSchema,
       ...withSignal(signal),
+    }),
+  /** Saves a design component as a new artifact (I18, FR-EDT-057); preview drawn from the flat. */
+  fromComponent: (
+    orgId: string,
+    body: CreateArtifactFromComponentRequest,
+    idempotencyKey: string,
+  ) =>
+    apiRequest(`${base(orgId)}/from-component`, {
+      method: 'POST',
+      body,
+      schema: artifactDetailSchema,
+      idempotencyKey,
     }),
   compatibility: (
     orgId: string,

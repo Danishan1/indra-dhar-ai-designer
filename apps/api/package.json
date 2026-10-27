@@ -23,6 +23,7 @@
     "@ai-designer/db": "workspace:*",
     "@ai-designer/design-operations": "workspace:*",
     "@ai-designer/garment-model": "workspace:*",
+    "@ai-designer/garment-render": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@ai-designer/media": "workspace:*",
     "@nestjs/common": "12.2.0",

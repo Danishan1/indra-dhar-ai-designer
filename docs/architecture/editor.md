@@ -91,6 +91,22 @@ garment automatically until the person zooms or pans. Dev gallery: `/dev/garment
   shared group id (one undo step). Locked components disable editing.
 - The canvas shows "Updating drawing…" while the deferred scene lags behind the latest change.
 
+## Artifacts (I18)
+
+- Left panel tabs **Parts** (hierarchy) / **Library** (`library/library-panel.tsx`): search, category and owner
+  filters, "Only what fits <selection>" (`compatibleWith`), load more. Cards show a fit badge (Fits / Needs review /
+  Doesn't fit + reason) from `artifacts/attach.ts` (`artifactFit`), Attach/Replace and Details (detail drawer).
+- Cards are draggable; dropping on a component in the drawing attaches it (the canvas shows whether it fits while
+  hovering). `useAttachArtifact` refuses incompatible targets before sending, picks `replace_artifact` for a second
+  artifact of the same component category (`planAttach`) and selects the target.
+- Properties → **Artifacts** section per binding: name, pinned revision id, chips (unavailable — reference kept,
+  deactivated, approximate — needs review), "Update to Rn", detach, placement (region, offset mm, scale, rotation;
+  coordinate space shown).
+- Render info (`useArtifactInfos()` from `SceneProvider`) covers bindings, relationship sources and fabric refs.
+- `attach_artifact`, `replace_artifact` and `update_placement` (region checks) need artifact definitions the
+  browser does not have, so they are sent at once and shown when the server answers.
+- Hierarchy menu "Save as artifact…" → `POST …/artifacts/from-component` (saved working copy; private by default).
+
 ## Rules for later iterations
 
 - **Never** put selection, viewport or tool state into the design (SPEC-007 §20); they live in the store.

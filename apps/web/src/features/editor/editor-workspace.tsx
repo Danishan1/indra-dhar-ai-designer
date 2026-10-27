@@ -135,6 +135,8 @@ export interface WorkspaceSlots {
   /** Tool buttons at the start of the toolbar. */
   tools: ReactNode;
   hierarchy: ReactNode;
+  /** Replaces the left panel's "Hierarchy" title row (e.g. Parts / Library tabs, I18). */
+  hierarchyHeader?: ReactNode;
   viewport: ReactNode;
   properties: ReactNode;
   operations: ReactNode;
@@ -147,6 +149,7 @@ function Workspace({
   header,
   tools,
   hierarchy: hierarchyContent,
+  hierarchyHeader,
   viewport,
   properties: propertiesContent,
   operations: operationsContent,
@@ -244,7 +247,7 @@ function Workspace({
           className="bg-panel"
         >
           <Region region="hierarchy" label="Hierarchy">
-            <PanelTitle>Hierarchy</PanelTitle>
+            {hierarchyHeader ?? <PanelTitle>Hierarchy</PanelTitle>}
             <div className="min-h-0 flex-1 overflow-auto">{hierarchyContent}</div>
           </Region>
         </ResizablePanel>

@@ -85,18 +85,36 @@ export const renameComponentSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
 });
 
-const placementRequestSchema = z.object({
+const placementFields = {
   region: z
     .string()
     .regex(/^[a-z][a-z0-9_]{0,63}$/)
-    .nullable()
-    .default(null),
-  anchor: z.string().trim().min(1).max(80).nullable().default(null),
-  mode: z
-    .enum(['attach', 'follow_boundary', 'fixed_position', 'tiled_fill'])
-    .nullable()
-    .default(null),
-  offsetMm: z.number().finite().nullable().default(null),
+    .nullable(),
+  anchor: z.string().trim().min(1).max(80).nullable(),
+  mode: z.enum(['attach', 'follow_boundary', 'fixed_position', 'tiled_fill']).nullable(),
+  offsetMm: z.number().finite().min(-1000).max(1000).nullable(),
+  /** Rotation of a placed motif/artwork in degrees (component_local). */
+  rotationDeg: z.number().finite().min(-360).max(360).nullable(),
+  /** Uniform scale of a placed motif/artwork or trim width. */
+  scale: z.number().finite().min(0.1).max(10).nullable(),
+};
+
+const placementRequestSchema = z.object({
+  region: placementFields.region.default(null),
+  anchor: placementFields.anchor.default(null),
+  mode: placementFields.mode.default(null),
+  offsetMm: placementFields.offsetMm.default(null),
+  rotationDeg: placementFields.rotationDeg.default(null),
+  scale: placementFields.scale.default(null),
+});
+/** Only the fields given are changed (no defaults). */
+const placementPatchSchema = z.object({
+  region: placementFields.region.optional(),
+  anchor: placementFields.anchor.optional(),
+  mode: placementFields.mode.optional(),
+  offsetMm: placementFields.offsetMm.optional(),
+  rotationDeg: placementFields.rotationDeg.optional(),
+  scale: placementFields.scale.optional(),
 });
 export type PlacementRequest = z.infer<typeof placementRequestSchema>;
 
@@ -129,7 +147,7 @@ export const detachArtifactSchema = z.object({
 export const updatePlacementSchema = z.object({
   type: z.literal('update_placement'),
   relationshipId: relId,
-  placement: placementRequestSchema.partial(),
+  placement: placementPatchSchema,
 });
 
 export const addRelationshipSchema = z.object({

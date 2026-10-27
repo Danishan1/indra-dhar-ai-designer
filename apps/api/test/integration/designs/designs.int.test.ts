@@ -574,11 +574,12 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     const asViewer = await json<EditorState>(
       await viewer.get(`${org()}/designs/${d.id}/editor-state`),
     );
-    expect(asViewer.capabilities).toEqual({
+    expect(asViewer.capabilities).toMatchObject({
       canEdit: false,
       canCommit: false,
       canRestore: false,
       canGenerate: false,
+      canUseArtifacts: false,
     });
     expect(asViewer.readOnlyReason).toBe('permission');
     // Other tenants: not found.

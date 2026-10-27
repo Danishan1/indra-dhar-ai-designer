@@ -11,10 +11,12 @@ export {
   isSafeHref,
   patternMarkup,
   elementMarkup,
+  componentPreviewSvg,
+  pathDataBounds,
   type SvgOptions,
 } from './svg-string.js';
 export * from './layout.js';
 export { ROLE_STYLES, NEUTRAL_FILL, type LineStyle } from './styles.js';
-export { motifCount, pickBoundary } from './trims.js';
+export { motifCount, pickBoundary, rotatedRect, shiftAway } from './trims.js';
 export { VISUAL_PROPERTIES } from './mapping.js';
 export * from './gallery.js';

@@ -38,7 +38,22 @@ export interface ArtifactRevisionInfo {
   geometryCapability: GeometryCapability;
   /** False for deactivated/deprecated artifacts: existing pins stay, new uses are refused. */
   active: boolean;
+  /** Display name (provenance notes). */
+  name?: string;
+  /** Visual property values the artifact states (copied as proposals when attached, I18). */
+  visual?: Readonly<Record<string, PropertyValue>>;
 }
+
+/** Categories whose artifacts define a component's design (their visual values are applied). */
+export const COMPONENT_ARTIFACT_CATEGORIES: ReadonlySet<string> = new Set([
+  'sleeve',
+  'collar',
+  'cuff',
+  'pocket',
+  'placket',
+  'neckline',
+  'fabric',
+]);
 
 export interface ApplyContext {
   /** The person the change is attributed to (confirmations are stamped with it). */
@@ -190,8 +205,8 @@ class Applier {
       anchor: req?.anchor ?? null,
       coordinateSpace: 'component_local',
       translation: null,
-      rotationDeg: null,
-      scale: null,
+      rotationDeg: req?.rotationDeg ?? null,
+      scale: req?.scale ?? null,
       orientation: mode === 'follow_boundary' ? 'follow_boundary' : null,
       offset:
         req?.offsetMm !== null && req?.offsetMm !== undefined
@@ -202,6 +217,82 @@ class Applier {
       approximate,
       confidence: null,
     };
+  }
+
+  /**
+   * Applies what a component/fabric artifact states to the component (I18): its visual values become
+   * proposals sourced from the artifact revision (never confirmed automatically — a person's confirmed
+   * value is kept and reported); a fabric becomes the component's `material.fabric_ref`.
+   */
+  applyArtifactValues(
+    c: DesignComponent,
+    info: ArtifactRevisionInfo,
+    replaced: string | null,
+  ): void {
+    if (!COMPONENT_ARTIFACT_CATEGORIES.has(info.category)) return;
+    const allowed = new Set(allowedPropertyKeys(this.catalog, c.componentType));
+    const ref = {
+      sourceType: 'artifact_revision' as const,
+      entityId: info.artifactId,
+      revisionId: info.artifactRevisionId,
+      note: info.name ?? null,
+    };
+    const kept: string[] = [];
+    for (const [key, pv] of Object.entries(info.visual ?? {})) {
+      if (!allowed.has(key) || pv.value === null) continue;
+      const current = c.properties[key];
+      const fromReplaced =
+        replaced !== null &&
+        current?.sourceType === 'artifact_revision' &&
+        current.sourceRefs.some((r) => r.revisionId === replaced);
+      if (
+        current?.status === 'confirmed' &&
+        current.sourceType !== 'artifact_revision' &&
+        !fromReplaced
+      ) {
+        if (JSON.stringify(current.value) !== JSON.stringify(pv.value)) kept.push(key);
+        continue;
+      }
+      c.properties[key] = {
+        value: pv.value,
+        unit: pv.unit,
+        status: 'proposed',
+        sourceType: 'artifact_revision',
+        sourceRefs: [ref],
+        confidence: null,
+        reviewRequired: true,
+        confirmedBy: null,
+        confirmedAt: null,
+      };
+    }
+    if (info.category === 'fabric' && allowed.has('material.fabric_ref')) {
+      const current = c.properties['material.fabric_ref']?.value as { entityId?: string } | null;
+      if (
+        replaced === null ||
+        current?.entityId === replaced ||
+        current === null ||
+        current === undefined
+      )
+        c.properties['material.fabric_ref'] = this.stampedValue(
+          {
+            entityType: 'artifact_revision',
+            entityId: info.artifactRevisionId,
+            revisionId: info.artifactRevisionId,
+          },
+          null,
+          'confirmed',
+          info.name ?? null,
+        );
+    }
+    if (kept.length)
+      this.warnings.push(
+        finding(
+          'artifact.kept_confirmed_values',
+          `Kept your confirmed ${kept.map((k) => (k.split('.')[1] ?? k).replaceAll('_', ' ')).join(', ')} (the artifact suggests different values)`,
+          comp(c.componentId),
+          'warning',
+        ),
+      );
   }
 
   approximateFinding(rel: DesignRelationship, c: DesignComponent): void {
@@ -408,6 +499,7 @@ class Applier {
           artifactRevisionId: info.artifactRevisionId,
           role: op.role ?? info.category,
         });
+        this.applyArtifactValues(c, info, null);
         const relType = PLACED_RELATIONSHIP[info.category] ?? (op.placement ? 'applied_to' : null);
         if (relType) {
           const placement = this.placement(c, info, op.placement);
@@ -447,6 +539,7 @@ class Applier {
         const old = binding.artifactRevisionId;
         binding.artifactId = info.artifactId;
         binding.artifactRevisionId = info.artifactRevisionId;
+        this.applyArtifactValues(c, info, old);
         for (const r of s.relationships) {
           if (
             r.source.entityType === 'artifact_revision' &&
@@ -474,6 +567,11 @@ class Applier {
             ),
           ]);
         c.artifactBindings = c.artifactBindings.filter((b) => b.bindingId !== binding.bindingId);
+        // The fabric reference goes with the binding; values copied from the artifact stay (they are
+        // the design's own values now and can be edited or cleared like any other).
+        const fabric = c.properties['material.fabric_ref']?.value as { entityId?: string } | null;
+        if (fabric?.entityId === binding.artifactRevisionId)
+          c.properties['material.fabric_ref'] = missingValue();
         const stillUsed = c.artifactBindings.some(
           (b) => b.artifactRevisionId === binding.artifactRevisionId,
         );
@@ -502,6 +600,10 @@ class Applier {
           ...(op.placement.mode !== undefined
             ? { orientation: op.placement.mode === 'follow_boundary' ? 'follow_boundary' : null }
             : {}),
+          ...(op.placement.rotationDeg !== undefined
+            ? { rotationDeg: op.placement.rotationDeg }
+            : {}),
+          ...(op.placement.scale !== undefined ? { scale: op.placement.scale } : {}),
           ...(op.placement.offsetMm !== undefined
             ? {
                 offset:

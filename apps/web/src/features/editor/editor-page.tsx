@@ -41,9 +41,9 @@ import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
 import { SaveStatusChip } from './components/save-status';
 import { Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
-import { HierarchyPanel } from './hierarchy/hierarchy-panel';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
+import { LeftPanelContent, LeftPanelTabs } from './library/left-panel';
 import { PropertiesPanel } from './properties/properties-panel';
 import {
   createEditorStore,
@@ -125,7 +125,8 @@ function Editor() {
       <WorkspaceLayout
         header={<EditorHeader />}
         tools={<EditorTools />}
-        hierarchy={<HierarchyPanel />}
+        hierarchy={<LeftPanelContent />}
+        hierarchyHeader={<LeftPanelTabs />}
         viewport={<GarmentCanvas />}
         properties={<PropertiesPanel />}
         operations={<HistoryList />}

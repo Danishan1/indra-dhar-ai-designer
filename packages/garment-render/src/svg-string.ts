@@ -7,7 +7,7 @@
 import { fmt } from './geometry.js';
 import { elementsOn, layoutViews, type ViewMode, viewBoxOf } from './layout.js';
 import { ROLE_STYLES } from './styles.js';
-import type { Layer, PatternDef, Scene, SceneElement } from './types.js';
+import type { Bounds, Layer, PatternDef, Scene, SceneElement } from './types.js';
 
 export const escapeXml = (s: string): string =>
   s
@@ -151,4 +151,70 @@ export function sceneToSvg(scene: Scene, options: SvgOptions = {}): string {
   }
   out.push('</svg>');
   return out.join('\n');
+}
+
+/** Bounds of path data (all coordinate pairs; control points included — a safe over-estimate). */
+export function pathDataBounds(ds: readonly string[]): Bounds | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const d of ds) {
+    const nums = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      minX = Math.min(minX, nums[i]!);
+      maxX = Math.max(maxX, nums[i]!);
+      minY = Math.min(minY, nums[i + 1]!);
+      maxY = Math.max(maxY, nums[i + 1]!);
+    }
+  }
+  return Number.isFinite(minX)
+    ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+    : null;
+}
+
+/**
+ * A standalone SVG of one component (and its children/trims) cropped to its drawing — the preview of
+ * an artifact saved from a design (I18). Front view when the component is drawn there, else back.
+ * Null when the component is not drawn at all.
+ */
+export function componentPreviewSvg(
+  scene: Scene,
+  componentIds: readonly string[],
+  options: { margin?: number; background?: string } = {},
+): string | null {
+  const ids = new Set(componentIds);
+  for (const view of ['front', 'back'] as const) {
+    const els = scene.views[view].elements.filter(
+      (e) => e.componentId !== null && ids.has(e.componentId) && e.layer !== 'guides',
+    );
+    if (!els.length) continue;
+    const b = pathDataBounds(els.map((e) => e.d))!;
+    const m = options.margin ?? 8;
+    const box = { x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m };
+    const used = new Set(els.map((e) => e.fill.match(/^url\(#(.+)\)$/)?.[1]).filter(Boolean));
+    const patterns = scene.patterns.filter((p) => used.has(p.id));
+    return [
+      `<svg ${attrs([
+        ['xmlns', 'http://www.w3.org/2000/svg'],
+        ['viewBox', viewBoxOf(box)],
+        ['role', 'img'],
+      ])}>`,
+      patterns.length ? `<defs>${patterns.map(patternMarkup).join('')}</defs>` : '',
+      options.background
+        ? `<rect ${attrs([
+            ['x', box.x],
+            ['y', box.y],
+            ['width', box.width],
+            ['height', box.height],
+            ['fill', options.background],
+          ])}/>`
+        : '',
+      ...els.map(elementMarkup),
+      '</svg>',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+  return null;
 }

@@ -38,6 +38,9 @@ importers:
       '@ai-designer/garment-model':
         specifier: workspace:*
         version: link:../../packages/garment-model
+      '@ai-designer/garment-render':
+        specifier: workspace:*
+        version: link:../../packages/garment-render
       '@ai-designer/logger':
         specifier: workspace:*
         version: link:../../packages/logger

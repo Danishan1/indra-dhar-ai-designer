@@ -16,6 +16,14 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { isEditableTarget } from '@/lib/shortcuts';
 
+import {
+  ARTIFACT_DRAG_TYPE,
+  artifactFit,
+  decodeDrag,
+  type Fit,
+  getActiveDrag,
+} from '../artifacts/attach';
+import { useAttachArtifact } from '../artifacts/use-attach';
 import { useEditor, useEditorStore } from '../store-context';
 
 import { CapabilityBadge } from './capability-badge';
@@ -51,6 +59,9 @@ export function GarmentCanvas() {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [dropFit, setDropFit] = useState<(Fit & { name: string; target: string }) | null>(null);
+  const attach = useAttachArtifact();
+  const canUseArtifacts = useEditor((s) => s.meta.capabilities.canUseArtifacts);
 
   const { placements, bounds } = useMemo(() => layoutViews(scene, viewMode), [scene, viewMode]);
   const visible = useMemo(
@@ -177,6 +188,33 @@ export function GarmentCanvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={() => setHovered(null)}
+      // Drop a library card on a component to attach it (FR-EDT-050).
+      onDragOver={(e) => {
+        if (!canUseArtifacts || !e.dataTransfer.types.includes(ARTIFACT_DRAG_TYPE)) return;
+        e.preventDefault();
+        const id = componentIdFromTarget(e.target);
+        if (id !== hovered) setHovered(id);
+        const a = getActiveDrag();
+        const c = id
+          ? store.getState().display.components.find((x) => x.componentId === id)
+          : undefined;
+        const fit = a && c ? { ...artifactFit(a, c), name: a.name, target: c.displayName } : null;
+        e.dataTransfer.dropEffect = !id || fit?.status === 'incompatible' ? 'none' : 'copy';
+        if (fit?.status !== dropFit?.status || fit?.target !== dropFit?.target) setDropFit(fit);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setHovered(null);
+        setDropFit(null);
+      }}
+      onDrop={(e) => {
+        setDropFit(null);
+        const a = decodeDrag(e.dataTransfer.getData(ARTIFACT_DRAG_TYPE));
+        if (!a) return;
+        e.preventDefault();
+        const id = componentIdFromTarget(e.target);
+        if (id) attach(a, id);
+      }}
     >
       <svg
         className="absolute inset-0 size-full"
@@ -246,6 +284,17 @@ export function GarmentCanvas() {
           <CapabilityBadge />
         </div>
       </div>
+      {dropFit ? (
+        <span
+          role="status"
+          data-testid="drop-hint"
+          className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 rounded-md border bg-panel/95 px-2 py-0.5 text-[12px]"
+        >
+          {dropFit.status === 'incompatible'
+            ? `${dropFit.name} can’t go on ${dropFit.target}: ${dropFit.reason ?? ''}`
+            : `Drop to put ${dropFit.name} on ${dropFit.target}${dropFit.status === 'review' ? ' (needs review)' : ''}`}
+        </span>
+      ) : null}
       {pending ? (
         <span
           role="status"

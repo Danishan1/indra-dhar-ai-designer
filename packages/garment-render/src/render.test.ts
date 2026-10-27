@@ -6,7 +6,7 @@ import { GALLERY_VARIANTS, galleryArtifact, withTrim, withValues } from './galle
 import { boundsOf } from './geometry.js';
 import { layoutViews } from './layout.js';
 import { createRenderer, geometryCapability, renderGarment } from './scene.js';
-import { sceneToSvg } from './svg-string.js';
+import { componentPreviewSvg, pathDataBounds, sceneToSvg } from './svg-string.js';
 import { motifCount } from './trims.js';
 import type { Scene } from './types.js';
 
@@ -263,5 +263,85 @@ describe('garment renderer', () => {
     for (const s of states) r.render(s);
     const avg = (performance.now() - t0) / states.length;
     expect(avg).toBeLessThan(16);
+  });
+});
+
+describe('placements and previews (I18)', () => {
+  it('artwork placements apply scale, rotation and offset reproducibly (GEO-005)', () => {
+    const make = (placement: Record<string, unknown>) => {
+      const s = shirt();
+      const front = s.components.find((c) => c.componentType === 'front_body_panel')!;
+      s.relationships.push({
+        relationshipId: 'rel_artwork00001',
+        type: 'embroidery_placed_on',
+        source: { entityType: 'artifact_revision', entityId: 'rev-flower' },
+        target: { entityType: 'design_component', entityId: front.componentId },
+        placement: {
+          region: 'left_chest',
+          anchor: null,
+          coordinateSpace: 'component_local',
+          translation: null,
+          rotationDeg: null,
+          scale: null,
+          orientation: null,
+          offset: null,
+          geometryRevisionId: null,
+          calibrationRef: null,
+          approximate: false,
+          confidence: null,
+          ...placement,
+        },
+        constraints: [],
+        status: 'confirmed',
+        provenanceRefs: [],
+      } as never);
+      const scene = renderGarment(s, {
+        artifact: () => ({
+          name: 'Flower',
+          category: 'embroidery',
+          shapeParams: { kind: 'motif', params: { widthMm: 40 } },
+        }),
+      });
+      return scene.views.front.elements.find((e) => e.relationshipId === 'rel_artwork00001')!;
+    };
+    const plain = make({});
+    expect(plain.role).toBe('artwork');
+    const bounds = (d: string) => pathDataBounds([d])!;
+    expect(bounds(plain.d).width).toBeCloseTo(40, 1);
+    const scaled = make({ scale: 2 });
+    expect(bounds(scaled.d).width).toBeCloseTo(80, 1);
+    const moved = make({ offset: { value: 2, unit: 'cm' } });
+    expect(bounds(moved.d).y - bounds(plain.d).y).toBeCloseTo(20, 1);
+    const turned = make({ rotationDeg: 45 });
+    expect(bounds(turned.d).width).toBeCloseTo(40 * Math.SQRT2, 0);
+    expect(make({ rotationDeg: 45 }).d).toBe(turned.d);
+    expect(make({ approximate: true }).role).toBe('approximate');
+  });
+
+  it('a trim offset moves it away from the component; scale widens it', () => {
+    const plain = renderGarment(withTrim(shirt(), 'hem', 'hem'), { artifact: galleryArtifact });
+    const trim = (sc: Scene) => sc.views.front.elements.find((e) => e.role === 'trim')!;
+    const s2 = withTrim(shirt(), 'hem', 'hem');
+    s2.relationships[0]!.placement = {
+      ...s2.relationships[0]!.placement!,
+      offset: { value: 10, unit: 'mm' },
+      scale: 2,
+    };
+    const shifted = trim(renderGarment(s2, { artifact: galleryArtifact }));
+    expect(pathDataBounds([shifted.d])!.y + pathDataBounds([shifted.d])!.height).toBeGreaterThan(
+      pathDataBounds([trim(plain).d])!.y + pathDataBounds([trim(plain).d])!.height + 15,
+    );
+  });
+
+  it('crops a component preview SVG for saved artifacts', () => {
+    const s = shirt();
+    const collar = s.components.find((c) => c.componentType === 'collar')!;
+    const svg = componentPreviewSvg(renderGarment(s), [collar.componentId], {
+      background: '#ffffff',
+    })!;
+    expect(svg).toContain(`data-component-id="${collar.componentId}"`);
+    expect(svg).not.toContain('cmp_000000000001"');
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(componentPreviewSvg(renderGarment(s), ['cmp_missing00000'])).toBeNull();
   });
 });

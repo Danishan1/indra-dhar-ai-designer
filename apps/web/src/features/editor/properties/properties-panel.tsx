@@ -17,6 +17,7 @@ import { PreferenceKeys, readPreference, writePreference } from '@/lib/local-pre
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
 
+import { ArtifactsSection } from './artifacts-section';
 import { PropertyRow } from './property-row';
 import { DISPLAY_LENGTH_UNITS, type DisplayLengthUnit, enumLabel, summarize } from './value-input';
 
@@ -279,6 +280,8 @@ function ComponentProperties({
           })}
         </div>
       ) : null}
+
+      {multi ? null : <ArtifactsSection component={first} />}
 
       {groups.map(([group, list]) => {
         const visible = list.filter((d) => showAdvanced || !d.ui.advanced);

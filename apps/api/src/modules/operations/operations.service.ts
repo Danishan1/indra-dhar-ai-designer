@@ -315,10 +315,14 @@ export class OperationsService implements OnModuleInit {
           },
         );
     }
-    const artifacts = await this.artifacts.revisionInfos(
-      ctx,
-      artifactRevisionIdsOf(plan.apply, state),
-    );
+    const artifactIds = artifactRevisionIdsOf(plan.apply, state);
+    // Putting an artifact into a design needs `artifact.use` (it never grants edit rights on it).
+    if (usesNewArtifacts(plan.apply) && !ctx.permissions.has('artifact.use'))
+      throw new AppError('PERMISSION_DENIED', 'You may not use artifacts in designs', {
+        reason: 'missing_permission',
+        permission: 'artifact.use',
+      });
+    const artifacts = await this.artifacts.revisionInfos(ctx, artifactIds);
     const result: ApplyResult = applyOperation(state, plan.apply, {
       actorUserId: ctx.userId,
       now: new Date().toISOString(),
@@ -490,6 +494,11 @@ function hashSnapshots(snapshots: Record<string, string>): Record<string, string
 }
 
 /** Artifact revisions the operation names or touches (attach/replace, placements of existing relationships). */
+function usesNewArtifacts(op: Operation): boolean {
+  if (op.type === 'attach_artifact' || op.type === 'replace_artifact') return true;
+  return op.type === 'batch' && op.operations.some((o) => usesNewArtifacts(o as Operation));
+}
+
 function artifactRevisionIdsOf(op: Operation, state: GarmentDesignState): string[] {
   const ids: string[] = [];
   const walk = (o: Operation) => {

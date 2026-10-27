@@ -11,6 +11,7 @@ import {
   type ArtifactRevision as ArtifactRevisionView,
   ArtifactRevisionCreatedEvent,
   artifactListQuerySchema,
+  type createArtifactFromComponentRequestSchema,
   type createArtifactRequestSchema,
   type createArtifactRevisionRequestSchema,
   decodeCursor,
@@ -41,12 +42,16 @@ import {
   validateArtifactRevision,
   type ArtifactDefinition,
   type ArtifactProperties,
+  type PropertyValue,
 } from '@ai-designer/garment-model';
+import { componentPreviewSvg, renderGarment } from '@ai-designer/garment-render';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
+import type { Request } from 'express';
 import type { z } from 'zod';
 
 import { AuditService } from '../../platform/audit/audit.service.js';
 import type { AuthzContext } from '../../platform/authz/authorizer.js';
+import { PolicyEnforcer } from '../../platform/authz/policy-enforcer.js';
 import { ResourceResolverRegistry } from '../../platform/authz/resource-resolvers.js';
 import { assertUpdated, assertVersion } from '../../platform/concurrency/assert-version.js';
 import { AppError } from '../../platform/errors/app-error.js';
@@ -55,6 +60,7 @@ import { PrismaService } from '../../platform/prisma/prisma.service.js';
 import { AssetsService } from '../assets/assets.service.js';
 import { AssetReferenceRegistry } from '../assets/reference-registry.js';
 import { DesignReferencesService } from '../designs/references.service.js';
+import { WorkingCopyService } from '../designs/working-copy.service.js';
 
 import { visibleArtifacts, writableArtifacts } from './artifact-scope.js';
 
@@ -70,6 +76,8 @@ export interface ArtifactRevisionInfoView {
   definition: ArtifactDefinition;
   geometryCapability: GeometryCapability;
   active: boolean;
+  name: string;
+  visual: Record<string, PropertyValue>;
 }
 
 /** What the built-in library allows from inside an organization: read, use, copy (FR-SEC-116). */
@@ -112,6 +120,8 @@ export class ArtifactsService implements OnModuleInit {
     private readonly assets: AssetsService,
     private readonly assetReferences: AssetReferenceRegistry,
     private readonly references: DesignReferencesService,
+    private readonly workingCopies: WorkingCopyService,
+    private readonly enforcer: PolicyEnforcer,
   ) {}
 
   onModuleInit(): void {
@@ -249,11 +259,14 @@ export class ArtifactsService implements OnModuleInit {
     if (!ids.length) return new Map<string, ArtifactRevisionInfoView>();
     const rows = await this.prisma.artifactRevision.findMany({
       where: { id: { in: ids }, artifact: visibleArtifacts(ctx) },
-      include: { artifact: { select: { id: true, category: true, lifecycleStatus: true } } },
+      include: {
+        artifact: { select: { id: true, name: true, category: true, lifecycleStatus: true } },
+      },
     });
     const out = new Map<string, ArtifactRevisionInfoView>();
     for (const r of rows) {
-      const definition = validateArtifactRevision(r.definition, r.properties).definition;
+      const checked = validateArtifactRevision(r.definition, r.properties);
+      const definition = checked.definition;
       if (!definition) continue;
       out.set(r.id, {
         artifactRevisionId: r.id,
@@ -262,6 +275,8 @@ export class ArtifactsService implements OnModuleInit {
         definition,
         geometryCapability: r.geometryCapability as GeometryCapability,
         active: r.artifact.lifecycleStatus === 'active',
+        name: r.artifact.name,
+        visual: checked.properties?.visual ?? {},
       });
     }
     return out;
@@ -275,10 +290,29 @@ export class ArtifactsService implements OnModuleInit {
     if (!revisionIds.length) return [];
     const rows = await this.prisma.artifactRevision.findMany({
       where: { id: { in: [...revisionIds] }, artifact: visibleArtifacts(ctx) },
-      include: { artifact: { select: { id: true, name: true, category: true } } },
+      include: {
+        artifact: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            displayId: true,
+            lifecycleStatus: true,
+            currentRevisionId: true,
+            currentRevision: { select: { revisionNumber: true } },
+          },
+        },
+      },
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => {
+      const def = r.definition as {
+        compatibleTargetTypes?: unknown;
+        allowedPlacementRegions?: unknown;
+        preferredPlacementRegions?: unknown;
+      };
+      const strings = (v: unknown) =>
+        Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
       const sp = (r.definition as { shapeParams?: unknown }).shapeParams as
         { kind?: unknown; params?: unknown } | null | undefined;
       return {
@@ -291,7 +325,85 @@ export class ArtifactsService implements OnModuleInit {
             ? { kind: sp.kind, params: sp.params as Record<string, number | string | boolean> }
             : null,
         previewUrl: this.previewUrl(ctx, r),
+        displayId: formatRevisionId(r.artifact.displayId, r.revisionNumber),
+        revisionNumber: r.revisionNumber,
+        currentRevisionId: r.artifact.currentRevisionId,
+        currentRevisionNumber: r.artifact.currentRevision?.revisionNumber ?? r.revisionNumber,
+        lifecycleStatus: r.artifact.lifecycleStatus as ArtifactRenderInfo['lifecycleStatus'],
+        compatibleTargetTypes: strings(def.compatibleTargetTypes),
+        allowedPlacementRegions: Array.isArray(def.allowedPlacementRegions)
+          ? strings(def.allowedPlacementRegions)
+          : null,
+        preferredPlacementRegions: strings(def.preferredPlacementRegions),
       };
+    });
+  }
+
+  // ---------------------------------------------------------------- save from a design (I18)
+
+  /**
+   * Saves a component of a design's working copy as a new artifact (FR-EDT-057): its compatible
+   * target is the component's type, its visual values are the component's design values (statuses
+   * kept — nothing becomes confirmed), its physical values stay as they are (usually missing), and its
+   * preview is the component cropped from the parametric 2D flat.
+   */
+  async createFromComponent(
+    req: Request,
+    ctx: AuthzContext,
+    body: z.output<typeof createArtifactFromComponentRequestSchema>,
+  ): Promise<ArtifactDetail> {
+    await this.enforcer.enforce(req, {
+      organizationId: ctx.organizationId,
+      permission: 'design.view',
+      resource: { type: 'design', id: body.designId },
+      notFoundLabel: 'Design',
+    });
+    const state = await this.workingCopies.currentState(ctx.organizationId, body.designId);
+    const component = state.components.find((c) => c.componentId === body.componentId);
+    if (!component) throw AppError.notFound('Component');
+    const category = component.componentType;
+    if (!(category in ArtifactCategories))
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `A ${category.replaceAll('_', ' ')} cannot be saved as an artifact yet`,
+        { componentType: category, allowed: Object.keys(ArtifactCategories) },
+      );
+    const visual: Record<string, PropertyValue> = {};
+    const physical: Record<string, PropertyValue> = {};
+    for (const [key, pv] of Object.entries(component.properties)) {
+      if (key.startsWith('material.')) {
+        if (key !== 'material.fabric_ref') physical[key] = pv;
+      } else if (pv.value !== null) visual[key] = pv;
+    }
+    const descendants = new Set([component.componentId]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const c of state.components)
+        if (
+          c.parentComponentId &&
+          descendants.has(c.parentComponentId) &&
+          !descendants.has(c.componentId)
+        ) {
+          descendants.add(c.componentId);
+          grew = true;
+        }
+    }
+    const preview = componentPreviewSvg(renderGarment(state), [...descendants], {
+      background: '#ffffff',
+    });
+    return this.create(ctx, {
+      category: category as ArtifactCategory,
+      name: body.name,
+      ...(body.description ? { description: body.description } : {}),
+      tags: body.tags ?? [category],
+      scope: body.scope,
+      definition: {
+        compatibleTargetTypes: [category],
+        placementModes: ['attach'],
+        previewSvg: preview && preview.length <= 20_000 ? preview : null,
+      },
+      properties: { visual, physical },
+      changeNote: 'Saved from a design component',
     });
   }
 

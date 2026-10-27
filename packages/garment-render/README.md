@@ -79,6 +79,12 @@ labelled **approximate** box (FR-RV-078/079). Embroidery/artwork are dashed plac
 region anchor (`left_chest`, …). Artifact names/shape parameters come from the `artifact` resolver
 (`GET /v1/orgs/:orgId/artifacts/render-info` in the web app).
 
+Placement (I18): `placement.scale` multiplies the trim width / artwork box, `placement.offset` (mm) moves a trim
+away from its boundary (`shiftAway`) or an artwork box down, `placement.rotationDeg` rotates the artwork box
+(`rotatedRect`). All values are in the component's local space, so the same placement always gives the same
+drawing (GEO-005). `componentPreviewSvg(scene, componentIds)` cuts a component (and its children) out of the flat
+for artifact previews.
+
 ## Files
 
 `types.ts` (scene model) · `registry.ts` (templates) · `frame.ts` (shared measurements) ·

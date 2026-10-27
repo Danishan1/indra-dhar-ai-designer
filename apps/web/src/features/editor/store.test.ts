@@ -65,7 +65,15 @@ class FakeServer implements EditorApi {
       },
       headRevision: null,
       approvedRevision: null,
-      capabilities: { canEdit, canCommit: canEdit, canRestore: canEdit, canGenerate: false },
+      capabilities: {
+        canEdit,
+        canCommit: canEdit,
+        canRestore: canEdit,
+        canGenerate: false,
+        canUseArtifacts: canEdit,
+        canCreateArtifacts: canEdit,
+        canPublishArtifacts: false,
+      },
       readOnlyReason: canEdit ? null : 'permission',
       userId: USER,
     };

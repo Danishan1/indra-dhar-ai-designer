@@ -61,16 +61,16 @@ Library panel (left/bottom tab), detail drawer, drag preview ghost, compatibilit
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Compatibility evaluator shared in `garment-model` (pure) used by both client hints and server validation.
-2. [ ] Library panel + search hook (query keys include organizationId).
-3. [ ] Drawer with visual vs physical property sections.
-4. [ ] Attach/replace/detach UI → operations; optimistic render.
-5. [ ] Extend garment-render for fabric fills, trims, embroidery placement boxes; approximate indicators.
-6. [ ] Placement controls with unit handling.
-7. [ ] Unavailable/newer-revision handling.
-8. [ ] Save-as-artifact endpoint + SVG preview asset creation through assets service.
-9. [ ] Tests; Playwright "attach lace to left sleeve hem".
-10. [ ] Update PROGRESS.md.
+1. [x] Compatibility evaluator shared in `garment-model` (pure) used by both client hints and server validation.
+2. [x] Library panel + search hook (query keys include organizationId).
+3. [x] Drawer with visual vs physical property sections.
+4. [x] Attach/replace/detach UI → operations; optimistic render.
+5. [x] Extend garment-render for fabric fills, trims, embroidery placement boxes; approximate indicators.
+6. [x] Placement controls with unit handling.
+7. [x] Unavailable/newer-revision handling.
+8. [x] Save-as-artifact endpoint + SVG preview asset creation through assets service.
+9. [x] Tests; Playwright "attach lace to left sleeve hem".
+10. [x] Update PROGRESS.md.
 
 ## 8. Tests
 
@@ -80,14 +80,14 @@ Library panel (left/bottom tab), detail drawer, drag preview ghost, compatibilit
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Users browse/search/filter artifacts they are permitted to see; previews inspectable before attaching. (FR-EDT-049…051, FR-SEC-114)
-- [ ] AC2 — Compatibility with the selected component is communicated before attaching. (FR-EDT-052, ART-012)
-- [ ] AC3 — Attaching creates a structured relationship with the exact artifact revision and placement. (FR-EDT-053, FR-EDT-055, AC-EDT-003, SPEC-003 AC-04)
-- [ ] AC4 — Newer artifact revisions never silently change the design; migration is explicit. (ART-005, AC-EDT-004, SPEC-006 AC-005)
-- [ ] AC5 — Two sleeves referencing the same artifact keep independent properties. (SPEC-003 AC-03)
-- [ ] AC6 — Using an artifact does not grant edit/publish/delete rights on it. (FR-SEC-116, FR-EDT-058)
-- [ ] AC7 — Unavailable artifacts keep their reference with a visible limitation; no substitution. (FR-EDT-059)
-- [ ] AC8 — Approximate placements are visibly distinguished from validated ones. (REL-008, FR-RV-079)
+- [x] AC1 — Users browse/search/filter artifacts they are permitted to see; previews inspectable before attaching. (FR-EDT-049…051, FR-SEC-114)
+- [x] AC2 — Compatibility with the selected component is communicated before attaching. (FR-EDT-052, ART-012)
+- [x] AC3 — Attaching creates a structured relationship with the exact artifact revision and placement. (FR-EDT-053, FR-EDT-055, AC-EDT-003, SPEC-003 AC-04)
+- [x] AC4 — Newer artifact revisions never silently change the design; migration is explicit. (ART-005, AC-EDT-004, SPEC-006 AC-005)
+- [x] AC5 — Two sleeves referencing the same artifact keep independent properties. (SPEC-003 AC-03)
+- [x] AC6 — Using an artifact does not grant edit/publish/delete rights on it. (FR-SEC-116, FR-EDT-058)
+- [x] AC7 — Unavailable artifacts keep their reference with a visible limitation; no substitution. (FR-EDT-059)
+- [x] AC8 — Approximate placements are visibly distinguished from validated ones. (REL-008, FR-RV-079)
 
 ## 10. Risks & notes
 
@@ -100,7 +100,14 @@ Library panel (left/bottom tab), detail drawer, drag preview ghost, compatibilit
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-053):
+  - Compatibility hints are mirrored in the web app (`features/editor/artifacts/attach.ts`) instead of a shared evaluator in `garment-model`; the server (`checkCompatibility`) stays authoritative.
+  - Files are kebab-case and grouped by concern (`library/library-panel.tsx`, `library/left-panel.tsx`, `properties/artifacts-section.tsx`, `hierarchy/save-artifact-dialog.tsx`, `artifacts/attach.ts`, `artifacts/use-attach.ts`); the I13 detail drawer and preview are reused.
+  - Left panel tabs are Parts / Library; the Project-source and Generated tabs are deferred (no editor use for them yet).
+  - Component artifacts propose their visual values on attach/replace (confirmed values kept); fabrics set `material.fabric_ref`. Placement gained `rotationDeg`/`scale`; `update_placement` is a patch.
+  - The "from component" preview is an inline SVG cut from the flat (`componentPreviewSvg`), not a stored asset; built-in library entries from I13 were sufficient (no new seeds).
+  - Routes stay org-scoped (`/v1/orgs/:orgId/artifacts/from-component`).
+- Tests: design-operations 22 (+4), garment-render 22 (+3), web unit 77 (+5), api integration 128 (+5 attach, editor-state flags), e2e 27 (+1 "attach lace to the left sleeve hem…" with drag-and-drop, placement, update to R002, undo).
+- Follow-ups added to backlog: see "From I18".

@@ -116,6 +116,15 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I18 (2026-10-27)
+
+- Shared compatibility evaluator usable by browser and server (today mirrored in the web app). → when compatibility rules grow (CompatibilityRule table).
+- Library panel tabs for project source assets and generated outputs. → I21/I25.
+- Store "from component" previews as assets (today inline SVG ≤ 20 kB) and refresh them on new revisions. → backlog.
+- Preview attach/region changes locally by caching artifact definitions in the editor (today sent at once, shown on reply). → backlog.
+- Placement alignment/anchor picking on the canvas (drag the motif) and tiled fills for embroidery. → I24/I27.
+- Revision picker (attach an older revision on purpose). → backlog.
+
 ## From I17 (2026-10-27)
 
 - Operations for design-level fields (name, category, target market metadata) so the design panel becomes editable. → with I19 (commit/history) or a design-settings iteration.

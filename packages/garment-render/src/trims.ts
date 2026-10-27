@@ -9,7 +9,19 @@ import type {
   GarmentDesignState,
 } from '@ai-designer/garment-model';
 
-import { add, dist, path, pointAt, polylineLength, pt, rect, scale, sub } from './geometry.js';
+import {
+  add,
+  dist,
+  offsetPolyline,
+  path,
+  pointAt,
+  polyline,
+  polylineLength,
+  pt,
+  rect,
+  scale,
+  sub,
+} from './geometry.js';
 import type {
   BoundaryPath,
   Bounds,
@@ -82,6 +94,38 @@ export function scallopPath(points: Point[], width: number, inside: Point) {
   return { path: b, count: n };
 }
 
+const scaleOf = (r: DesignRelationship): number => {
+  const sc = r.placement?.scale;
+  return typeof sc === 'number' && sc > 0 ? sc : 1;
+};
+const offsetMm = (r: DesignRelationship): number => {
+  const o = r.placement?.offset;
+  if (!o) return 0;
+  return o.unit === 'cm' ? o.value * 10 : o.unit === 'in' ? o.value * 25.4 : o.value;
+};
+
+/** Moves an edge `d` mm away from `inside` (negative: towards it). */
+export function shiftAway(points: readonly Point[], d: number, inside: Point): Point[] {
+  const shifted = offsetPolyline(points, d);
+  const mid = points[Math.floor(points.length / 2)]!;
+  const smid = shifted[Math.floor(points.length / 2)]!;
+  const away = dist(smid, inside) > dist(mid, inside);
+  return away ? shifted : offsetPolyline(points, -d);
+}
+
+/** A rectangle of `w`×`h` centred on `c`, rotated by `deg` (deterministic). */
+export function rotatedRect(c: Point, w: number, h: number, deg: number) {
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  const corner = (dx: number, dy: number) =>
+    pt(c.x + dx * cos - dy * sin, c.y + dx * sin + dy * cos);
+  return polyline(
+    [corner(-w / 2, -h / 2), corner(w / 2, -h / 2), corner(w / 2, h / 2), corner(-w / 2, h / 2)],
+    true,
+  );
+}
+
 const centreOf = (t: TrimTarget): Point =>
   t.anchors.centre ?? pt(t.bounds.x + t.bounds.width / 2, t.bounds.y + t.bounds.height / 2);
 
@@ -137,7 +181,10 @@ export function renderTrims(
         boundary.points.length >= 2 &&
         dist(boundary.points[0]!, boundary.points.at(-1)!) > 0
       ) {
-        const { path: p } = scallopPath(boundary.points, num('widthMm', 18), centreOf(target));
+        const inside = centreOf(target);
+        const offset = offsetMm(r);
+        const pts = offset ? shiftAway(boundary.points, offset, inside) : boundary.points;
+        const { path: p } = scallopPath(pts, num('widthMm', 18) * scaleOf(r), inside);
         elements.push({
           ...base,
           id: `${r.relationshipId}:${view}:trim`,
@@ -160,10 +207,12 @@ export function renderTrims(
     }
     // Embroidery / artwork: a placeholder box at the region (or the centre, marked approximate).
     const at = (region && target.anchors[region]) || null;
-    const w = num('widthMm', 70);
-    const h = num('heightMm', w);
-    const c = at ?? centreOf(target);
-    const p = rect(c.x - w / 2, c.y - h / 2, w, h);
+    const w = num('widthMm', 70) * scaleOf(r);
+    const h = num('heightMm', num('widthMm', 70)) * scaleOf(r);
+    const base0 = at ?? centreOf(target);
+    // Offset moves the placement down from its anchor (component_local y), rotation turns it.
+    const c = pt(base0.x, base0.y + offsetMm(r));
+    const p = rotatedRect(c, w, h, r.placement?.rotationDeg ?? 0);
     const approx = !at || r.placement?.approximate === true;
     elements.push({
       ...base,

@@ -37,6 +37,41 @@ const collarArtifact: ArtifactRevisionInfo = {
   geometryCapability: 'G2',
   active: true,
 };
+const stated = (value: string) => ({
+  value,
+  unit: null,
+  status: 'confirmed' as const,
+  sourceType: 'imported_data' as const,
+  sourceRefs: [],
+  confidence: null,
+  reviewRequired: false,
+  confirmedBy: 'platform-library',
+  confirmedAt: WHEN,
+});
+const raglanSleeve: ArtifactRevisionInfo = {
+  artifactRevisionId: 'rev-raglan-1',
+  artifactId: 'art-raglan',
+  category: 'sleeve',
+  name: 'Long raglan sleeve',
+  definition: artifactDefinitionSchema.parse({ compatibleTargetTypes: ['sleeve'] }),
+  geometryCapability: 'G2',
+  active: true,
+  visual: { 'construction.sleeve_type': stated('raglan') },
+};
+const navyTwill: ArtifactRevisionInfo = {
+  artifactRevisionId: 'rev-navy-1',
+  artifactId: 'art-navy',
+  category: 'fabric',
+  name: 'Navy twill',
+  definition: artifactDefinitionSchema.parse({
+    compatibleTargetTypes: ['garment_body', 'sleeve'],
+    repeatable: true,
+    placementModes: ['tiled_fill'],
+  }),
+  geometryCapability: 'G2',
+  active: true,
+  visual: { 'appearance.color': stated('#1e3a8a'), 'appearance.pattern': stated('solid') },
+};
 const ctx = (over: Partial<ApplyContext> = {}): ApplyContext => ({
   actorUserId: 'user-1',
   now: WHEN,
@@ -46,6 +81,16 @@ const ctx = (over: Partial<ApplyContext> = {}): ApplyContext => ({
     [collarArtifact.artifactRevisionId, collarArtifact],
     ['rev-lace-3', { ...lace, artifactRevisionId: 'rev-lace-3' }],
     ['rev-old', { ...lace, artifactRevisionId: 'rev-old', active: false }],
+    [raglanSleeve.artifactRevisionId, raglanSleeve],
+    [
+      'rev-raglan-2',
+      {
+        ...raglanSleeve,
+        artifactRevisionId: 'rev-raglan-2',
+        visual: { 'construction.sleeve_type': stated('dolman') },
+      },
+    ],
+    [navyTwill.artifactRevisionId, navyTwill],
   ]),
   ...over,
 });
@@ -570,3 +615,144 @@ function sortState(s: GarmentDesignState) {
     ),
   };
 }
+
+describe('component and fabric artifacts (I18)', () => {
+  it('copies stated visual values as proposals sourced from the pinned revision; sleeves stay independent', () => {
+    const s = shirt();
+    const left = find(s, 'sleeve', 'left');
+    const right = find(s, 'sleeve', 'right');
+    let r = ok(s, {
+      type: 'attach_artifact',
+      componentId: left.componentId,
+      artifactRevisionId: 'rev-raglan-1',
+    });
+    let l = find(r.state, 'sleeve', 'left');
+    expect(l.properties['construction.sleeve_type']).toMatchObject({
+      value: 'raglan',
+      status: 'proposed',
+      sourceType: 'artifact_revision',
+      sourceRefs: [
+        { entityId: 'art-raglan', revisionId: 'rev-raglan-1', note: 'Long raglan sleeve' },
+      ],
+    });
+    r = ok(r.state, {
+      type: 'attach_artifact',
+      componentId: right.componentId,
+      artifactRevisionId: 'rev-raglan-1',
+    });
+    // Independent properties: editing one sleeve does not touch the other (SPEC-003 AC-03).
+    r = ok(r.state, {
+      type: 'set_property',
+      componentId: right.componentId,
+      key: 'dimension.sleeve_length',
+      value: 300,
+      unit: 'mm',
+    });
+    expect(find(r.state, 'sleeve', 'left').properties['dimension.sleeve_length']?.value).toBeNull();
+    // Replacing with a newer revision re-applies its values; the old pin is gone.
+    l = find(r.state, 'sleeve', 'left');
+    const binding = l.artifactBindings[0]!;
+    r = ok(r.state, {
+      type: 'replace_artifact',
+      componentId: left.componentId,
+      bindingId: binding.bindingId,
+      artifactRevisionId: 'rev-raglan-2',
+    });
+    l = find(r.state, 'sleeve', 'left');
+    expect(l.properties['construction.sleeve_type']?.value).toBe('dolman');
+    expect(l.artifactBindings[0]?.artifactRevisionId).toBe('rev-raglan-2');
+    expect(find(r.state, 'sleeve', 'right').artifactBindings[0]?.artifactRevisionId).toBe(
+      'rev-raglan-1',
+    );
+  });
+
+  it('never overrides a confirmed value, and says so', () => {
+    const s = shirt();
+    const left = find(s, 'sleeve', 'left');
+    let r = ok(s, {
+      type: 'set_property',
+      componentId: left.componentId,
+      key: 'construction.sleeve_type',
+      value: 'set_in',
+    });
+    r = ok(r.state, {
+      type: 'attach_artifact',
+      componentId: left.componentId,
+      artifactRevisionId: 'rev-raglan-1',
+    });
+    expect(find(r.state, 'sleeve', 'left').properties['construction.sleeve_type']).toMatchObject({
+      value: 'set_in',
+      status: 'confirmed',
+    });
+    expect(r.findings.map((f) => f.ruleId)).toContain('artifact.kept_confirmed_values');
+  });
+
+  it('a fabric becomes the fabric reference (confirmed by the person) and leaves with the binding', () => {
+    const s = shirt();
+    const body = find(s, 'garment_body');
+    let r = ok(s, {
+      type: 'attach_artifact',
+      componentId: body.componentId,
+      artifactRevisionId: 'rev-navy-1',
+    });
+    let b = find(r.state, 'garment_body');
+    expect(b.properties['material.fabric_ref']).toMatchObject({
+      value: { entityType: 'artifact_revision', entityId: 'rev-navy-1' },
+      status: 'confirmed',
+      confirmedBy: 'user-1',
+    });
+    expect(b.properties['appearance.color']).toMatchObject({
+      value: '#1e3a8a',
+      status: 'proposed',
+    });
+    expect(r.state.relationships).toHaveLength(0);
+    r = ok(r.state, {
+      type: 'detach_artifact',
+      componentId: body.componentId,
+      bindingId: b.artifactBindings[0]!.bindingId,
+    });
+    b = find(r.state, 'garment_body');
+    expect(b.properties['material.fabric_ref']?.status).toBe('missing');
+    expect(b.properties['appearance.color']?.value).toBe('#1e3a8a');
+  });
+
+  it('placement rotation and scale are stored and updated reproducibly (GEO-005)', () => {
+    const s = shirt();
+    const sleeve = find(s, 'sleeve', 'left');
+    let r = ok(s, {
+      type: 'attach_artifact',
+      componentId: sleeve.componentId,
+      artifactRevisionId: 'rev-lace-2',
+      placement: { region: 'hem', rotationDeg: 15, scale: 1.5 },
+    });
+    const rel = r.state.relationships[0]!;
+    expect(rel.placement).toMatchObject({ region: 'hem', rotationDeg: 15, scale: 1.5 });
+    r = ok(r.state, {
+      type: 'update_placement',
+      relationshipId: rel.relationshipId,
+      placement: { scale: 0.5, offsetMm: 4 },
+    });
+    expect(r.state.relationships[0]!.placement).toMatchObject({
+      rotationDeg: 15,
+      scale: 0.5,
+      offset: { value: 4, unit: 'mm' },
+    });
+    const again = ok(s, {
+      type: 'attach_artifact',
+      componentId: sleeve.componentId,
+      artifactRevisionId: 'rev-lace-2',
+      placement: { region: 'hem', rotationDeg: 15, scale: 1.5 },
+      bindingId: r.state.components.find((c) => c.componentId === sleeve.componentId)!
+        .artifactBindings[0]!.bindingId,
+      relationshipId: rel.relationshipId,
+    });
+    expect(again.state.relationships[0]!.placement).toEqual(rel.placement);
+    expect(() =>
+      op({
+        type: 'update_placement',
+        relationshipId: rel.relationshipId,
+        placement: { scale: 50 },
+      }),
+    ).toThrow();
+  });
+});

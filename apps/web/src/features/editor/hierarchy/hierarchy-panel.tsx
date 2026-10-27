@@ -42,6 +42,7 @@ import { selectModeFor } from '../canvas/hit-test';
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
 
+import { canSaveAsArtifact, SaveArtifactDialog } from './save-artifact-dialog';
 import { addableChildren, flattenTree, type TreeNode, useTree } from './use-hierarchy';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -74,6 +75,8 @@ export function HierarchyPanel() {
   const [focused, setFocused] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState<DesignComponent | null>(null);
+  const [saving, setSaving] = useState<DesignComponent | null>(null);
+  const canSaveArtifacts = useEditor((s) => s.meta.capabilities.canCreateArtifacts);
   const refs = useRef(new Map<string, HTMLDivElement>());
 
   const focusedId =
@@ -197,6 +200,11 @@ export function HierarchyPanel() {
             onRename={(name) => rename(row.component, name)}
             onCancelRename={() => setRenaming(null)}
             onStartRename={() => setRenaming(row.component.componentId)}
+            onSaveAsArtifact={
+              canSaveArtifacts && canSaveAsArtifact(row.component)
+                ? () => setSaving(row.component)
+                : undefined
+            }
             onRemove={() =>
               components.some((x) => x.parentComponentId === row.component.componentId)
                 ? setRemoving(row.component)
@@ -205,6 +213,7 @@ export function HierarchyPanel() {
           />
         ))}
       </div>
+      {saving ? <SaveArtifactDialog component={saving} onClose={() => setSaving(null)} /> : null}
       <Dialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
         <DialogContent>
           <DialogHeader>
@@ -247,6 +256,7 @@ function TreeRow({
   onRename,
   onCancelRename,
   onStartRename,
+  onSaveAsArtifact,
   onRemove,
 }: {
   row: TreeNode;
@@ -263,6 +273,7 @@ function TreeRow({
   onRename: (name: string) => void;
   onCancelRename: () => void;
   onStartRename: () => void;
+  onSaveAsArtifact: (() => void) | undefined;
   onRemove: () => void;
 }) {
   const apply = useEditor((s) => s.apply);
@@ -410,6 +421,12 @@ function TreeRow({
                       {a.label}
                     </DropdownMenuItem>
                   ))}
+                </>
+              ) : null}
+              {onSaveAsArtifact ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={onSaveAsArtifact}>Save as artifact…</DropdownMenuItem>
                 </>
               ) : null}
               <DropdownMenuSeparator />

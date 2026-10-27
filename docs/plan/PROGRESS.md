@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I18 — Artifact browser & structured attachment** (next)                                            |
+| **Current iteration** | **I19 — Revision history, commit & comparison UI** (next)                                            |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I17 finished)                                                                            |
+| Last updated          | 2026-10-27 (I18 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -37,7 +37,7 @@
 | I15 | Editor shell, editor-core & autosave                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-015 (default), ADR-050; docs/architecture/editor.md |
 | I16 | Parametric 2D garment renderer (SVG)                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-024, ADR-051; packages/garment-render/README.md     |
 | I17 | Hierarchy, selection & contextual properties          | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-052; docs/architecture/editor.md                    |
-| I18 | Artifact browser & structured attachment              | 3     | todo   |            |            |          |                                                         |
+| I18 | Artifact browser & structured attachment              | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-053; docs/architecture/editor.md, artifacts.md      |
 | I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                         |
 | I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                    |
 | I21 | Generation job management & progress (SSE)            | 4     | todo   |            |            |          |                                                         |
@@ -108,6 +108,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I18 — web-side compatibility hints, Parts/Library tabs only, component values proposed on attach, placement patch with rotation/scale, inline SVG previews for saved components — ADR-053
 - 2026-10-27 — I17 — dependency rules added to garment-model, lock/visibility stay component flags (UI-enforced lock), read-only design panel, debug panel removed — ADR-052
 - 2026-10-27 — I16 — kebab-case files grouped by concern, viewport logic in the editor store, `artifacts/render-info` endpoint, golden SVGs instead of pixel screenshots, Node perf check — ADR-051
 - 2026-10-27 — I15 — org-scoped editor-state route with PDP capability flags, editor in the `(editor)` group, slot-based workspace layout + status bar, ids generated in the browser, no IndexedDB snapshot / conflict diff yet — ADR-050
@@ -128,6 +129,17 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I18 Artifact browser & structured attachment (session 1) — DONE
+
+- Plan: operations (placement rotation/scale, patch, component values, fabric ref) → API (`artifact.use`, render-info pins, from-component) → renderer placements + component previews → editor Library tab, drag-and-drop, Artifacts section, Save as artifact → tests → docs.
+- Built: revision-pinned attach/replace/detach with explicit "Update to Rn"; component artifacts propose their values (confirmed kept), fabrics set the fabric ref; placement controls (region, offset, scale, rotation, coordinate space); unavailable/deactivated/approximate chips; library panel with fit badges and "only what fits"; drag a card onto the drawing; "Save as artifact…" from the hierarchy; editor capability flags for artifacts.
+- Tests: design-operations 22, garment-render 22, web unit 77, api unit 101, integration api 128 + worker 13, e2e 27.
+- **Owner actions (Windows):**
+  1. `pnpm install` (the API now depends on `@ai-designer/garment-render`).
+  2. No migration.
+  3. `pnpm dev` → open a design, select a sleeve, open **Library** in the left panel, attach "Scalloped lace border" (or drag it onto the drawing), adjust its placement in Properties → Artifacts; use a hierarchy row's ⋯ menu → "Save as artifact…".
+- **Next step:** I19 — revision history, commit & comparison UI.
 
 ### 2026-10-27 — I17 Hierarchy, selection & contextual properties (session 1) — DONE
 

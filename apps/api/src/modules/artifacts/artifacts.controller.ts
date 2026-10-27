@@ -9,6 +9,7 @@ import {
   artifactRevisionSchema,
   compatibilityCheckRequestSchema,
   compatibilityCheckResponseSchema,
+  createArtifactFromComponentRequestSchema,
   createArtifactRequestSchema,
   createArtifactRevisionRequestSchema,
   duplicateArtifactRequestSchema,
@@ -103,6 +104,25 @@ export class ArtifactsController {
     @Body() body: z.output<typeof compatibilityCheckRequestSchema>,
   ) {
     return this.artifacts.compatibility(authzContext(req), body);
+  }
+
+  @Post('from-component')
+  @Idempotent()
+  @RequirePermission('artifact.create')
+  @Endpoint({
+    summary: 'Save a component of a design as a new artifact (preview from the 2D flat)',
+    tags: ['artifacts'],
+    params: orgIdParamsSchema,
+    body: createArtifactFromComponentRequestSchema,
+    response: artifactDetailSchema,
+    successStatus: 201,
+    errors: ['NOT_FOUND', 'PERMISSION_DENIED', 'VALIDATION_FAILED', 'VALIDATION_BLOCKED'],
+  })
+  fromComponent(
+    @Req() req: Request,
+    @Body() body: z.output<typeof createArtifactFromComponentRequestSchema>,
+  ) {
+    return this.artifacts.createFromComponent(req, authzContext(req), body);
   }
 
   @Get('render-info')

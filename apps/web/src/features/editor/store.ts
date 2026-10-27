@@ -93,6 +93,8 @@ export type OperationInput = z.input<typeof singleClientOperationSchema>;
 const SERVER_ONLY_PREVIEW = new Set<string>([
   'attach_artifact',
   'replace_artifact',
+  // A region change is checked against the artifact definition, which only the server has.
+  'update_placement',
   'regenerate_region',
   'interpret_reference',
 ]);

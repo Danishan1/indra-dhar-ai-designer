@@ -200,6 +200,12 @@ export const editorStateSchema = z.object({
     canCommit: z.boolean(),
     canRestore: z.boolean(),
     canGenerate: z.boolean(),
+    /** Attach/replace library artifacts (`artifact.use`, I18). */
+    canUseArtifacts: z.boolean().default(false),
+    /** Save a component as a new private artifact (`artifact.create`). */
+    canCreateArtifacts: z.boolean().default(false),
+    /** Save straight into the organization library (`artifact.publish`). */
+    canPublishArtifacts: z.boolean().default(false),
   }),
   /** Why editing is off (null when `canEdit`). */
   readOnlyReason: z.enum(['permission', 'project_status']).nullable(),

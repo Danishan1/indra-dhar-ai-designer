@@ -248,6 +248,17 @@ export const artifactRenderInfoSchema = z.object({
     .nullable(),
   /** Same-origin preview image (used as fabric texture), or null. */
   previewUrl: z.string().nullable(),
+  /** e.g. `LAC-0001-R002` — the exact revision a design pins. */
+  displayId: z.string(),
+  revisionNumber: z.number().int(),
+  /** Latest revision of the artifact ("Update to Rn" when newer, ART-005). */
+  currentRevisionId: z.uuid().nullable(),
+  currentRevisionNumber: z.number().int(),
+  /** `active`, or deactivated/deprecated: pinned uses stay, new uses are refused (ART-010). */
+  lifecycleStatus: artifactLifecycleStatusSchema,
+  compatibleTargetTypes: z.array(z.string()),
+  allowedPlacementRegions: z.array(z.string()).nullable(),
+  preferredPlacementRegions: z.array(z.string()),
 });
 export type ArtifactRenderInfo = z.infer<typeof artifactRenderInfoSchema>;
 
@@ -255,3 +266,18 @@ export const artifactRenderInfoResponseSchema = z.object({
   /** Only revisions the caller may see; unknown or hidden ids are simply absent. */
   items: z.array(artifactRenderInfoSchema),
 });
+
+// ── save a design component as an artifact (I18) ─────────────────────────────
+
+export const createArtifactFromComponentRequestSchema = z.object({
+  designId: z.uuid(),
+  componentId: z.string().regex(/^cmp_[a-z0-9]{8,32}$/),
+  name: nameSchema,
+  description: z.string().trim().max(2000).optional(),
+  tags: tagsSchema.optional(),
+  /** `user` = only you see it; `organization` needs `artifact.publish`. */
+  scope: writableArtifactScopeSchema.default('user'),
+});
+export type CreateArtifactFromComponentRequest = z.input<
+  typeof createArtifactFromComponentRequestSchema
+>;
