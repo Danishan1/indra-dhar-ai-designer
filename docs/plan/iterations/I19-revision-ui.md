@@ -62,15 +62,15 @@ History side panel, compare full-screen mode with toolbar (A/B pickers, side-by-
 
 ## 7. Implementation tasks (ordered checklist)
 
-1. [ ] Summary generator from operation records since base revision.
-2. [ ] Commit dialog + endpoint integration + idempotency.
-3. [ ] History panel with pagination and markers.
-4. [ ] Read-only revision viewing mode in editor store.
-5. [ ] Diff classification in garment-model + compare endpoint.
-6. [ ] Compare view (structured + visual side-by-side/overlay; synced viewport).
-7. [ ] Restore flow and confirmation copy.
-8. [ ] Tests; Playwright journey (commit R1, edit, commit R2, compare, restore R1, commit R3).
-9. [ ] Update PROGRESS.md.
+1. [x] Summary generator from operation records since base revision.
+2. [x] Commit dialog + endpoint integration + idempotency.
+3. [x] History panel with pagination and markers.
+4. [x] Read-only revision viewing mode in editor store.
+5. [x] Diff classification in garment-model + compare endpoint.
+6. [x] Compare view (structured + visual side-by-side/overlay; synced viewport).
+7. [x] Restore flow and confirmation copy.
+8. [x] Tests; Playwright journey (commit R1, edit, commit R2, compare, restore R1, commit R3).
+9. [x] Update PROGRESS.md.
 
 ## 8. Tests
 
@@ -80,13 +80,13 @@ History side panel, compare full-screen mode with toolbar (A/B pickers, side-by-
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Committing creates an immutable revision; previous revisions unchanged. (FR-PRJ-021, FR-PRJ-026, DSN-008, SPEC-006 AC-002/003, SPEC-003 AC-01)
-- [ ] AC2 — History lists revisions with author, time, summary, lineage. (FR-PRJ-028, FR-PRJ-029)
-- [ ] AC3 — Comparison identifies component, property, relationship and artifact-reference changes, separating visual-only differences. (DSN-011, FR-PRJ-030/031, FR-EDT-094, SPEC-003 AC-08, AC-EDT-012)
-- [ ] AC4 — Each comparison panel shows which revision it represents. (FR-RV-121, FR-RV-184)
-- [ ] AC5 — Restoring creates a new working state; committing it yields a new revision with valid lineage; later revisions remain. (FR-PRJ-033/034, SPEC-006 AC-004)
-- [ ] AC6 — The UI distinguishes autosaved working copy from committed revisions. (FR-EDT-092)
-- [ ] AC7 — Revision content hash is verified when restoring/viewing. (FR-PRJ-023)
+- [x] AC1 — Committing creates an immutable revision; previous revisions unchanged. (FR-PRJ-021, FR-PRJ-026, DSN-008, SPEC-006 AC-002/003, SPEC-003 AC-01)
+- [x] AC2 — History lists revisions with author, time, summary, lineage. (FR-PRJ-028, FR-PRJ-029)
+- [x] AC3 — Comparison identifies component, property, relationship and artifact-reference changes, separating visual-only differences. (DSN-011, FR-PRJ-030/031, FR-EDT-094, SPEC-003 AC-08, AC-EDT-012)
+- [x] AC4 — Each comparison panel shows which revision it represents. (FR-RV-121, FR-RV-184)
+- [x] AC5 — Restoring creates a new working state; committing it yields a new revision with valid lineage; later revisions remain. (FR-PRJ-033/034, SPEC-006 AC-004)
+- [x] AC6 — The UI distinguishes autosaved working copy from committed revisions. (FR-EDT-092)
+- [x] AC7 — Revision content hash is verified when restoring/viewing. (FR-PRJ-023)
 
 ## 10. Risks & notes
 
@@ -99,7 +99,14 @@ History side panel, compare full-screen mode with toolbar (A/B pickers, side-by-
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-054):
+  - No new commit/restore/summary routes: the I12 org-scoped APIs are reused; the commit dialog's change list comes from `compare?from=<head>&to=working` (the same generator as stored summaries) instead of a separate `working-copy/summary` endpoint built from operation records.
+  - Diff classification is a new `classifyDiff` next to `diffDesignStates` (entries with category, `visualOnly`, `semantic`); compare responses add `entries`, `changedComponentIds`, `metadataOnly`.
+  - Files are kebab-case (`revisions/{api.ts, use-revisions.ts, history-panel.tsx, commit-dialog.tsx, restore-dialog.tsx, revision-inspector.tsx, diff-list.tsx, flat-view.tsx}`); the read-only banner, compare view and overlay live in `revision-inspector.tsx`.
+  - Viewing/comparing replaces the editing panels (workspace `takeover` slot) rather than switching the canvas into a read-only mode; History is a right-panel tab.
+  - Compare side A is always a revision (B can be the working copy), as the API requires.
+  - The design-operations property-based test got a 30 s timeout (it timed out under the parallel `pnpm verify`).
+- Tests: garment-model 131 (+4 classifier), web unit 81 (+4: diff list, inspect guard), api integration 128 (compare entries), e2e 28 (+1 commit R002/R003 → history → compare + overlay → view → restore R001 → commit R004).
+- Follow-ups added to backlog: see "From I19".

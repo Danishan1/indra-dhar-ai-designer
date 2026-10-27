@@ -479,6 +479,19 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     const cmp = await json<CompareResponse>(res);
     expect(cmp.from).toMatchObject({ kind: 'revision', label: `${d.displayId}-R001` });
     expect(cmp.summary).toContain('Left sleeve: Sleeve length set to 560 mm');
+    // Classified entries (I19): the property change, with the sleeve to highlight.
+    expect(cmp.entries).toEqual([
+      expect.objectContaining({
+        category: 'property',
+        field: 'dimension.sleeve_length',
+        after: 560,
+        label: 'Left sleeve · Sleeve length',
+        semantic: true,
+        visualOnly: false,
+      }),
+    ]);
+    expect(cmp.changedComponentIds).toHaveLength(1);
+    expect(cmp.metadataOnly).toBe(false);
     expect(cmp.diff).toMatchObject({
       hasSemanticChanges: true,
       components: { changed: [expect.objectContaining({ properties: expect.any(Array) })] },
@@ -497,6 +510,9 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     );
     expect(vsWorking.to).toMatchObject({ kind: 'working', id: null });
     expect(vsWorking.summary).toEqual(['Removed Chest pocket']);
+    expect(vsWorking.entries).toEqual([
+      expect.objectContaining({ category: 'structural', kind: 'removed', label: 'Chest pocket' }),
+    ]);
     expect((await designer.get(`${org()}/designs/${d.id}/compare?from=${r1}&to=nope`)).status).toBe(
       400,
     );

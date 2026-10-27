@@ -107,6 +107,25 @@ garment automatically until the person zooms or pans. Dev gallery: `/dev/garment
   browser does not have, so they are sent at once and shown when the server answers.
 - Hierarchy menu "Save as artifact…" → `POST …/artifacts/from-component` (saved working copy; private by default).
 
+## Revisions (I19)
+
+- Header: working copy / latest / approved badges, "Restored from Rn" while a restore is not committed, **Commit…**.
+- Right panel tabs **Properties** / **History** (`revisions/history-panel.tsx`): the working copy (autosaved, not a
+  revision) on top, then revisions newest first (author, time, summary, lineage "After Rn · restored from Rm",
+  Latest / Approved / base markers, validation counts) with View, Compare and Restore. Paged (20).
+- Commit dialog (`commit-dialog.tsx`): saves pending changes, lists the changes since the latest revision
+  (`GET …/compare?from=<head>&to=working`), optional description, validation snapshot, one idempotency key per
+  dialog; `NO_CHANGES` offers "Commit anyway" only for metadata-only changes. Afterwards the store reloads.
+- `store.inspect` (`viewRevision`, `compare`, `closeInspect`): while set, the workspace `takeover` slot shows
+  `RevisionInspector` instead of the panels and `apply`/undo/redo do nothing. View = one revision read-only with an
+  "Integrity verified" badge (the server re-hashes every snapshot read). Compare = A (revision) / B (revision or
+  working copy) pickers, side by side or overlay with an opacity slider, one shared camera (`PanZoomArea`), changed
+  components highlighted by stable id, grouped diff list (appearance-only and non-design changes separate). Esc
+  closes it.
+- Restore dialog explains that history is kept and that uncommitted changes are replaced; afterwards the store
+  reloads and the next commit records "restored from".
+- Panel tabs share `components/panel-tabs.tsx` (`createTabStore`, `PanelTabs`, `PanelTabContent`).
+
 ## Rules for later iterations
 
 - **Never** put selection, viewport or tool state into the design (SPEC-007 §20); they live in the store.

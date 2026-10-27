@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I19 — Revision history, commit & comparison UI** (next)                                            |
+| **Current iteration** | **I20 — Design validation engine & findings UI** (next)                                              |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I18 finished)                                                                            |
+| Last updated          | 2026-10-27 (I19 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -38,7 +38,7 @@
 | I16 | Parametric 2D garment renderer (SVG)                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-024, ADR-051; packages/garment-render/README.md     |
 | I17 | Hierarchy, selection & contextual properties          | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-052; docs/architecture/editor.md                    |
 | I18 | Artifact browser & structured attachment              | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-053; docs/architecture/editor.md, artifacts.md      |
-| I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                         |
+| I19 | Revision history, commit & comparison UI              | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-054; docs/architecture/editor.md                    |
 | I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                    |
 | I21 | Generation job management & progress (SSE)            | 4     | todo   |            |            |          |                                                         |
 | I22 | AI provider registry, credentials & adapters          | 4     | todo   |            |            |          | Decide ADR-009                                          |
@@ -108,6 +108,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I19 — I12 APIs reused (change list from compare head→working), `classifyDiff` in garment-model, inspector as a workspace takeover, history as a right-panel tab — ADR-054
 - 2026-10-27 — I18 — web-side compatibility hints, Parts/Library tabs only, component values proposed on attach, placement patch with rotation/scale, inline SVG previews for saved components — ADR-053
 - 2026-10-27 — I17 — dependency rules added to garment-model, lock/visibility stay component flags (UI-enforced lock), read-only design panel, debug panel removed — ADR-052
 - 2026-10-27 — I16 — kebab-case files grouped by concern, viewport logic in the editor store, `artifacts/render-info` endpoint, golden SVGs instead of pixel screenshots, Node perf check — ADR-051
@@ -129,6 +130,17 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I19 Revision history, commit & comparison UI (session 1) — DONE
+
+- Plan: classify diffs in garment-model → compare API entries → store inspect state → history tab, commit dialog, restore dialog → revision viewer and compare (side by side / overlay, shared camera, highlights, grouped diff list) → tests → docs.
+- Built: Commit… in the header and History tab (change list since the latest revision, description, validation snapshot, idempotent); History with working copy card, lineage, markers, paging; read-only revision view with integrity badge; compare any revision with another or the working copy; restore with clear consequences and a "Restored from Rn" badge until the next commit.
+- Tests: garment-model 131, design-operations 22, garment-render 22, web unit 81, api unit 101, integration api 128 + worker 13, e2e 28.
+- **Owner actions (Windows):**
+  1. `pnpm install` (no new packages).
+  2. No migration.
+  3. `pnpm dev` → open a design, change something, **Commit…** (header), open **History** in the right panel: View / Compare / Restore a revision.
+- **Next step:** I20 — design validation engine & findings UI (→ M3).
 
 ### 2026-10-27 — I18 Artifact browser & structured attachment (session 1) — DONE
 

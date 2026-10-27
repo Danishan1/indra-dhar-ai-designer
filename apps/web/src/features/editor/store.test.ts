@@ -432,6 +432,25 @@ describe('editor store (I15 save pipeline)', () => {
     expect(selectCanUndo(s())).toBe(false);
   });
 
+  it('viewing or comparing revisions pauses editing and never changes the design (I19)', async () => {
+    s().viewRevision('rev-1');
+    expect(s().inspect).toEqual({ mode: 'view', revisionId: 'rev-1' });
+    expect(s().apply(rename(server.state, 'Nope'), { label: 'Rename' })).toBe(false);
+    await s().undo();
+    await settle();
+    expect(server.calls).toHaveLength(0);
+    s().compare('rev-1', 'working');
+    expect(s().inspect).toEqual({ mode: 'compare', a: 'rev-1', b: 'working' });
+    s().viewRevision('working');
+    expect(s().inspect).toBeNull();
+    expect(s().apply(rename(server.state, 'Yes'), { label: 'Rename' })).toBe(true);
+    s().compare('rev-1', 'rev-2');
+    s().closeInspect();
+    expect(s().inspect).toBeNull();
+    // Restore markers come from the working copy.
+    expect(s().server).toMatchObject({ restoredFromRevisionId: null });
+  });
+
   it('a change that cannot be undone is a history boundary', async () => {
     server.revertible = false;
     s().apply(rename(server.state, 'A'), { label: 'Rename' });

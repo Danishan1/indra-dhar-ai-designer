@@ -27,6 +27,7 @@ export * from './registry/property-rules.js';
 export * from './canonical/canonicalize.js';
 export * from './canonical/hash.js';
 export * from './diff/diff-design-states.js';
+export * from './diff/classify-diff.js';
 export * from './validation/structural.js';
 export * from './versioning/version.js';
 export * from './versioning/migrations.js';

@@ -30,4 +30,6 @@ A **design** lives in a project and has exactly one **working copy** (the mutabl
 
 ## Code
 
-`apps/api/src/modules/designs/` — `designs.service.ts` (create, list, duplicate, resolvers, project hooks), `working-copy.service.ts` (save/commit/restore), `revision.service.ts` (insert, verify, history), `compare.service.ts`, `change-summary.ts` (pure: summaries, refs, counts). Web: `apps/web/src/features/designs/` (developer views until the editor, I15–I19).
+`apps/api/src/modules/designs/` — `designs.service.ts` (create, list, duplicate, resolvers, project hooks), `working-copy.service.ts` (save/commit/restore), `revision.service.ts` (insert, verify, history), `compare.service.ts`, `change-summary.ts` (pure: summaries, refs, counts). Web: the editor's History tab, commit dialog and revision viewer/compare (`apps/web/src/features/editor/revisions/`, I19); `apps/web/src/features/designs/` keeps the developer views.
+
+Compare responses carry `entries` (`classifyDiff`: structural / property / artifact / relationship / metadata / editor_hint, appearance-only flagged), `changedComponentIds` (highlighting) and `metadataOnly` next to the raw `diff` and summary lines (I19, ADR-054).

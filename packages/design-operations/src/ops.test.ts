@@ -554,7 +554,7 @@ describe('batches, inverses and patches', () => {
       }),
       { numRuns: 60 },
     );
-  });
+  }, 30_000); // 60 random runs; slow when the whole workspace tests in parallel
 
   it('replace_state swaps everything and inverts to the previous state', () => {
     const s = shirt();

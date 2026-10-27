@@ -139,6 +139,13 @@ export interface WorkspaceSlots {
   hierarchyHeader?: ReactNode;
   viewport: ReactNode;
   properties: ReactNode;
+  /** Replaces the right panel's "Properties" title row (e.g. Properties / History tabs, I19). */
+  propertiesHeader?: ReactNode;
+  /**
+   * Shown instead of the panels (hierarchy, viewport, properties, bottom) while set — e.g. viewing
+   * or comparing revisions (I19). Header, toolbar and status bar stay.
+   */
+  takeover?: ReactNode;
   operations: ReactNode;
   validation: ReactNode;
   jobs: ReactNode;
@@ -152,6 +159,8 @@ function Workspace({
   hierarchyHeader,
   viewport,
   properties: propertiesContent,
+  propertiesHeader,
+  takeover,
   operations: operationsContent,
   validation,
   jobs,
@@ -230,92 +239,100 @@ function Workspace({
         </div>
       </Region>
 
-      <ResizablePanelGroup
-        id="editor-main"
-        orientation="horizontal"
-        className="min-h-0 flex-1"
-        {...mainLayout}
-      >
-        <ResizablePanel
-          id="hierarchy"
-          panelRef={hierarchy.ref}
-          onResize={hierarchy.onResize}
-          defaultSize="18"
-          minSize={180}
-          maxSize="35"
-          collapsible
-          className="bg-panel"
+      {takeover ? (
+        <div className="flex min-h-0 flex-1 flex-col" data-testid="workspace-takeover">
+          {takeover}
+        </div>
+      ) : null}
+      {/* Kept mounted (hidden) so panels, canvas and scroll positions survive a takeover. */}
+      <div className={cn('flex min-h-0 flex-1 flex-col', takeover ? 'hidden' : undefined)}>
+        <ResizablePanelGroup
+          id="editor-main"
+          orientation="horizontal"
+          className="min-h-0 flex-1"
+          {...mainLayout}
         >
-          <Region region="hierarchy" label="Hierarchy">
-            {hierarchyHeader ?? <PanelTitle>Hierarchy</PanelTitle>}
-            <div className="min-h-0 flex-1 overflow-auto">{hierarchyContent}</div>
-          </Region>
-        </ResizablePanel>
-        <ResizableHandle aria-label="Resize hierarchy panel" />
-        <ResizablePanel id="center" minSize="30">
-          <ResizablePanelGroup id="editor-center" orientation="vertical" {...centerLayout}>
-            <ResizablePanel id="viewport" minSize="30">
-              <Region region="viewport" label="Viewport" className="bg-viewport">
-                {viewport}
-              </Region>
-            </ResizablePanel>
-            <ResizableHandle aria-label="Resize operations panel" />
-            <ResizablePanel
-              id="operations"
-              panelRef={operations.ref}
-              onResize={operations.onResize}
-              defaultSize="24"
-              minSize={96}
-              maxSize="60"
-              collapsible
-              className="bg-panel"
-            >
-              <Region region="operations" label="Operations and status">
-                <Tabs defaultValue="operations" className="h-full gap-0">
-                  <div className="flex h-8 shrink-0 items-center border-b px-2">
-                    <TabsList className="h-6">
-                      <TabsTrigger value="operations" className="text-xs">
-                        Operations
-                      </TabsTrigger>
-                      <TabsTrigger value="validation" className="text-xs">
-                        Validation
-                      </TabsTrigger>
-                      <TabsTrigger value="jobs" className="text-xs">
-                        Jobs
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-                  <TabsContent value="operations" className="min-h-0 overflow-auto">
-                    {operationsContent}
-                  </TabsContent>
-                  <TabsContent value="validation" className="min-h-0 overflow-auto">
-                    {validation}
-                  </TabsContent>
-                  <TabsContent value="jobs" className="min-h-0 overflow-auto">
-                    {jobs}
-                  </TabsContent>
-                </Tabs>
-              </Region>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </ResizablePanel>
-        <ResizableHandle aria-label="Resize properties panel" />
-        <ResizablePanel
-          id="properties"
-          panelRef={properties.ref}
-          onResize={properties.onResize}
-          defaultSize="22"
-          minSize={220}
-          maxSize="40"
-          collapsible
-          className="bg-panel"
-        >
-          <Region region="properties" label="Properties">
-            <PanelTitle>Properties</PanelTitle>
-            <div className="min-h-0 flex-1 overflow-auto">{propertiesContent}</div>
-          </Region>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          <ResizablePanel
+            id="hierarchy"
+            panelRef={hierarchy.ref}
+            onResize={hierarchy.onResize}
+            defaultSize="18"
+            minSize={180}
+            maxSize="35"
+            collapsible
+            className="bg-panel"
+          >
+            <Region region="hierarchy" label="Hierarchy">
+              {hierarchyHeader ?? <PanelTitle>Hierarchy</PanelTitle>}
+              <div className="min-h-0 flex-1 overflow-auto">{hierarchyContent}</div>
+            </Region>
+          </ResizablePanel>
+          <ResizableHandle aria-label="Resize hierarchy panel" />
+          <ResizablePanel id="center" minSize="30">
+            <ResizablePanelGroup id="editor-center" orientation="vertical" {...centerLayout}>
+              <ResizablePanel id="viewport" minSize="30">
+                <Region region="viewport" label="Viewport" className="bg-viewport">
+                  {viewport}
+                </Region>
+              </ResizablePanel>
+              <ResizableHandle aria-label="Resize operations panel" />
+              <ResizablePanel
+                id="operations"
+                panelRef={operations.ref}
+                onResize={operations.onResize}
+                defaultSize="24"
+                minSize={96}
+                maxSize="60"
+                collapsible
+                className="bg-panel"
+              >
+                <Region region="operations" label="Operations and status">
+                  <Tabs defaultValue="operations" className="h-full gap-0">
+                    <div className="flex h-8 shrink-0 items-center border-b px-2">
+                      <TabsList className="h-6">
+                        <TabsTrigger value="operations" className="text-xs">
+                          Operations
+                        </TabsTrigger>
+                        <TabsTrigger value="validation" className="text-xs">
+                          Validation
+                        </TabsTrigger>
+                        <TabsTrigger value="jobs" className="text-xs">
+                          Jobs
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+                    <TabsContent value="operations" className="min-h-0 overflow-auto">
+                      {operationsContent}
+                    </TabsContent>
+                    <TabsContent value="validation" className="min-h-0 overflow-auto">
+                      {validation}
+                    </TabsContent>
+                    <TabsContent value="jobs" className="min-h-0 overflow-auto">
+                      {jobs}
+                    </TabsContent>
+                  </Tabs>
+                </Region>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+          <ResizableHandle aria-label="Resize properties panel" />
+          <ResizablePanel
+            id="properties"
+            panelRef={properties.ref}
+            onResize={properties.onResize}
+            defaultSize="22"
+            minSize={220}
+            maxSize="40"
+            collapsible
+            className="bg-panel"
+          >
+            <Region region="properties" label="Properties">
+              {propertiesHeader ?? <PanelTitle>Properties</PanelTitle>}
+              <div className="min-h-0 flex-1 overflow-auto">{propertiesContent}</div>
+            </Region>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
       {statusBar ? (
         <Region
           region="status"

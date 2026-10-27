@@ -1,4 +1,5 @@
 import type { CompareResponse } from '@ai-designer/contracts';
+import { changedComponentIds, classifyDiff } from '@ai-designer/garment-model';
 import { Injectable } from '@nestjs/common';
 
 import type { AuthzContext } from '../../platform/authz/authorizer.js';
@@ -43,11 +44,15 @@ export class CompareService {
       toSide = { kind: 'revision', id: to.row.id, label: to.row.displayId };
     }
     const { diff, lines } = this.revisions.diff(from.state, toState);
+    const entries = classifyDiff(diff, from.state, toState);
     return {
       from: { kind: 'revision', id: from.row.id, label: from.row.displayId },
       to: toSide,
       summary: lines,
       diff: diff as unknown as Record<string, unknown>,
+      entries,
+      changedComponentIds: changedComponentIds(entries),
+      metadataOnly: diff.metadataOnly,
     };
   }
 }

@@ -116,6 +116,14 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I19 (2026-10-27)
+
+- Show artifact names/revision ids (not raw ids) in diff entries and commit summaries. → with I20 or a summary polish pass.
+- Compare: pick the working copy as side A (needs `from=working` in the API); compare across designs. → backlog.
+- Retire the developer history/compare views in `features/designs/` once nothing links to them. → I28 (review flow).
+- Keyboard shortcut for commit and next/previous revision in the inspector. → backlog.
+- Server-rendered comparison images for sharing/exports. → I35.
+
 ## From I18 (2026-10-27)
 
 - Shared compatibility evaluator usable by browser and server (today mirrored in the web app). → when compatibility rules grow (CompatibilityRule table).

@@ -78,7 +78,7 @@ const { state: current } = readAnyVersion(row.snapshot);
 
 ## Public API
 
-Schemas and inferred types · `templates.create` · registries and `extendCatalog` · `validateDesignState(state, catalog?, { knownArtifactRevisions? })` · `canonicalize`, `canonicalJson`, `contentHash`, `semanticHash`, `sha256Hex` · `diffDesignStates` · `cloneWithNewIds`, `createComponentId` and friends · `SCHEMA_VERSION`, `MIGRATIONS`, `migrateToLatest`, `readAnyVersion` · unit helpers · `promote`, `isConfirmed` · `evaluatePropertyRules` / `PROPERTY_RULES` (dependency rules: which properties do not apply, and conflicting values still set — I17).
+Schemas and inferred types · `templates.create` · registries and `extendCatalog` · `validateDesignState(state, catalog?, { knownArtifactRevisions? })` · `canonicalize`, `canonicalJson`, `contentHash`, `semanticHash`, `sha256Hex` · `diffDesignStates`, `classifyDiff` / `changedComponentIds` (labelled entries by category: structural, property, artifact, relationship, metadata, editor_hint; appearance-only flagged — I19) · `cloneWithNewIds`, `createComponentId` and friends · `SCHEMA_VERSION`, `MIGRATIONS`, `migrateToLatest`, `readAnyVersion` · unit helpers · `promote`, `isConfirmed` · `evaluatePropertyRules` / `PROPERTY_RULES` (dependency rules: which properties do not apply, and conflicting values still set — I17).
 
 ## Extending
 

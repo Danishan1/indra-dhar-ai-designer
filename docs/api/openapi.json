@@ -11923,13 +11923,105 @@
                         "type": "string"
                       },
                       "additionalProperties": {}
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "structural",
+                              "property",
+                              "artifact",
+                              "relationship",
+                              "metadata",
+                              "editor_hint"
+                            ]
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "added",
+                              "removed",
+                              "changed"
+                            ]
+                          },
+                          "componentId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "entityId": {
+                            "type": "string"
+                          },
+                          "field": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "before": {},
+                          "after": {},
+                          "statusBefore": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "statusAfter": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "visualOnly": {
+                            "type": "boolean"
+                          },
+                          "semantic": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "kind",
+                          "componentId",
+                          "entityId",
+                          "field",
+                          "label",
+                          "before",
+                          "after",
+                          "statusBefore",
+                          "statusAfter",
+                          "visualOnly",
+                          "semantic"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "changedComponentIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "metadataOnly": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "from",
                     "to",
                     "summary",
-                    "diff"
+                    "diff",
+                    "entries",
+                    "changedComponentIds",
+                    "metadataOnly"
                   ],
                   "additionalProperties": false
                 }

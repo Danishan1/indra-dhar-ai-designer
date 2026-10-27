@@ -39,12 +39,17 @@ import { editorApi } from './api';
 import { GarmentCanvas } from './canvas/garment-canvas';
 import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
+import { createTabStore, PanelTabContent, PanelTabs } from './components/panel-tabs';
 import { SaveStatusChip } from './components/save-status';
 import { Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
 import { LeftPanelContent, LeftPanelTabs } from './library/left-panel';
 import { PropertiesPanel } from './properties/properties-panel';
+import { CommitButton } from './revisions/commit-dialog';
+import { HistoryPanel } from './revisions/history-panel';
+import { RevisionInspector } from './revisions/revision-inspector';
+import { useRevisionSnapshot } from './revisions/use-revisions';
 import {
   createEditorStore,
   type EditorStore,
@@ -117,9 +122,30 @@ function EditorSession({ orgId, initial }: { orgId: string; initial: EditorState
   );
 }
 
+const useRightTab = createTabStore<'properties' | 'history'>('properties');
+const RIGHT_TABS = [
+  { id: 'properties', label: 'Properties' },
+  { id: 'history', label: 'History' },
+] as const;
+
+function RightPanelTabs() {
+  return <PanelTabs name="right" label="Right panel" tabs={RIGHT_TABS} store={useRightTab} />;
+}
+
+function RightPanelContent() {
+  return (
+    <PanelTabContent
+      name="right"
+      store={useRightTab}
+      render={(tab) => (tab === 'properties' ? <PropertiesPanel /> : <HistoryPanel />)}
+    />
+  );
+}
+
 function Editor() {
   useEditorShortcuts();
   useUnsavedGuard();
+  const inspect = useEditor((s) => s.inspect);
   return (
     <>
       <WorkspaceLayout
@@ -128,7 +154,9 @@ function Editor() {
         hierarchy={<LeftPanelContent />}
         hierarchyHeader={<LeftPanelTabs />}
         viewport={<GarmentCanvas />}
-        properties={<PropertiesPanel />}
+        properties={<RightPanelContent />}
+        propertiesHeader={<RightPanelTabs />}
+        takeover={inspect ? <RevisionInspector inspect={inspect} /> : undefined}
         operations={<HistoryList />}
         validation={<FindingsList />}
         jobs={<Placeholder>Generation jobs (I21).</Placeholder>}
@@ -155,6 +183,13 @@ function EditorHeader() {
   const version = useEditor((s) => s.server.version);
   const uncommitted = useEditor((s) => s.server.hasUncommittedChanges);
   const head = revLabel(meta.headRevision);
+  const restoredId = useEditor((s) => s.server.restoredFromRevisionId);
+  const restoredSnap = useRevisionSnapshot(restoredId);
+  const restoredFrom = restoredId
+    ? restoredSnap.data
+      ? `R${String(restoredSnap.data.revisionNumber).padStart(3, '0')}`
+      : 'an earlier revision'
+    : null;
   const approved = revLabel(meta.approvedRevision);
   return (
     <>
@@ -192,6 +227,13 @@ function EditorHeader() {
           </Hint>
         </li>
       </ul>
+      {restoredFrom ? (
+        <Hint label="The working copy was restored from an earlier revision; commit to record it.">
+          <Badge variant="outline" data-testid="restored-badge">
+            Restored from {restoredFrom}
+          </Badge>
+        </Hint>
+      ) : null}
       {!meta.capabilities.canEdit ? (
         <Hint
           label={
@@ -205,8 +247,9 @@ function EditorHeader() {
           </Badge>
         </Hint>
       ) : null}
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
         <SaveStatusConnected />
+        <CommitButton />
       </div>
     </>
   );

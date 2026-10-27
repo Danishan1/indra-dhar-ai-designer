@@ -133,7 +133,15 @@ export interface EditorConflict {
 export interface EditorStoreState {
   meta: EditorMeta;
   /** Last acknowledged server state — the truth. */
-  server: { state: GarmentDesignState; version: number; hasUncommittedChanges: boolean };
+  server: {
+    state: GarmentDesignState;
+    version: number;
+    hasUncommittedChanges: boolean;
+    /** Revision the working copy is based on (normally the latest). */
+    baseRevisionId: string | null;
+    /** Set after "restore Rn" until the next commit (FR-PRJ-033). */
+    restoredFromRevisionId: string | null;
+  };
   /** What the editor shows: server state + pending changes. */
   display: GarmentDesignState;
   queue: PendingQueue;
@@ -165,6 +173,11 @@ export interface EditorStoreState {
   /** An undo / redo is running. */
   historyBusy: boolean;
   lastOperation: { id: string; displayId: string; label: string } | null;
+  /**
+   * Looking at history instead of editing (I19): one revision read-only, or a comparison of two
+   * sides (`working` = the working copy). Editing is paused meanwhile.
+   */
+  inspect: EditorInspect | null;
 
   /** Make a change. Returns false when it was refused locally (nothing queued). */
   apply(operation: OperationInput, options: { label: string; groupId?: string | null }): boolean;
@@ -194,8 +207,15 @@ export interface EditorStoreState {
   zoomOut(): void;
   /** 100 % (1 mm = 1 px), centred on the garment. */
   zoomReset(): void;
+  /** Open a revision read-only (`working` closes the view). */
+  viewRevision(revisionId: string): void;
+  compare(a: string, b: string): void;
+  closeInspect(): void;
   dispose(): void;
 }
+
+export type EditorInspect =
+  { mode: 'view'; revisionId: string } | { mode: 'compare'; a: string; b: string };
 
 export type EditorStore = StoreApi<EditorStoreState>;
 
@@ -262,6 +282,8 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
       state: serverState,
       version: wc.version,
       hasUncommittedChanges: wc.hasUncommittedChanges,
+      baseRevisionId: wc.baseRevisionId,
+      restoredFromRevisionId: wc.restoredFromRevisionId,
     },
     display: serverState,
     queue: emptyQueue,
@@ -278,10 +300,11 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
     historyBusy: false,
     lastOperation: null,
     refusals: {},
+    inspect: null,
 
     apply(input, options) {
       const s = getState();
-      if (!s.meta.capabilities.canEdit) return false;
+      if (!s.meta.capabilities.canEdit || s.inspect) return false;
       const parsed = singleClientOperationSchema.safeParse(input);
       if (!parsed.success) {
         notify.error('This change is not valid', [parsed.error.issues[0]?.message ?? '']);
@@ -328,8 +351,18 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
 
     flush: () => flush(),
 
-    undo: () => runHistory('undo'),
-    redo: () => runHistory('redo'),
+    undo: () => (getState().inspect ? Promise.resolve() : runHistory('undo')),
+    redo: () => (getState().inspect ? Promise.resolve() : runHistory('redo')),
+
+    viewRevision(revisionId) {
+      set({ inspect: revisionId === 'working' ? null : { mode: 'view', revisionId } });
+    },
+    compare(a, b) {
+      set({ inspect: { mode: 'compare', a, b } });
+    },
+    closeInspect() {
+      set({ inspect: null });
+    },
 
     async reloadFromServer() {
       const fresh = await load();
@@ -342,6 +375,8 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
           state,
           version: fresh.wc.version,
           hasUncommittedChanges: fresh.wc.hasUncommittedChanges,
+          baseRevisionId: fresh.wc.baseRevisionId,
+          restoredFromRevisionId: fresh.wc.restoredFromRevisionId,
         },
         display: state,
         queue: emptyQueue,
@@ -369,6 +404,8 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
           state,
           version: fresh.wc.version,
           hasUncommittedChanges: fresh.wc.hasUncommittedChanges,
+          baseRevisionId: fresh.wc.baseRevisionId,
+          restoredFromRevisionId: fresh.wc.restoredFromRevisionId,
         },
         display,
         queue,
@@ -597,6 +634,8 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
         state,
         version: res.workingCopy.version,
         hasUncommittedChanges: res.workingCopy.hasUncommittedChanges,
+        baseRevisionId: res.workingCopy.baseRevisionId,
+        restoredFromRevisionId: s.server.restoredFromRevisionId,
       },
       display,
       queue,

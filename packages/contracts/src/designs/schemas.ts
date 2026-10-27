@@ -160,6 +160,32 @@ const compareSideSchema = z.object({
   label: z.string(),
 });
 
+/** One classified change (`classifyDiff` in garment-model, I19). */
+export const diffEntrySchema = z.object({
+  category: z.enum([
+    'structural',
+    'property',
+    'artifact',
+    'relationship',
+    'metadata',
+    'editor_hint',
+  ]),
+  kind: z.enum(['added', 'removed', 'changed']),
+  componentId: z.string().nullable(),
+  entityId: z.string(),
+  field: z.string().nullable(),
+  label: z.string(),
+  before: z.unknown(),
+  after: z.unknown(),
+  statusBefore: z.string().nullable(),
+  statusAfter: z.string().nullable(),
+  /** Only the appearance changed (FR-PRJ-031). */
+  visualOnly: z.boolean(),
+  /** A change to the garment (false for metadata and editor-only flags). */
+  semantic: z.boolean(),
+});
+export type DiffEntry = z.infer<typeof diffEntrySchema>;
+
 export const compareResponseSchema = z.object({
   from: compareSideSchema,
   to: compareSideSchema,
@@ -167,6 +193,12 @@ export const compareResponseSchema = z.object({
   summary: z.array(z.string()),
   /** Structural diff from `diffDesignStates` (components, properties, relationships, artifacts). */
   diff: z.record(z.string(), z.unknown()),
+  /** The diff as labelled entries grouped by category (I19). */
+  entries: z.array(diffEntrySchema),
+  /** Components that differ (for highlighting; editor-only flags excluded). */
+  changedComponentIds: z.array(z.string()),
+  /** Something changed, but nothing about the garment itself. */
+  metadataOnly: z.boolean(),
 });
 export type CompareResponse = z.infer<typeof compareResponseSchema>;
 
