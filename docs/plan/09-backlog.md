@@ -116,9 +116,18 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I15 (2026-10-27)
+
+- IndexedDB recovery snapshot of pending changes (survives a crash / closed tab while offline). → when offline editing matters.
+- Conflict dialog: show a diff of server vs my pending changes before choosing. → I19 (compare in the editor).
+- Persist undo history across reloads (server operations already allow it: list the session's revertible operations). → backlog.
+- Live presence / other editors' changes pushed to the editor (today detected only on save). → backlog (multi-user).
+- Group typing bursts / drags into one undo step with `groupId` from the real panels and canvas. → I16/I17.
+- Replace the dev debug panel and hierarchy list with real panels. → I17.
+
 ## From I14 (2026-10-26)
 
-- Client-side optimistic apply + command stack using `design-operations` in the browser. → I15.
+- ~~Client-side optimistic apply + command stack using `design-operations` in the browser. → I15.~~ Done in I15.
 - AI strategies (`regenerate_region`, `interpret_reference`, …) with jobs (`job_id`), statuses requested/running/failed/cancelled. → I21/I25.
 - Operations for design-level fields (category change, metadata) and geometry (`vector_operation`). → I16/I17.
 - Preservation constraints are recorded but only trivially honoured by deterministic ops; enforce/verify them for AI results. → I25.

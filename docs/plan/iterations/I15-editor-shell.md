@@ -79,14 +79,14 @@ None (optional `user_preferences` JSONB on User for editor layout — or keep cl
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Editor workspace renders with header, toolbar, hierarchy, viewport, properties, operations/history, status regions; panels resize/collapse without modifying the design. (FR-EDT-001, 002, 008)
-- [ ] AC2 — Save status distinguishes saving, saved, unsaved, failed, conflict. (FR-EDT-005, FR-EDT-087)
-- [ ] AC3 — "Saved" shown only after server acknowledgement. (FR-PRJ-016)
-- [ ] AC4 — Undo/redo work for supported ops and never delete committed revisions. (FR-EDT-079, 080, 082; AC-EDT-007)
-- [ ] AC5 — Concurrent edits produce a conflict path, never a silent overwrite. (FR-PRJ-025, FR-EDT-089, AC-EDT-011)
-- [ ] AC6 — Failed save preserves pending changes and offers retry. (FR-EDT-091, AC-EDT-015)
-- [ ] AC7 — Shortcuts do not fire while typing in inputs. (FR-EDT-127)
-- [ ] AC8 — Header distinguishes working state, latest revision, approved revision. (NFR-PRJ-013, FR-EDT-092)
+- [x] AC1 — Editor workspace renders with header, toolbar, hierarchy, viewport, properties, operations/history, status regions; panels resize/collapse without modifying the design. (FR-EDT-001, 002, 008)
+- [x] AC2 — Save status distinguishes saving, saved, unsaved, failed, conflict. (FR-EDT-005, FR-EDT-087)
+- [x] AC3 — "Saved" shown only after server acknowledgement. (FR-PRJ-016)
+- [x] AC4 — Undo/redo work for supported ops and never delete committed revisions. (FR-EDT-079, 080, 082; AC-EDT-007)
+- [x] AC5 — Concurrent edits produce a conflict path, never a silent overwrite. (FR-PRJ-025, FR-EDT-089, AC-EDT-011)
+- [x] AC6 — Failed save preserves pending changes and offers retry. (FR-EDT-091, AC-EDT-015)
+- [x] AC7 — Shortcuts do not fire while typing in inputs. (FR-EDT-127)
+- [x] AC8 — Header distinguishes working state, latest revision, approved revision. (NFR-PRJ-013, FR-EDT-092)
 
 ## 10. Risks & notes
 
@@ -101,7 +101,16 @@ None (optional `user_preferences` JSONB on User for editor layout — or keep cl
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-050):
+  - Route is org-scoped like every other: `GET /v1/orgs/{orgId}/designs/{designId}/editor-state`; it also returns the project (`editable`), revision summaries, `readOnlyReason` and the user id. Capabilities come from the PDP through the new `PolicyEnforcer.can()` (no audit).
+  - The page lives in the `(editor)` route group (full viewport), not `(app)`; that layout now includes `OrganizationProvider`. A wrong `projectId` in the URL redirects to the design's project.
+  - Layout files: the existing `editor-workspace.tsx` became a slot-based layout (`WorkspaceLayout`) reused by `/editor/demo` and the editor; a `status` region (status bar) was added. File names follow the repo's kebab-case convention (`editor-page.tsx`, `components/save-status.tsx`, `hooks/use-editor-shortcuts.ts`, `store-context.tsx`).
+  - New ids are generated in the browser (`normalizeOperation`) so optimistic and server results agree; operation types needing server data (artifacts, AI) are sent without preview.
+  - Undo right after a change saves it first; leaving the editor flushes immediately. Undo history is per editor session.
+  - IndexedDB recovery snapshot (optional) not built → backlog.
+  - "View diff of server vs local" in the conflict dialog not built (Reload / Re-apply / Cancel only) → backlog (needs the compare view inside the editor, I19).
+  - Read-only e2e covers an archived project (single-user test); the viewer path is covered by the integration test.
+- Tests: editor-core 27, web unit 60 (store 14, save chip 7, shortcuts 2 new), api integration 122 (+1 editor-state, read-only/grant assertions), e2e 23 (+2: autosave/undo/redo/conflict with two browser contexts; archived read-only).
+- Follow-ups added to backlog: see "From I15".

@@ -5,6 +5,9 @@ import {
   type DesignStatus,
   type DesignTemplate,
   DisplayIdPrefixes,
+  type EditorState,
+  isEditable,
+  type ProjectStatus,
   encodeCursor,
   type Page,
   RevisionCommittedEvent,
@@ -194,6 +197,57 @@ export class DesignsService implements OnModuleInit {
     });
     if (!row) throw AppError.notFound('Design');
     return toView(row);
+  }
+
+  // ---------------------------------------------------------------- editor
+
+  /**
+   * What the editor needs to open a design (I15): design, project, working copy, revision pointers
+   * and capability flags (computed with the same PDP that guards each action).
+   */
+  async editorState(req: Request, ctx: AuthzContext, designId: string): Promise<EditorState> {
+    const design = await this.get(ctx, designId);
+    const [project, workingCopy] = await Promise.all([
+      this.projects.get(ctx, design.projectId),
+      this.workingCopies.get(ctx, designId),
+    ]);
+    const revisionIds = [design.headRevisionId, design.approvedRevisionId].filter(
+      (x): x is string => !!x,
+    );
+    const resource = { type: 'design', id: designId };
+    const can = (
+      permission: 'design.edit' | 'design.commit' | 'design.restore' | 'design.generate',
+    ) => this.enforcer.can(req, { organizationId: ctx.organizationId, permission, resource });
+    const [summaries, edit, commit, restore, generate] = await Promise.all([
+      this.revisions.summariesByIds(ctx.organizationId, designId, revisionIds),
+      can('design.edit'),
+      can('design.commit'),
+      can('design.restore'),
+      can('design.generate'),
+    ]);
+    const editable = isEditable(project.status as ProjectStatus);
+    return {
+      design,
+      project: {
+        id: project.id,
+        displayId: project.displayId,
+        name: project.name,
+        status: project.status,
+        editable,
+      },
+      workingCopy,
+      headRevision: (design.headRevisionId && summaries.get(design.headRevisionId)) || null,
+      approvedRevision:
+        (design.approvedRevisionId && summaries.get(design.approvedRevisionId)) || null,
+      capabilities: {
+        canEdit: editable && edit,
+        canCommit: editable && commit,
+        canRestore: editable && restore,
+        canGenerate: editable && generate,
+      },
+      readOnlyReason: !edit ? 'permission' : !editable ? 'project_status' : null,
+      userId: ctx.userId,
+    };
   }
 
   // ---------------------------------------------------------------- duplicate

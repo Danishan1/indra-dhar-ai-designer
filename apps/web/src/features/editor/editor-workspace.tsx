@@ -37,9 +37,9 @@ import { cn } from '@/lib/utils';
 
 /** The six workspace regions of SPEC-007 §5. Tests and later iterations address them by name. */
 export type EditorRegion =
-  'header' | 'toolbar' | 'hierarchy' | 'viewport' | 'properties' | 'operations';
+  'header' | 'toolbar' | 'hierarchy' | 'viewport' | 'properties' | 'operations' | 'status';
 
-function Region({
+export function Region({
   region,
   label,
   className,
@@ -61,7 +61,7 @@ function Region({
   );
 }
 
-function PanelTitle({ children }: { children: ReactNode }) {
+export function PanelTitle({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-8 shrink-0 items-center border-b px-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
       {children}
@@ -88,17 +88,22 @@ function useCollapsiblePanel(): {
   return { ref, collapsed, toggle, onResize };
 }
 
-function ToolButton({
+export function ToolButton({
   icon: Icon,
   label,
   combo,
   pressed,
+  disabled,
+  tooltip,
   onClick,
 }: {
   icon: LucideIcon;
   label: string;
   combo?: string;
   pressed?: boolean;
+  disabled?: boolean;
+  /** Extra tooltip text, e.g. what Undo would undo. */
+  tooltip?: string;
   onClick?: () => void;
 }) {
   return (
@@ -110,20 +115,45 @@ function ToolButton({
           aria-label={label}
           {...(pressed === undefined ? {} : { 'aria-pressed': pressed })}
           className={cn(pressed && 'bg-accent text-accent-foreground')}
+          disabled={disabled}
           onClick={onClick}
         >
           <Icon />
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {label}
+        {tooltip ?? label}
         {combo ? ` (${formatCombo(combo)})` : ''}
       </TooltipContent>
     </Tooltip>
   );
 }
 
-function Workspace({ title }: { title: string }) {
+/** What a page puts into the workspace regions; the layout (panels, sizes, shortcuts) is shared. */
+export interface WorkspaceSlots {
+  header: ReactNode;
+  /** Tool buttons at the start of the toolbar. */
+  tools: ReactNode;
+  hierarchy: ReactNode;
+  viewport: ReactNode;
+  properties: ReactNode;
+  operations: ReactNode;
+  validation: ReactNode;
+  jobs: ReactNode;
+  statusBar?: ReactNode;
+}
+
+function Workspace({
+  header,
+  tools,
+  hierarchy: hierarchyContent,
+  viewport,
+  properties: propertiesContent,
+  operations: operationsContent,
+  validation,
+  jobs,
+  statusBar,
+}: WorkspaceSlots) {
   const hierarchy = useCollapsiblePanel();
   const properties = useCollapsiblePanel();
   const operations = useCollapsiblePanel();
@@ -163,14 +193,7 @@ function Workspace({ title }: { title: string }) {
         label="Editor header"
         className="h-10 flex-row items-center gap-2 border-b bg-panel px-2"
       >
-        <Button asChild variant="ghost" size="icon-sm" aria-label="Back to home">
-          <Link href="/">
-            <ArrowLeftIcon />
-          </Link>
-        </Button>
-        <ShirtIcon className="size-4 text-primary" aria-hidden />
-        <h1 className="truncate text-[13px] font-semibold">{title}</h1>
-        <span className="text-xs text-muted-foreground">· working copy (preview)</span>
+        {header}
       </Region>
 
       <Region
@@ -178,11 +201,7 @@ function Workspace({ title }: { title: string }) {
         label="Toolbar"
         className="h-9 flex-row items-center gap-0.5 border-b bg-panel px-2"
       >
-        <ToolButton icon={MousePointer2Icon} label="Select" pressed />
-        <ToolButton icon={BoxSelectIcon} label="Region select" />
-        <ToolButton icon={PenToolIcon} label="Annotate" />
-        <ToolButton icon={ZoomInIcon} label="Zoom" />
-        <Separator orientation="vertical" className="mx-1 h-5" />
+        {tools}
         <div className="ml-auto flex items-center gap-0.5">
           <ToolButton
             icon={PanelLeftIcon}
@@ -226,9 +245,7 @@ function Workspace({ title }: { title: string }) {
         >
           <Region region="hierarchy" label="Hierarchy">
             <PanelTitle>Hierarchy</PanelTitle>
-            <div className="p-3 text-[13px] text-muted-foreground">
-              Garment components appear here (I17).
-            </div>
+            <div className="min-h-0 flex-1 overflow-auto">{hierarchyContent}</div>
           </Region>
         </ResizablePanel>
         <ResizableHandle aria-label="Resize hierarchy panel" />
@@ -236,11 +253,7 @@ function Workspace({ title }: { title: string }) {
           <ResizablePanelGroup id="editor-center" orientation="vertical" {...centerLayout}>
             <ResizablePanel id="viewport" minSize="30">
               <Region region="viewport" label="Viewport" className="bg-viewport">
-                <div className="relative flex flex-1 items-center justify-center bg-[radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:16px_16px]">
-                  <span className="rounded-md border bg-panel/80 px-3 py-1.5 text-[13px] text-muted-foreground">
-                    2D garment viewport (I16)
-                  </span>
-                </div>
+                {viewport}
               </Region>
             </ResizablePanel>
             <ResizableHandle aria-label="Resize operations panel" />
@@ -269,14 +282,14 @@ function Workspace({ title }: { title: string }) {
                       </TabsTrigger>
                     </TabsList>
                   </div>
-                  <TabsContent value="operations" className="p-3 text-[13px] text-muted-foreground">
-                    Operation history (I14/I15).
+                  <TabsContent value="operations" className="min-h-0 overflow-auto">
+                    {operationsContent}
                   </TabsContent>
-                  <TabsContent value="validation" className="p-3 text-[13px] text-muted-foreground">
-                    Validation findings (I20).
+                  <TabsContent value="validation" className="min-h-0 overflow-auto">
+                    {validation}
                   </TabsContent>
-                  <TabsContent value="jobs" className="p-3 text-[13px] text-muted-foreground">
-                    Generation jobs (I21).
+                  <TabsContent value="jobs" className="min-h-0 overflow-auto">
+                    {jobs}
                   </TabsContent>
                 </Tabs>
               </Region>
@@ -296,39 +309,107 @@ function Workspace({ title }: { title: string }) {
         >
           <Region region="properties" label="Properties">
             <PanelTitle>Properties</PanelTitle>
-            <div className="flex flex-col gap-3 p-3 text-[13px]">
-              <p className="text-muted-foreground">Contextual properties of the selection (I17).</p>
-              <div>
-                <h2 className="mb-1.5 text-xs font-medium text-muted-foreground">
-                  Value status legend
-                </h2>
-                <ul className="flex flex-wrap gap-1.5">
-                  {ValueStatuses.map((status) => (
-                    <li key={status}>
-                      <ValueStatusBadge status={status} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            <div className="min-h-0 flex-1 overflow-auto">{propertiesContent}</div>
           </Region>
         </ResizablePanel>
       </ResizablePanelGroup>
+      {statusBar ? (
+        <Region
+          region="status"
+          label="Status bar"
+          className="h-6 flex-row items-center gap-3 border-t bg-panel px-2 text-[11px] text-muted-foreground"
+        >
+          {statusBar}
+        </Region>
+      ) : null}
     </div>
   );
 }
 
-/** Editor workspace skeleton. Rendered on the client only: panel sizes come from local storage. */
-export function EditorWorkspace({ title }: { title: string }) {
+export function WorkspaceSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-px" aria-busy="true">
+      <Skeleton className="h-10 rounded-none" />
+      <Skeleton className="h-9 rounded-none" />
+      <Skeleton className="flex-1 rounded-none opacity-50" />
+    </div>
+  );
+}
+
+/** The workspace layout. Rendered on the client only: panel sizes come from local storage. */
+export function WorkspaceLayout(slots: WorkspaceSlots) {
   const isClient = useIsClient();
-  if (!isClient) {
-    return (
-      <div className="flex h-full flex-col gap-px" aria-busy="true">
-        <Skeleton className="h-10 rounded-none" />
-        <Skeleton className="h-9 rounded-none" />
-        <Skeleton className="flex-1 rounded-none opacity-50" />
-      </div>
-    );
-  }
-  return <Workspace title={title} />;
+  if (!isClient) return <WorkspaceSkeleton />;
+  return <Workspace {...slots} />;
+}
+
+export const Placeholder = ({ children }: { children: ReactNode }) => (
+  <div className="p-3 text-[13px] text-muted-foreground">{children}</div>
+);
+
+export const ViewportPlaceholder = ({ children }: { children: ReactNode }) => (
+  <div className="relative flex flex-1 items-center justify-center bg-[radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:16px_16px]">
+    {children}
+  </div>
+);
+
+/** Layout preview with placeholder content (`/editor/demo`). */
+export function EditorWorkspace({ title }: { title: string }) {
+  return (
+    <WorkspaceLayout
+      header={
+        <>
+          <Button asChild variant="ghost" size="icon-sm" aria-label="Back to home">
+            <Link href="/">
+              <ArrowLeftIcon />
+            </Link>
+          </Button>
+          <ShirtIcon className="size-4 text-primary" aria-hidden />
+          <h1 className="truncate text-[13px] font-semibold">{title}</h1>
+          <span className="text-xs text-muted-foreground">· working copy (preview)</span>
+        </>
+      }
+      tools={
+        <>
+          <ToolButton icon={MousePointer2Icon} label="Select" pressed />
+          <ToolButton icon={BoxSelectIcon} label="Region select" />
+          <ToolButton icon={PenToolIcon} label="Annotate" />
+          <ToolButton icon={ZoomInIcon} label="Zoom" />
+          <Separator orientation="vertical" className="mx-1 h-5" />
+        </>
+      }
+      hierarchy={<Placeholder>Garment components appear here (I17).</Placeholder>}
+      viewport={
+        <ViewportPlaceholder>
+          <span className="rounded-md border bg-panel/80 px-3 py-1.5 text-[13px] text-muted-foreground">
+            2D garment viewport (I16)
+          </span>
+        </ViewportPlaceholder>
+      }
+      properties={
+        <div className="flex flex-col gap-3 p-3 text-[13px]">
+          <p className="text-muted-foreground">Contextual properties of the selection (I17).</p>
+          <ValueStatusLegend />
+        </div>
+      }
+      operations={<Placeholder>Operation history (I14/I15).</Placeholder>}
+      validation={<Placeholder>Validation findings (I20).</Placeholder>}
+      jobs={<Placeholder>Generation jobs (I21).</Placeholder>}
+    />
+  );
+}
+
+export function ValueStatusLegend() {
+  return (
+    <div>
+      <h2 className="mb-1.5 text-xs font-medium text-muted-foreground">Value status legend</h2>
+      <ul className="flex flex-wrap gap-1.5">
+        {ValueStatuses.map((status) => (
+          <li key={status}>
+            <ValueStatusBadge status={status} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }

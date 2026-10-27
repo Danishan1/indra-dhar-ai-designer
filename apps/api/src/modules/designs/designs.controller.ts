@@ -9,6 +9,7 @@ import {
   designParamsSchema,
   designSchema,
   duplicateDesignRequestSchema,
+  editorStateSchema,
   projectDesignsParamsSchema,
   restoreRevisionRequestSchema,
   revisionListResponseSchema,
@@ -106,6 +107,19 @@ export class DesignsController {
   })
   get(@Req() req: Request, @Param('designId') designId: string) {
     return this.designs.get(authzContext(req), designId);
+  }
+
+  @Get('editor-state')
+  @RequirePermission('design.view', { resource: DESIGN })
+  @Endpoint({
+    summary: 'Everything the editor needs: design, project, working copy, revisions, capabilities',
+    tags: ['designs'],
+    params: designParamsSchema,
+    response: editorStateSchema,
+    errors: [...READ_ERRORS],
+  })
+  editorState(@Req() req: Request, @Param('designId') designId: string) {
+    return this.designs.editorState(req, authzContext(req), designId);
   }
 
   @Get('working-copy')

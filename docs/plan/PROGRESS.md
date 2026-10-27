@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I15 — Editor shell, editor-core & autosave** (next)                                                |
+| **Current iteration** | **I16 — Parametric 2D garment renderer (SVG)** (next)                                                |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-26 (I14 finished)                                                                            |
+| Last updated          | 2026-10-27 (I15 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -18,57 +18,57 @@
 
 ## Iteration status
 
-| ID  | Iteration                                             | Phase | Status | Started    | Done       | Sessions | Notes                                                 |
-| --- | ----------------------------------------------------- | ----- | ------ | ---------- | ---------- | -------- | ----------------------------------------------------- |
-| I01 | Monorepo bootstrap & tooling                          | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | Toolchain pinned (ADR-022)                            |
-| I02 | Local infrastructure & backend base                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | SeaweedFS (ADR-021); AC1 needs owner check on Windows |
-| I03 | Platform primitives                                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | ADR-038 packages/db, ADR-039                          |
-| I04 | Web app shell & design system                         | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | → M1 reached; ADR-040                                 |
-| I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                |
-| I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                   |
-| I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md           |
-| I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                 |
-| I09 | Asset & storage service                               | 2     | done   | 2026-10-23 | 2026-10-26 | 1        | ADR-044; docs/architecture/assets.md                  |
-| I10 | Projects & lifecycle core                             | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-045; docs/architecture/projects.md                |
-| I11 | Canonical garment model package                       | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-046; ADR-008 default applied (owner to confirm)   |
-| I12 | Designs, working copies & immutable revisions         | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-047; docs/architecture/designs.md                 |
-| I13 | Artifact registry & built-in library                  | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-048; docs/architecture/artifacts.md               |
-| I14 | Design operation router (deterministic)               | 3     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-049; docs/architecture/operations.md              |
-| I15 | Editor shell, editor-core & autosave                  | 3     | todo   |            |            |          |                                                       |
-| I16 | Parametric 2D garment renderer (SVG)                  | 3     | todo   |            |            |          |                                                       |
-| I17 | Hierarchy, selection & contextual properties          | 3     | todo   |            |            |          |                                                       |
-| I18 | Artifact browser & structured attachment              | 3     | todo   |            |            |          |                                                       |
-| I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                       |
-| I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                  |
-| I21 | Generation job management & progress (SSE)            | 4     | todo   |            |            |          |                                                       |
-| I22 | AI provider registry, credentials & adapters          | 4     | todo   |            |            |          | Decide ADR-009                                        |
-| I23 | Prompt & request compilation, routing                 | 4     | todo   |            |            |          |                                                       |
-| I24 | Usage metering & entitlement preflight                | 4     | todo   |            |            |          | Default ADR-011                                       |
-| I25 | AI generation in the editor                           | 4     | todo   |            |            |          |                                                       |
-| I26 | Design initiation from sketch/photo/fabric            | 4     | todo   |            |            |          |                                                       |
-| I27 | Region tools, annotations & targeted edits            | 4     | todo   |            |            |          | → M4                                                  |
-| I28 | Review & approval workflow                            | 5     | todo   |            |            |          |                                                       |
-| I29 | Notifications                                         | 5     | todo   |            |            |          | → M5                                                  |
-| I30 | Plans, subscriptions, entitlements & budgets          | 6     | todo   |            |            |          | Confirm ADR-011                                       |
-| I31 | Pricing, charges & invoices                           | 6     | todo   |            |            |          |                                                       |
-| I32 | Payment integration & subscription lifecycle          | 6     | todo   |            |            |          | Decide ADR-010                                        |
-| I33 | Customer-provided API credentials (BYOK)              | 6     | todo   |            |            |          |                                                       |
-| I34 | Reconciliation & financial operations                 | 6     | todo   |            |            |          | → M6                                                  |
-| I35 | Server render pipeline, manifests, cache & exports    | 7     | todo   |            |            |          |                                                       |
-| I36 | Interactive 3D viewer                                 | 7     | todo   |            |            |          |                                                       |
-| I37 | 2D/3D component linking & material sync               | 7     | todo   |            |            |          | → M7                                                  |
-| I38 | Production specification core & BOM                   | 8     | todo   |            |            |          |                                                       |
-| I39 | Measurements, POMs, tolerances & grading              | 8     | todo   |            |            |          |                                                       |
-| I40 | Construction, colorways, artwork, labels & quality    | 8     | todo   |            |            |          |                                                       |
-| I41 | Specification validation & production readiness       | 8     | todo   |            |            |          |                                                       |
-| I42 | Tech pack export                                      | 8     | todo   |            |            |          |                                                       |
-| I43 | Spec review, release, change impact & supplier access | 8     | todo   |            |            |          |                                                       |
-| I44 | AI-assisted specification drafting                    | 8     | todo   |            |            |          | → M8                                                  |
-| I45 | Platform administration console                       | 9     | todo   |            |            |          |                                                       |
-| I46 | Observability & audit tooling                         | 9     | todo   |            |            |          |                                                       |
-| I47 | Security hardening, API tokens, export & deletion     | 9     | todo   |            |            |          |                                                       |
-| I48 | Production deployment, backups & runbooks             | 9     | todo   |            |            |          |                                                       |
-| I49 | Release hardening                                     | 9     | todo   |            |            |          | → M9                                                  |
+| ID  | Iteration                                             | Phase | Status | Started    | Done       | Sessions | Notes                                                   |
+| --- | ----------------------------------------------------- | ----- | ------ | ---------- | ---------- | -------- | ------------------------------------------------------- |
+| I01 | Monorepo bootstrap & tooling                          | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | Toolchain pinned (ADR-022)                              |
+| I02 | Local infrastructure & backend base                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | SeaweedFS (ADR-021); AC1 needs owner check on Windows   |
+| I03 | Platform primitives                                   | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | ADR-038 packages/db, ADR-039                            |
+| I04 | Web app shell & design system                         | 0     | done   | 2026-10-22 | 2026-10-22 | 1        | → M1 reached; ADR-040                                   |
+| I05 | Accounts & authentication                             | 1     | done   | 2026-10-22 | 2026-10-22 | 1        | Better Auth (ADR-006); see identity.md                  |
+| I06 | Organizations, memberships & invitations              | 1     | done   | 2026-10-22 | 2026-10-23 | 1        | ADR-017 accepted (default), ADR-041                     |
+| I07 | Authorization engine & tenant isolation               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | ADR-042; docs/architecture/authorization.md             |
+| I08 | MFA, step-up, sessions & security audit               | 1     | done   | 2026-10-23 | 2026-10-23 | 1        | → M2 reached; ADR-043                                   |
+| I09 | Asset & storage service                               | 2     | done   | 2026-10-23 | 2026-10-26 | 1        | ADR-044; docs/architecture/assets.md                    |
+| I10 | Projects & lifecycle core                             | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-045; docs/architecture/projects.md                  |
+| I11 | Canonical garment model package                       | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-046; ADR-008 default applied (owner to confirm)     |
+| I12 | Designs, working copies & immutable revisions         | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-047; docs/architecture/designs.md                   |
+| I13 | Artifact registry & built-in library                  | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-048; docs/architecture/artifacts.md                 |
+| I14 | Design operation router (deterministic)               | 3     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-049; docs/architecture/operations.md                |
+| I15 | Editor shell, editor-core & autosave                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-015 (default), ADR-050; docs/architecture/editor.md |
+| I16 | Parametric 2D garment renderer (SVG)                  | 3     | todo   |            |            |          |                                                         |
+| I17 | Hierarchy, selection & contextual properties          | 3     | todo   |            |            |          |                                                         |
+| I18 | Artifact browser & structured attachment              | 3     | todo   |            |            |          |                                                         |
+| I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                         |
+| I20 | Design validation engine & findings UI                | 3     | todo   |            |            |          | → M3                                                    |
+| I21 | Generation job management & progress (SSE)            | 4     | todo   |            |            |          |                                                         |
+| I22 | AI provider registry, credentials & adapters          | 4     | todo   |            |            |          | Decide ADR-009                                          |
+| I23 | Prompt & request compilation, routing                 | 4     | todo   |            |            |          |                                                         |
+| I24 | Usage metering & entitlement preflight                | 4     | todo   |            |            |          | Default ADR-011                                         |
+| I25 | AI generation in the editor                           | 4     | todo   |            |            |          |                                                         |
+| I26 | Design initiation from sketch/photo/fabric            | 4     | todo   |            |            |          |                                                         |
+| I27 | Region tools, annotations & targeted edits            | 4     | todo   |            |            |          | → M4                                                    |
+| I28 | Review & approval workflow                            | 5     | todo   |            |            |          |                                                         |
+| I29 | Notifications                                         | 5     | todo   |            |            |          | → M5                                                    |
+| I30 | Plans, subscriptions, entitlements & budgets          | 6     | todo   |            |            |          | Confirm ADR-011                                         |
+| I31 | Pricing, charges & invoices                           | 6     | todo   |            |            |          |                                                         |
+| I32 | Payment integration & subscription lifecycle          | 6     | todo   |            |            |          | Decide ADR-010                                          |
+| I33 | Customer-provided API credentials (BYOK)              | 6     | todo   |            |            |          |                                                         |
+| I34 | Reconciliation & financial operations                 | 6     | todo   |            |            |          | → M6                                                    |
+| I35 | Server render pipeline, manifests, cache & exports    | 7     | todo   |            |            |          |                                                         |
+| I36 | Interactive 3D viewer                                 | 7     | todo   |            |            |          |                                                         |
+| I37 | 2D/3D component linking & material sync               | 7     | todo   |            |            |          | → M7                                                    |
+| I38 | Production specification core & BOM                   | 8     | todo   |            |            |          |                                                         |
+| I39 | Measurements, POMs, tolerances & grading              | 8     | todo   |            |            |          |                                                         |
+| I40 | Construction, colorways, artwork, labels & quality    | 8     | todo   |            |            |          |                                                         |
+| I41 | Specification validation & production readiness       | 8     | todo   |            |            |          |                                                         |
+| I42 | Tech pack export                                      | 8     | todo   |            |            |          |                                                         |
+| I43 | Spec review, release, change impact & supplier access | 8     | todo   |            |            |          |                                                         |
+| I44 | AI-assisted specification drafting                    | 8     | todo   |            |            |          | → M8                                                    |
+| I45 | Platform administration console                       | 9     | todo   |            |            |          |                                                         |
+| I46 | Observability & audit tooling                         | 9     | todo   |            |            |          |                                                         |
+| I47 | Security hardening, API tokens, export & deletion     | 9     | todo   |            |            |          |                                                         |
+| I48 | Production deployment, backups & runbooks             | 9     | todo   |            |            |          |                                                         |
+| I49 | Release hardening                                     | 9     | todo   |            |            |          | → M9                                                    |
 
 ## Milestones
 
@@ -102,11 +102,13 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 - ADR-021 — object storage: SeaweedFS chosen by default (2026-10-22, I02).
 - ADR-017 — organization + one default workspace; workspace UI deferred (2026-10-23, I06).
+- ADR-015 — Zustand 5.0.15 for editor state accepted by default (2026-10-27, I15).
 
 ## Deviations from plan
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I15 — org-scoped editor-state route with PDP capability flags, editor in the `(editor)` group, slot-based workspace layout + status bar, ids generated in the browser, no IndexedDB snapshot / conflict diff yet — ADR-050
 - 2026-10-26 — I14 — org-scoped operation routes, server-side undo with stored inverses, PUT working-copy removed (internal `replace_state`), quick-edit panel — ADR-049
 - 2026-10-26 — I13 — built-in library synced at API start with inline SVG previews (no seed script), revision route by id, scope hooks in the PDP, no CompatibilityRule table yet — ADR-048
 - 2026-10-26 — I12 — revision route by id, `design.create` for create/duplicate, PDP restriction inheritance (`governedBy`), `PolicyEnforcer`, text[] refs until I13 — ADR-047
@@ -124,6 +126,18 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I15 Editor shell, editor-core & autosave (session 1) — DONE
+
+- Plan: ADR-015 default (Zustand) → `packages/editor-core` → editor-state endpoint → store + workspace → tests → docs.
+- Built: pure package `packages/editor-core` (command stack with server operation ids, selection, viewport, tools, pending queue, save-state reducer); `GET /v1/orgs/:orgId/designs/:designId/editor-state` + `PolicyEnforcer.can()`; web editor at `/projects/{projectId}/designs/{designId}`: Zustand store (optimistic apply, 500 ms batches, idempotent retries with backoff, conflict dialog Reload / Re-apply / Cancel, server-side undo/redo, offline + unsaved-changes guards), header with working copy / latest / approved badges and save chip, undo/redo toolbar, shortcuts, hierarchy list, history & findings tabs, status bar, dev-only debug panel; "Open editor" links on the design page and designs tab.
+- Tests: editor-core 27, web unit 60, api unit 101, integration api 122 + worker 13, e2e 23. OpenAPI regenerated.
+- **Owner actions (Windows):**
+  1. `pnpm install` (new package `@ai-designer/editor-core`, new web dependency `zustand` 5.0.15).
+  2. No migration this time.
+  3. `pnpm dev` → open a project → Designs → **Open editor**. Use the Debug panel (right side, dev builds only) to set a property, watch the save chip go Saving… → Saved, try Ctrl+Z / Ctrl+Shift+Z, and open the same design in a second window to see the conflict dialog.
+  4. Please confirm or override ADR-015 (Zustand) — applied as the documented default.
+- **Next step:** I16 — parametric 2D garment renderer (SVG) in the viewport region.
 
 ### 2026-10-26 — I14 Design operation router (session 1) — DONE
 

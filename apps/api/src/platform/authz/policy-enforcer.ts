@@ -77,6 +77,33 @@ export class PolicyEnforcer {
     throw this.toError(decision, input.notFoundLabel ?? 'Organization', permission);
   }
 
+  /**
+   * Would the current person be allowed? For capability flags in responses (e.g. the editor's
+   * read-only mode) — never instead of `enforce` before an action. Nothing is audited.
+   */
+  async can(req: Request, input: Omit<EnforceInput, 'notFoundLabel'>): Promise<boolean> {
+    const principal = RequestContext.get()?.principal;
+    if (principal?.type !== 'human' || !principal.id) return false;
+    const decision = await this.authorizer.authorize({
+      principal,
+      organizationId: input.organizationId,
+      ...(input.permission ? { permission: input.permission } : {}),
+      ...(input.resource ? { resource: input.resource } : {}),
+      ...(req.auth
+        ? {
+            session: {
+              mfaVerified: req.auth.assurance === 'mfa_verified',
+              stepUpAt: req.auth.stepUpAt,
+              createdAt: req.auth.createdAt,
+              lastSeenAt: req.auth.lastSeenAt,
+            },
+          }
+        : {}),
+    });
+    // An obligation (step-up) can be met by the person, so the capability is still offered.
+    return decision.decision === 'allow';
+  }
+
   private toError(decision: AuthzDecision, notFoundLabel: string, permission?: string): AppError {
     switch (decision.reasonCode) {
       case 'NOT_AUTHENTICATED':

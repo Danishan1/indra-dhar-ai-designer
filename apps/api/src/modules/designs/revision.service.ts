@@ -226,6 +226,20 @@ export class RevisionService {
     return { diff, lines: summarizeDiff(diff, from, to) };
   }
 
+  /** Summaries of the given revisions of a design, keyed by id (missing ids are skipped). */
+  async summariesByIds(
+    organizationId: string,
+    designId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, RevisionSummary>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.designRevision.findMany({
+      where: { organizationId, designId, id: { in: [...ids] } },
+      select: SUMMARY_SELECT,
+    });
+    return new Map((await this.toSummaries(rows)).map((s) => [s.id, s]));
+  }
+
   async toSummaries(rows: readonly SummaryRow[]): Promise<RevisionSummary[]> {
     const ids = [...new Set(rows.map((r) => r.createdBy).filter((x): x is string => !!x))];
     const profiles = ids.length ? await this.accounts.getProfiles(ids) : new Map();

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { isoDateTimeSchema } from '../common.js';
 import { pageQuerySchema, pageSchema } from '../pagination.js';
+import { projectStatusSchema } from '../projects/schemas.js';
 
 /**
  * Designs, working copies and immutable revisions (I12, SPEC-006 §8.3–8.4, ADR-003/018).
@@ -174,3 +175,34 @@ export const duplicateDesignRequestSchema = z.object({
   targetProjectId: z.uuid().optional(),
   name: nameSchema.optional(),
 });
+
+// ── editor (I15) ─────────────────────────────────────────────────────────────
+
+/** Everything the editor needs to open a design in one request (SPEC-007 §5, I15). */
+export const editorStateSchema = z.object({
+  design: designSchema,
+  project: z.object({
+    id: z.uuid(),
+    displayId: z.string(),
+    name: z.string(),
+    status: projectStatusSchema,
+    /** Designs of completed / archived projects are read-only until reopened. */
+    editable: z.boolean(),
+  }),
+  workingCopy: workingCopySchema,
+  /** Latest committed revision (null only for designs created before their first commit). */
+  headRevision: revisionSummarySchema.nullable(),
+  /** Approved revision, when there is one (approvals arrive in I28). */
+  approvedRevision: revisionSummarySchema.nullable(),
+  /** What the current person may do here; the server still enforces every action. */
+  capabilities: z.object({
+    canEdit: z.boolean(),
+    canCommit: z.boolean(),
+    canRestore: z.boolean(),
+    canGenerate: z.boolean(),
+  }),
+  /** Why editing is off (null when `canEdit`). */
+  readOnlyReason: z.enum(['permission', 'project_status']).nullable(),
+  userId: z.uuid(),
+});
+export type EditorState = z.infer<typeof editorStateSchema>;

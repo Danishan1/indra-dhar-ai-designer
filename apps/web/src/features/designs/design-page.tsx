@@ -2,7 +2,7 @@
 
 import { isEditable, type ProjectStatus } from '@ai-designer/contracts';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
+import { ArrowLeftIcon, CopyIcon, PenToolIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -89,16 +89,23 @@ export function DesignPage({ designId }: { designId: string }) {
           </span>
         }
         actions={
-          can('design.create') && !readOnly ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={duplicate.isPending}
-              onClick={() => duplicate.mutate()}
-            >
-              <CopyIcon /> Duplicate
+          <>
+            {can('design.create') && !readOnly ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={duplicate.isPending}
+                onClick={() => duplicate.mutate()}
+              >
+                <CopyIcon /> Duplicate
+              </Button>
+            ) : null}
+            <Button asChild size="sm">
+              <Link href={`/projects/${d.projectId}/designs/${d.id}`}>
+                <PenToolIcon /> Open editor
+              </Link>
             </Button>
-          ) : null
+          </>
         }
       />
       <div className="p-6">

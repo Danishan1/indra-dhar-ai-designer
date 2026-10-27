@@ -65,6 +65,9 @@ export function DesignsTab({ projectId, editable }: { projectId: string; editabl
                 <TableHead>Latest revision</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Changed</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,6 +90,16 @@ export function DesignsTab({ projectId, editable }: { projectId: string; editabl
                   </TableCell>
                   <TableCell>{d.status === 'DRAFT' ? 'Draft' : d.status}</TableCell>
                   <TableCell>{when(d.updatedAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button asChild size="sm" variant="ghost">
+                      <Link
+                        href={`/projects/${d.projectId}/designs/${d.id}`}
+                        aria-label={`Open ${d.name} in the editor`}
+                      >
+                        Open editor
+                      </Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

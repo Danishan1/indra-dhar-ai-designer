@@ -45,6 +45,7 @@ export const queryKeys = {
       workingCopy: (designId: string) => [...all, 'design', designId, 'working-copy'] as const,
       revisions: (designId: string) => [...all, 'design', designId, 'revisions'] as const,
       operations: (designId: string) => [...all, 'design', designId, 'operations'] as const,
+      editorState: (designId: string) => [...all, 'design', designId, 'editor-state'] as const,
       compare: (designId: string, from: string, to: string) =>
         [...all, 'design', designId, 'compare', from, to] as const,
     };

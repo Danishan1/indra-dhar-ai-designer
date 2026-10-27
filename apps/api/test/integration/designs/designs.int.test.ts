@@ -2,6 +2,7 @@ import { ErrorHttpStatus } from '@ai-designer/contracts';
 import type {
   CompareResponse,
   Design,
+  EditorState,
   Project,
   Revision,
   RevisionSummary,
@@ -555,6 +556,37 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     expect(copy.defaultDesignId).toBe(designs.items[0]!.id);
   });
 
+  it('editor-state opens a design in one request with capability flags (I15)', async () => {
+    const d = await newDesign();
+    const res = await designer.get(`${org()}/designs/${d.id}/editor-state`);
+    expect(res.status).toBe(200);
+    const es = await json<EditorState>(res);
+    expect(es.design.id).toBe(d.id);
+    expect(es.project).toMatchObject({ id: project.id, editable: true });
+    expect(es.workingCopy.version).toBe(d.workingCopyVersion);
+    expect(es.headRevision?.id).toBe(d.headRevisionId);
+    expect(es.headRevision?.revisionNumber).toBe(1);
+    expect(es.approvedRevision).toBeNull();
+    expect(es.capabilities).toMatchObject({ canEdit: true, canCommit: true, canRestore: true });
+    expect(es.readOnlyReason).toBeNull();
+    expect(es.userId).toBe(designerUserId);
+    // Viewers open the same design read-only.
+    const asViewer = await json<EditorState>(
+      await viewer.get(`${org()}/designs/${d.id}/editor-state`),
+    );
+    expect(asViewer.capabilities).toEqual({
+      canEdit: false,
+      canCommit: false,
+      canRestore: false,
+      canGenerate: false,
+    });
+    expect(asViewer.readOnlyReason).toBe('permission');
+    // Other tenants: not found.
+    expect(
+      (await other.owner.client.get(`/v1/orgs/${other.orgId}/designs/${d.id}/editor-state`)).status,
+    ).toBe(404);
+  });
+
   it('designs of archived projects are read-only', async () => {
     const p = await newProject(owner);
     const d = await newDesign({}, owner, p.id);
@@ -575,6 +607,10 @@ describe('designs: working copies and immutable revisions (integration)', () => 
     expect(res.status).toBe(409);
     expect((await code(res)).code).toBe('INVALID_STATE_TRANSITION');
     expect((await owner.get(`${org()}/designs/${d.id}`)).status).toBe(200);
+    const es = await json<EditorState>(await owner.get(`${org()}/designs/${d.id}/editor-state`));
+    expect(es.project.editable).toBe(false);
+    expect(es.capabilities.canEdit).toBe(false);
+    expect(es.readOnlyReason).toBe('project_status');
     expect((await owner.post(`${org()}/projects/${p.id}/designs`, { name: 'x' })).status).toBe(409);
   });
 
@@ -603,11 +639,19 @@ describe('designs: working copies and immutable revisions (integration)', () => 
       displayName: 'Granted',
     };
     expect((await operate(d, wc.version, rename)).status).toBe(403);
+    const readOnly = await json<EditorState>(
+      await designer.get(`${org()}/designs/${d.id}/editor-state`),
+    );
+    expect(readOnly.capabilities.canEdit).toBe(false);
     // Edit grant: edits and commits work.
     await owner.post(`${org()}/projects/${p.id}/grants`, {
       userId: designerUserId,
       actions: ['project.view', 'project.edit'],
     });
+    expect(
+      (await json<EditorState>(await designer.get(`${org()}/designs/${d.id}/editor-state`)))
+        .capabilities.canEdit,
+    ).toBe(true);
     const saved = await operate(d, wc.version, rename);
     expect(saved.status).toBe(201);
     const { workingCopy } = await json<{ workingCopy: { version: number } }>(saved);

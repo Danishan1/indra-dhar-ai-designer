@@ -27,6 +27,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/architecture/designs.md` — **designs, working copies (single writer, versioned saves) and immutable revisions (commit, restore, compare, integrity).**
 - `docs/architecture/artifacts.md` — **artifact registry: scopes (built-in/org/private), immutable revisions, compatibility, built-in library sync.**
 - `docs/architecture/operations.md` + `packages/design-operations/README.md` — **every draft change is a design operation (types, router, undo, single writer).**
+- `docs/architecture/editor.md` + `packages/editor-core/README.md` — **the editor workspace: Zustand store, optimistic changes (`apply`), autosave batches, conflicts, server-side undo/redo.**
 - `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)
