@@ -51,3 +51,6 @@ packages/db/src/generated/
 logs/*
 # logs
 !logs/README.md
+
+# Playwright sign-in state when e2e runs from the repo root (never commit)
+/.auth/

@@ -7,6 +7,7 @@ import {
   type ArtifactLifecycleStatuses,
   ArtifactPublishedEvent,
   ArtifactReactivatedEvent,
+  type ArtifactRenderInfo,
   type ArtifactRevision as ArtifactRevisionView,
   ArtifactRevisionCreatedEvent,
   artifactListQuerySchema,
@@ -264,6 +265,34 @@ export class ArtifactsService implements OnModuleInit {
       });
     }
     return out;
+  }
+
+  /** Render info of revisions a design uses (I16). Invisible / unknown ids are left out. */
+  async renderInfos(
+    ctx: AuthzContext,
+    revisionIds: readonly string[],
+  ): Promise<ArtifactRenderInfo[]> {
+    if (!revisionIds.length) return [];
+    const rows = await this.prisma.artifactRevision.findMany({
+      where: { id: { in: [...revisionIds] }, artifact: visibleArtifacts(ctx) },
+      include: { artifact: { select: { id: true, name: true, category: true } } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => {
+      const sp = (r.definition as { shapeParams?: unknown }).shapeParams as
+        { kind?: unknown; params?: unknown } | null | undefined;
+      return {
+        artifactRevisionId: r.id,
+        artifactId: r.artifact.id,
+        name: r.artifact.name,
+        category: r.artifact.category as ArtifactRenderInfo['category'],
+        shapeParams:
+          sp && typeof sp.kind === 'string' && sp.params && typeof sp.params === 'object'
+            ? { kind: sp.kind, params: sp.params as Record<string, number | string | boolean> }
+            : null,
+        previewUrl: this.previewUrl(ctx, r),
+      };
+    });
   }
 
   // ---------------------------------------------------------------- write

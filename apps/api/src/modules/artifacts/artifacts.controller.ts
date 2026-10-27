@@ -3,6 +3,8 @@ import {
   artifactListQuerySchema,
   artifactListResponseSchema,
   artifactParamsSchema,
+  artifactRenderInfoQuerySchema,
+  artifactRenderInfoResponseSchema,
   artifactRevisionParamsSchema,
   artifactRevisionSchema,
   compatibilityCheckRequestSchema,
@@ -101,6 +103,23 @@ export class ArtifactsController {
     @Body() body: z.output<typeof compatibilityCheckRequestSchema>,
   ) {
     return this.artifacts.compatibility(authzContext(req), body);
+  }
+
+  @Get('render-info')
+  @RequirePermission('artifact.view')
+  @Endpoint({
+    summary: 'Render info (name, category, shape parameters, preview) of artifact revisions',
+    tags: ['artifacts'],
+    params: orgIdParamsSchema,
+    query: artifactRenderInfoQuerySchema,
+    response: artifactRenderInfoResponseSchema,
+    errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED'],
+  })
+  async renderInfo(
+    @Req() req: Request,
+    @Query() query: z.output<typeof artifactRenderInfoQuerySchema>,
+  ) {
+    return { items: await this.artifacts.renderInfos(authzContext(req), query.ids) };
   }
 
   @Get(':artifactId')

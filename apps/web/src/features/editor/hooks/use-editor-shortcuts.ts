@@ -50,6 +50,30 @@ export function useEditorShortcuts() {
     handler: () => s().setTool('select'),
   });
   useShortcut({
+    id: 'editor.zoom-in',
+    combo: '=',
+    description: 'Zoom in',
+    handler: () => s().zoomIn(),
+  });
+  useShortcut({
+    id: 'editor.zoom-out',
+    combo: '-',
+    description: 'Zoom out',
+    handler: () => s().zoomOut(),
+  });
+  useShortcut({
+    id: 'editor.fit',
+    combo: 'shift+1',
+    description: 'Fit to view',
+    handler: () => s().fitToView(),
+  });
+  useShortcut({
+    id: 'editor.zoom-reset',
+    combo: 'shift+0',
+    description: 'Zoom to 100%',
+    handler: () => s().zoomReset(),
+  });
+  useShortcut({
     id: 'editor.tool-pan',
     combo: 'h',
     description: 'Pan tool',

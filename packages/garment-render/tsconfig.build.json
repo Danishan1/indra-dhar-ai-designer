@@ -1,0 +1,11 @@
+{
+  "extends": "@ai-designer/config/tsconfig/library.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

@@ -336,6 +336,41 @@ describe('editor store (I15 save pipeline)', () => {
     expect(s().save.status).toBe('saved');
   });
 
+  it('view state (fit, zoom, view mode, layers) never touches the design (AC6)', () => {
+    const version = s().server.version;
+    s().setCanvas({ width: 1000, height: 600 }, { x: -400, y: -150, width: 800, height: 900 });
+    expect(s().canvas.autoFit).toBe(true);
+    const fitted = s().viewport.zoom;
+    expect(fitted).toBeCloseTo((600 - 64) / 900, 5);
+    // Resizing keeps it fitted until the person zooms.
+    s().setCanvas({ width: 1000, height: 900 }, s().canvas.content);
+    const refit = s().viewport.zoom;
+    expect(refit).toBeGreaterThan(fitted);
+    s().setCanvas({ width: 1000, height: 600 }, s().canvas.content);
+    s().zoomIn();
+    expect(s().viewport.zoom).toBeCloseTo(fitted * 1.25, 5);
+    expect(s().canvas.autoFit).toBe(false);
+    s().setCanvas({ width: 1000, height: 900 }, s().canvas.content);
+    expect(s().viewport.zoom).toBeCloseTo(fitted * 1.25, 5);
+    s().setCanvas({ width: 1000, height: 600 }, s().canvas.content);
+    s().zoomReset();
+    expect(s().viewport.zoom).toBe(1);
+    s().fitToView();
+    expect(s().viewport.zoom).toBeCloseTo(fitted, 5);
+    s().zoomIn();
+    s().setViewMode('front');
+    expect(s().canvas.autoFit).toBe(true);
+    s().toggleLayer('guides');
+    expect(s().layers.guides).toBe(true);
+    s().holdTool('pan');
+    expect(s().tool.active).toBe('pan');
+    s().releaseTool();
+    expect(s().tool.active).toBe('select');
+    expect(server.calls).toHaveLength(0);
+    expect(s().server.version).toBe(version);
+    expect(s().queue.queued).toHaveLength(0);
+  });
+
   it('read-only editors refuse changes', () => {
     make(false);
     expect(s().apply(rename(server.state, 'A'), { label: 'Rename' })).toBe(false);

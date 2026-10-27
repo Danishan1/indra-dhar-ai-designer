@@ -6,10 +6,10 @@
 
 | Field                 | Value                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Current iteration** | **I16 — Parametric 2D garment renderer (SVG)** (next)                                                |
+| **Current iteration** | **I17 — Hierarchy, selection & contextual properties** (next)                                        |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I15 finished)                                                                            |
+| Last updated          | 2026-10-27 (I16 finished)                                                                            |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -35,7 +35,7 @@
 | I13 | Artifact registry & built-in library                  | 2     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-048; docs/architecture/artifacts.md                 |
 | I14 | Design operation router (deterministic)               | 3     | done   | 2026-10-26 | 2026-10-26 | 1        | ADR-049; docs/architecture/operations.md                |
 | I15 | Editor shell, editor-core & autosave                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-015 (default), ADR-050; docs/architecture/editor.md |
-| I16 | Parametric 2D garment renderer (SVG)                  | 3     | todo   |            |            |          |                                                         |
+| I16 | Parametric 2D garment renderer (SVG)                  | 3     | done   | 2026-10-27 | 2026-10-27 | 1        | ADR-024, ADR-051; packages/garment-render/README.md     |
 | I17 | Hierarchy, selection & contextual properties          | 3     | todo   |            |            |          |                                                         |
 | I18 | Artifact browser & structured attachment              | 3     | todo   |            |            |          |                                                         |
 | I19 | Revision history, commit & comparison UI              | 3     | todo   |            |            |          |                                                         |
@@ -108,6 +108,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-10-27 — I16 — kebab-case files grouped by concern, viewport logic in the editor store, `artifacts/render-info` endpoint, golden SVGs instead of pixel screenshots, Node perf check — ADR-051
 - 2026-10-27 — I15 — org-scoped editor-state route with PDP capability flags, editor in the `(editor)` group, slot-based workspace layout + status bar, ids generated in the browser, no IndexedDB snapshot / conflict diff yet — ADR-050
 - 2026-10-26 — I14 — org-scoped operation routes, server-side undo with stored inverses, PUT working-copy removed (internal `replace_state`), quick-edit panel — ADR-049
 - 2026-10-26 — I13 — built-in library synced at API start with inline SVG previews (no seed script), revision route by id, scope hooks in the PDP, no CompatibilityRule table yet — ADR-048
@@ -126,6 +127,17 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-10-27 — I16 Parametric 2D garment renderer (session 1) — DONE
+
+- Plan: ADR-024 accepted → `packages/garment-render` (frame, components, fills, trims, scene, SVG export) with golden/property/perf tests → render-info endpoint → canvas in the editor viewport → gallery → docs.
+- Built: pure package `packages/garment-render` (woven shirt + knit T-shirt templates; body, panels, sleeves incl. raglan/drop/dolman/sleeveless, cuffs, collars, necklines, plackets, pockets, hems, yoke; stripe/check/texture fills; lace/trim along boundaries with approximate fallback; artwork placeholders; placeholders & warnings; memoized per component; deterministic `sceneToSvg`); `GET /v1/orgs/:orgId/artifacts/render-info`; editor canvas (`GarmentCanvas`: zoom/pan/fit/100 %, Front/Back/Split, layers, click-to-select by component id, hover/selection overlay, capability badge + "drawn with defaults" chip); dev gallery `/dev/garment-gallery`.
+- Tests: garment-render 19, editor-core 28, web unit 66, api unit 101, integration api 123 + worker 13, e2e 25. OpenAPI regenerated.
+- **Owner actions (Windows):**
+  1. `pnpm install` (new package `@ai-designer/garment-render`).
+  2. No migration.
+  3. `pnpm dev` → open a design in the editor: the flat appears in the centre; click a sleeve, zoom with the wheel, hold Space to pan, switch Front/Back/Split; set a sleeve length in the Debug panel and watch the drawing change. Gallery: `http://localhost:3000/dev/garment-gallery`.
+- **Next step:** I17 — hierarchy, selection & contextual properties panels.
 
 ### 2026-10-27 — I15 Editor shell, editor-core & autosave (session 1) — DONE
 

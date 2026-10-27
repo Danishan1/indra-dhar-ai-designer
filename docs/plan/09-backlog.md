@@ -116,6 +116,16 @@ _(Append: date — source iteration — item — reason)_
 - 3D model refs for artifacts. → I36.
 - Better built-in visuals (vector geometry refs, tileable textures) once the renderer exists. → I16.
 
+## From I16 (2026-10-27)
+
+- More render templates/categories (dress, trousers, jacket…) and component types (hood, waistband, gusset, decorative regions). → with ADR-008 extensions.
+- Pattern-making accuracy is out of scope (G2 only); a G3+ geometry engine would be a separate ADR. → backlog.
+- In-browser render timing (p95) telemetry for AC8 on reference devices. → I39 (observability).
+- Fabric texture scale from artifact physical properties (today `shapeParams.repeatMm`, default 120 mm). → I18 (fabrics on components).
+- Rotated / mirrored placement of artwork and trims (placement.rotationDeg, orientation). → I18.
+- Server-side SVG/PNG/PDF export using `sceneToSvg` in the worker. → I35.
+- Keyboard selection inside the canvas (Tab through components) beyond the hierarchy list. → I17 (accessibility pass).
+
 ## From I15 (2026-10-27)
 
 - IndexedDB recovery snapshot of pending changes (survives a crash / closed tab while offline). → when offline editing matters.

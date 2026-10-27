@@ -215,3 +215,43 @@ export const whereUsedResponseSchema = z.object({
   draftCount: z.number().int(),
 });
 export type WhereUsed = z.infer<typeof whereUsedResponseSchema>;
+
+// ── render info (I16) ────────────────────────────────────────────────────────
+
+/** What the 2D renderer needs about artifact revisions a design uses (trims, fabrics). */
+export const artifactRenderInfoQuerySchema = z.object({
+  /** Comma-separated artifact revision ids (max 100). */
+  ids: z
+    .string()
+    .transform((s) => [
+      ...new Set(
+        s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean),
+      ),
+    ])
+    .pipe(z.array(z.uuid()).max(100)),
+});
+
+export const artifactRenderInfoSchema = z.object({
+  artifactRevisionId: z.uuid(),
+  artifactId: z.uuid(),
+  name: z.string(),
+  category: artifactCategorySchema,
+  /** `definition.shapeParams` of the revision (parametric 2D shape), or null. */
+  shapeParams: z
+    .object({
+      kind: z.string(),
+      params: z.record(z.string(), z.union([z.number(), z.string(), z.boolean()])),
+    })
+    .nullable(),
+  /** Same-origin preview image (used as fabric texture), or null. */
+  previewUrl: z.string().nullable(),
+});
+export type ArtifactRenderInfo = z.infer<typeof artifactRenderInfoSchema>;
+
+export const artifactRenderInfoResponseSchema = z.object({
+  /** Only revisions the caller may see; unknown or hidden ids are simply absent. */
+  items: z.array(artifactRenderInfoSchema),
+});

@@ -36,16 +36,12 @@ import { queryKeys } from '@/lib/query/keys';
 import { cn } from '@/lib/utils';
 
 import { editorApi } from './api';
+import { GarmentCanvas } from './canvas/garment-canvas';
+import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
 import { DebugPanel } from './components/debug-panel';
 import { SaveStatusChip } from './components/save-status';
-import {
-  Placeholder,
-  ToolButton,
-  ValueStatusLegend,
-  ViewportPlaceholder,
-  WorkspaceLayout,
-} from './editor-workspace';
+import { Placeholder, ToolButton, ValueStatusLegend, WorkspaceLayout } from './editor-workspace';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
 import {
@@ -115,7 +111,9 @@ function EditorSession({ orgId, initial }: { orgId: string; initial: EditorState
   useEffect(() => () => store.getState().dispose(), [store]);
   return (
     <EditorStoreProvider store={store}>
-      <Editor />
+      <SceneProvider>
+        <Editor />
+      </SceneProvider>
     </EditorStoreProvider>
   );
 }
@@ -129,7 +127,7 @@ function Editor() {
         header={<EditorHeader />}
         tools={<EditorTools />}
         hierarchy={<HierarchyList />}
-        viewport={<EditorViewport />}
+        viewport={<GarmentCanvas />}
         properties={<PropertiesPanel />}
         operations={<HistoryList />}
         validation={<FindingsList />}
@@ -347,19 +345,6 @@ function HierarchyList() {
           </li>
         ))}
     </ul>
-  );
-}
-
-function EditorViewport() {
-  const primary = useEditor(
-    (s) => s.display.components.find((c) => c.componentId === s.selection.primary)?.displayName,
-  );
-  return (
-    <ViewportPlaceholder>
-      <span className="rounded-md border bg-panel/80 px-3 py-1.5 text-[13px] text-muted-foreground">
-        2D garment viewport (I16){primary ? ` · ${primary}` : ''}
-      </span>
-    </ViewportPlaceholder>
   );
 }
 

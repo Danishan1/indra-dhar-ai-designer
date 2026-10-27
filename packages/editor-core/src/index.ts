@@ -9,3 +9,4 @@ export * from './viewport.js';
 export * from './tools.js';
 export * from './pending-ops.js';
 export * from './save-state.js';
+export * from './view-options.js';

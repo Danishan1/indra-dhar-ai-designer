@@ -39,6 +39,8 @@ export const queryKeys = {
       artifacts: (filters?: Record<string, unknown>) =>
         [...all, 'artifacts', filters ?? {}] as const,
       artifact: (artifactId: string) => [...all, 'artifact', artifactId] as const,
+      artifactRenderInfo: (ids: readonly string[]) =>
+        [...all, 'artifact-render-info', [...ids].sort().join(',')] as const,
       whereUsed: (artifactId: string) => [...all, 'artifact', artifactId, 'where-used'] as const,
       projectDesigns: (projectId: string) => [...all, 'project', projectId, 'designs'] as const,
       design: (designId: string) => [...all, 'design', designId] as const,

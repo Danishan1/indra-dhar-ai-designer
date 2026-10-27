@@ -58,11 +58,21 @@ cannot invert clears history with a notice; a refused undo (`CONFLICT changed_si
 the same parts) clears history too. Undo never touches committed revisions — going further back means
 restoring a revision.
 
+## Canvas (I16)
+
+`features/editor/canvas/`: `SceneProvider` renders `display` with one memoizing renderer per open
+design (`@ai-designer/garment-render`), artifact render info is fetched from
+`GET …/artifacts/render-info` (`artifact-render-info.ts`). `GarmentCanvas` draws the scene (React SVG,
+`scene-svg.tsx`) with `viewport` from the store; wheel/pinch zoom around the pointer, Space/middle
+mouse/Pan tool to pan, `=`/`-` zoom, Shift+1 fit, Shift+0 100 %. Clicks select by `data-component-id`
+(`hit-test.ts`; Shift adds, Ctrl/Cmd toggles, background clears). `ViewTabs` (Front/Back/Split, layers)
+and `CapabilityBadge` (G2 + components drawn with defaults) sit on the canvas. The canvas fits the
+garment automatically until the person zooms or pans. Dev gallery: `/dev/garment-gallery`.
+
 ## Rules for later iterations
 
 - **Never** put selection, viewport or tool state into the design (SPEC-007 §20); they live in the store.
 - Subscribe narrowly: `useEditor((s) => s.display.components)` — never return a fresh object/array from
   a selector without `useShallow` (React would re-render forever).
-- I16 renders `display` in the viewport region and drives `viewport`/`selection`/`tool` through the store
-  actions; I17 replaces the hierarchy list and the debug panel with real panels that call `apply`.
+- I17 replaces the hierarchy list and the debug panel with real panels that call `apply`.
 - Capabilities in `meta.capabilities` are cosmetic; the API still authorizes each operation.

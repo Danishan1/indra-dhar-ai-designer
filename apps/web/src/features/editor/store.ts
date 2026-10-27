@@ -42,8 +42,19 @@ import {
   enqueue,
   hasPending,
   initialSaveState,
+  type Bounds,
+  type CanvasLayer,
+  defaultLayers,
+  fitToBounds,
+  holdTool,
   initialToolState,
   initialViewport,
+  type LayerVisibility,
+  releaseTool,
+  toggleLayer,
+  type ViewMode,
+  zoomBy,
+  zoomTo,
   type InFlightBatch,
   markAttemptFailed,
   peekRedo,
@@ -129,6 +140,18 @@ export interface EditorStoreState {
   selection: Selection;
   viewport: Viewport;
   tool: ToolState;
+  viewMode: ViewMode;
+  layers: LayerVisibility;
+  /** Canvas size in pixels and drawn content bounds (mm), reported by the canvas. */
+  canvas: {
+    width: number;
+    height: number;
+    content: Bounds | null;
+    /** Keep the garment fitted when the canvas or the drawing changes (until the person zooms/pans). */
+    autoFit: boolean;
+    /** A view-mode switch asked for a fit that has not happened yet. */
+    pendingFit: boolean;
+  };
   conflict: EditorConflict | null;
   /** Non-blocking findings returned with the last acknowledged change. */
   findings: DesignFinding[];
@@ -152,6 +175,18 @@ export interface EditorStoreState {
   clearSelection(): void;
   setViewport(viewport: Viewport): void;
   setTool(tool: Tool): void;
+  /** Temporarily switch tools while a key is held (Space → pan). */
+  holdTool(tool: Tool): void;
+  releaseTool(): void;
+  setViewMode(mode: ViewMode): void;
+  toggleLayer(layer: CanvasLayer): void;
+  /** The canvas reports its size and content; the first report fits the garment to the view. */
+  setCanvas(size: { width: number; height: number }, content: Bounds | null): void;
+  fitToView(): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  /** 100 % (1 mm = 1 px), centred on the garment. */
+  zoomReset(): void;
   dispose(): void;
 }
 
@@ -219,6 +254,9 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
     selection: emptySelection,
     viewport: initialViewport,
     tool: initialToolState,
+    viewMode: 'split',
+    layers: defaultLayers,
+    canvas: { width: 0, height: 0, content: null, autoFit: true, pendingFit: true },
     conflict: null,
     findings: wc.findings,
     historyBusy: false,
@@ -339,10 +377,82 @@ export function createEditorStore(initial: EditorState, deps: EditorDeps): Edito
       if (next !== s.selection) set({ selection: next });
     },
     setViewport(viewport) {
-      set({ viewport });
+      // A manual zoom/pan stops fitting the garment automatically on resize.
+      const { canvas } = getState();
+      set({ viewport, ...(canvas.autoFit ? { canvas: { ...canvas, autoFit: false } } : {}) });
     },
     setTool(tool) {
       set({ tool: setTool(getState().tool, tool) });
+    },
+    holdTool(tool) {
+      const s = getState();
+      const next = holdTool(s.tool, tool);
+      if (next !== s.tool) set({ tool: next });
+    },
+    releaseTool() {
+      const s = getState();
+      const next = releaseTool(s.tool);
+      if (next !== s.tool) set({ tool: next });
+    },
+    setViewMode(viewMode) {
+      const s = getState();
+      if (s.viewMode !== viewMode)
+        set({ viewMode, canvas: { ...s.canvas, autoFit: true, pendingFit: true } });
+    },
+    toggleLayer(layer) {
+      set({ layers: toggleLayer(getState().layers, layer) });
+    },
+    setCanvas(size, content) {
+      const c = getState().canvas;
+      const sameBounds =
+        c.content === content ||
+        (c.content !== null &&
+          content !== null &&
+          c.content.x === content.x &&
+          c.content.y === content.y &&
+          c.content.width === content.width &&
+          c.content.height === content.height);
+      const fit = c.autoFit && content !== null && size.width > 0 && size.height > 0;
+      if (c.width === size.width && c.height === size.height && sameBounds && !c.pendingFit) return;
+      const canvas = { ...size, content, autoFit: c.autoFit, pendingFit: c.pendingFit && !fit };
+      if (fit) set({ canvas, viewport: fitToBounds(content, size, 32) });
+      else set({ canvas });
+    },
+    fitToView() {
+      const { canvas } = getState();
+      if (canvas.content && canvas.width > 0)
+        set({
+          viewport: fitToBounds(canvas.content, canvas, 32),
+          canvas: { ...canvas, autoFit: true },
+        });
+    },
+    zoomIn() {
+      const { canvas, viewport } = getState();
+      set({
+        viewport: zoomBy(viewport, 1.25, { x: canvas.width / 2, y: canvas.height / 2 }),
+        canvas: { ...canvas, autoFit: false },
+      });
+    },
+    zoomOut() {
+      const { canvas, viewport } = getState();
+      set({
+        viewport: zoomBy(viewport, 0.8, { x: canvas.width / 2, y: canvas.height / 2 }),
+        canvas: { ...canvas, autoFit: false },
+      });
+    },
+    zoomReset() {
+      const { canvas } = getState();
+      const b = canvas.content;
+      set({
+        viewport: b
+          ? {
+              ...zoomTo(initialViewport, 1),
+              panX: canvas.width / 2 - (b.x + b.width / 2),
+              panY: canvas.height / 2 - (b.y + b.height / 2),
+            }
+          : initialViewport,
+        canvas: { ...canvas, autoFit: false },
+      });
     },
     dispose() {
       // Leaving the editor: send what is still pending right away instead of waiting for the

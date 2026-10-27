@@ -1,0 +1,32 @@
+{
+  "name": "@ai-designer/garment-render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Parametric 2D garment renderer: canonical design state → deterministic, component-aware SVG technical flats (front/back)",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "@ai-designer/garment-model": "workspace:*"
+  },
+  "devDependencies": {
+    "@ai-designer/config": "workspace:*",
+    "eslint": "10.13.0",
+    "fast-check": "4.10.2",
+    "rimraf": "6.1.3",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

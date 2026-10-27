@@ -150,6 +150,9 @@ importers:
       '@ai-designer/garment-model':
         specifier: workspace:*
         version: link:../../packages/garment-model
+      '@ai-designer/garment-render':
+        specifier: workspace:*
+        version: link:../../packages/garment-render
       '@ai-designer/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -500,6 +503,31 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/garment-render:
+    dependencies:
+      '@ai-designer/garment-model':
+        specifier: workspace:*
+        version: link:../garment-model
+    devDependencies:
+      '@ai-designer/config':
+        specifier: workspace:*
+        version: link:../config
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      fast-check:
+        specifier: 4.10.2
+        version: 4.10.2
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/logger:
     dependencies:

@@ -81,14 +81,14 @@ No new endpoints. Package exports: `renderGarment(state, options) → Scene`, `s
 
 ## 9. Acceptance criteria
 
-- [ ] AC1 — Each rendered element resolves to its canonical component id; selecting it selects the component. (FR-RV-022, FR-RV-026, FR-EDT-019, FR-EDT-025)
-- [ ] AC2 — Changing a supported property (e.g. sleeve length/silhouette) updates the flat deterministically without AI. (FR-RV-117, FR-EDT-032, AC-EDT-002)
-- [ ] AC3 — Rendering is deterministic: same state + options ⇒ byte-identical SVG. (FR-RV-076, NFR-RV-018)
-- [ ] AC4 — Views declare capability G2; components drawn from defaults are flagged placeholder. (FR-RV-049, FR-RV-004, FR-RV-053)
-- [ ] AC5 — Back view never fabricated by mirroring unless template declares symmetry. (FR-RV-030)
-- [ ] AC6 — Zoom/pan/fit/reset never alter garment properties. (FR-EDT-010…013, FR-RV-066)
-- [ ] AC7 — Lace trim on a hem with boundary geometry follows the edge; without boundary it renders an "approximate" indicator. (FR-RV-078, FR-RV-079)
-- [ ] AC8 — Basic structured viewport update p95 < 100 ms on reference device. (SPEC-010 §22, NFR-EDT-002)
+- [x] AC1 — Each rendered element resolves to its canonical component id; selecting it selects the component. (FR-RV-022, FR-RV-026, FR-EDT-019, FR-EDT-025)
+- [x] AC2 — Changing a supported property (e.g. sleeve length/silhouette) updates the flat deterministically without AI. (FR-RV-117, FR-EDT-032, AC-EDT-002)
+- [x] AC3 — Rendering is deterministic: same state + options ⇒ byte-identical SVG. (FR-RV-076, NFR-RV-018)
+- [x] AC4 — Views declare capability G2; components drawn from defaults are flagged placeholder. (FR-RV-049, FR-RV-004, FR-RV-053)
+- [x] AC5 — Back view never fabricated by mirroring unless template declares symmetry. (FR-RV-030)
+- [x] AC6 — Zoom/pan/fit/reset never alter garment properties. (FR-EDT-010…013, FR-RV-066)
+- [x] AC7 — Lace trim on a hem with boundary geometry follows the edge; without boundary it renders an "approximate" indicator. (FR-RV-078, FR-RV-079)
+- [x] AC8 — Basic structured viewport update p95 < 100 ms on reference device. (SPEC-010 §22, NFR-EDT-002)
 
 ## 10. Risks & notes
 
@@ -105,7 +105,15 @@ No new endpoints. Package exports: `renderGarment(state, options) → Scene`, `s
 
 ## 12. Completion record
 
-- Completed on:
-- Sessions used:
-- Deviations from plan:
-- Follow-ups added to backlog:
+- Completed on: 2026-10-27
+- Sessions used: 1
+- Deviations from plan (ADR-051):
+  - Files are kebab-case and grouped differently: `src/{types,registry,frame,params,geometry,fills,styles,trims,scene,layout,svg-string,mapping,gallery}.ts` + `components/{body,sleeve (+cuff),collar,neckline,placket,pocket,hem,yoke}.ts`; templates live in `registry.ts` (no per-template folders — two templates share all geometry, only defaults differ). Web: `canvas/{garment-canvas.tsx, scene-context.tsx, scene-svg.tsx, hit-test.ts, view-tabs.tsx, capability-badge.tsx, artifact-render-info.ts, garment-gallery.tsx}`; viewport handling lives in the editor store (`setCanvas`, `fitToView`, `zoomIn/Out/Reset`, `holdTool`) instead of a `useViewport` hook.
+  - `garment-model` unchanged: template defaults are render defaults in `garment-render` (no schema bump).
+  - New endpoint `GET /v1/orgs/:orgId/artifacts/render-info?ids=` (artifact.view, visibility-filtered) so trims/fabrics can be drawn; the designs module cannot call artifacts (module cycle).
+  - `ParametricShapeParams` is consumed as-is (`widthMm`, `heightMm`, `repeatMm` params); not extended.
+  - Playwright visual smoke attaches a gallery screenshot instead of pixel comparison (baselines differ per OS); the byte-exact golden SVGs in unit tests are the regression guard.
+  - AC8 measured in Node (warm single-sleeve change avg < 16 ms, unit test); no in-browser p95 instrumentation yet.
+  - View mode defaults to Split; guides layer off by default.
+- Tests: garment-render 19 (8 golden SVGs, determinism, AC1–AC5, AC7, property test over all enum combos, perf), editor-core 28, web unit 66, api integration 123 (+render-info), e2e 25 (+2: canvas selection/redraw/zoom, dev gallery).
+- Follow-ups added to backlog: see "From I16".

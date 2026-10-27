@@ -358,6 +358,42 @@ describe('artifact registry (integration)', () => {
     ).toBe(403);
   });
 
+  it('render info for the 2D renderer respects visibility (I16)', async () => {
+    const lace = (await list(designer, '&q=Scalloped lace border&scope=platform'))[0]!;
+    const mine = await create(designer, { name: 'Private trim for render' });
+    const mineRev = mine.revisions[0]!.id;
+    const info = (client: TestClient, ids: string[]) =>
+      client.get(`${org()}/artifacts/render-info?ids=${ids.join(',')}`);
+    const res = await info(designer, [lace.currentRevisionId!, mineRev]);
+    expect(res.status).toBe(200);
+    const { items } = await json<{
+      items: {
+        artifactRevisionId: string;
+        name: string;
+        category: string;
+        shapeParams: { kind: string } | null;
+        previewUrl: string | null;
+      }[];
+    }>(res);
+    const byId = new Map(items.map((i) => [i.artifactRevisionId, i]));
+    expect(byId.get(lace.currentRevisionId!)).toMatchObject({
+      category: 'lace',
+      shapeParams: { kind: 'border' },
+    });
+    expect(byId.get(lace.currentRevisionId!)?.previewUrl).toContain('/preview');
+    expect(byId.get(mineRev)?.name).toBe('Private trim for render');
+    // Someone else's private artifact is simply absent.
+    const asLead = await json<{ items: { artifactRevisionId: string }[] }>(
+      await info(lead, [lace.currentRevisionId!, mineRev]),
+    );
+    expect(asLead.items.map((i) => i.artifactRevisionId)).toEqual([lace.currentRevisionId]);
+    expect((await info(designer, ['not-a-uuid'])).status).toBe(400);
+    const stranger = await other.owner.client.get(
+      `/v1/orgs/${other.orgId}/artifacts/render-info?ids=${mineRev}`,
+    );
+    expect((await json<{ items: unknown[] }>(stranger)).items).toEqual([]);
+  });
+
   it('other organizations cannot see or change organization artifacts (AC-11, FR-SEC-115)', async () => {
     const shared = await create(lead, { name: 'Org only', scope: 'organization' });
     const stranger = other.owner.client;

@@ -18,6 +18,7 @@
     "@ai-designer/design-operations": "workspace:*",
     "@ai-designer/editor-core": "workspace:*",
     "@ai-designer/garment-model": "workspace:*",
+    "@ai-designer/garment-render": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@hookform/resolvers": "5.9.1",
     "@tailwindcss/postcss": "4.3.3",

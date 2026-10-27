@@ -426,3 +426,16 @@ describe('save state', () => {
     ).toBe('offline');
   });
 });
+
+describe('view options', () => {
+  it('toggles layers and validates view modes', async () => {
+    const { defaultLayers, toggleLayer, visibleLayers, isViewMode } =
+      await import('./view-options.js');
+    expect(visibleLayers(defaultLayers)).toEqual(['garment', 'trims', 'artwork']);
+    const l = toggleLayer(defaultLayers, 'guides');
+    expect(visibleLayers(l)).toContain('guides');
+    expect(defaultLayers.guides).toBe(false);
+    expect(isViewMode('split')).toBe(true);
+    expect(isViewMode('side')).toBe(false);
+  });
+});
