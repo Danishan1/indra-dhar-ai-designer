@@ -59,6 +59,12 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
   const head = useEditor((s) => s.meta.headRevision);
   const uncommitted = useEditor((s) => s.server.hasUncommittedChanges || selectHasUnsavedWork(s));
   const [modelImages, setModelImages] = useState(true);
+  const [presentation, setPresentation] = useState({
+    model: 'female' as 'female' | 'male' | 'child' | 'none',
+    pose: 'standing_front' as 'standing_front' | 'three_quarter' | 'walking',
+    background: 'studio_white' as 'studio_white' | 'light_grey' | 'lifestyle',
+    view: 'front' as 'front' | 'back',
+  });
   const [provider, setProvider] = useState('');
   const key = useRef(newIdempotencyKey());
 
@@ -79,7 +85,11 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
       return studioApi.createTechPack(
         active.id,
         designId,
-        { modelImages, ...(chosen ? { provider: chosen as 'gemini' | 'openai' | 'fake' } : {}) },
+        {
+          modelImages,
+          presentation,
+          ...(chosen ? { provider: chosen as 'gemini' | 'openai' | 'fake' } : {}),
+        },
         key.current,
       );
     },
@@ -130,6 +140,52 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
             />
             Include mannequin and model images (2 more AI images)
           </label>
+          {modelImages ? (
+            <div className="grid grid-cols-2 gap-2" data-testid="presentation-presets">
+              <Preset
+                label="Model"
+                value={presentation.model}
+                options={[
+                  ['female', 'Female'],
+                  ['male', 'Male'],
+                  ['child', 'Child'],
+                  ['none', 'Ghost mannequin'],
+                ]}
+                onChange={(v) => setPresentation((p) => ({ ...p, model: v as typeof p.model }))}
+              />
+              <Preset
+                label="Pose"
+                value={presentation.pose}
+                options={[
+                  ['standing_front', 'Standing, facing'],
+                  ['three_quarter', 'Three-quarter'],
+                  ['walking', 'Walking'],
+                ]}
+                onChange={(v) => setPresentation((p) => ({ ...p, pose: v as typeof p.pose }))}
+              />
+              <Preset
+                label="Background"
+                value={presentation.background}
+                options={[
+                  ['studio_white', 'Studio white'],
+                  ['light_grey', 'Light grey'],
+                  ['lifestyle', 'Lifestyle'],
+                ]}
+                onChange={(v) =>
+                  setPresentation((p) => ({ ...p, background: v as typeof p.background }))
+                }
+              />
+              <Preset
+                label="View"
+                value={presentation.view}
+                options={[
+                  ['front', 'Front'],
+                  ['back', 'Back'],
+                ]}
+                onChange={(v) => setPresentation((p) => ({ ...p, view: v as typeof p.view }))}
+              />
+            </div>
+          ) : null}
           {previous.data?.items.length ? (
             <div className="flex flex-col gap-1 text-[13px]">
               <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -167,5 +223,29 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Preset({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: [string, string][];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-[12px]">{label}</Label>
+      <SimpleSelect
+        aria-label={label}
+        value={value}
+        onValueChange={onChange}
+        options={options.map(([v, l]) => ({ value: v, label: l }))}
+      />
+    </div>
   );
 }

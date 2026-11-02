@@ -109,6 +109,7 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-11-02 — demo track v2 (owner request) — editable reconstruction (`shapes`), model discovery/routing and organization AI keys ahead of I22/I24, tech pack PDF fallbacks — ADR-057
 - 2026-11-02 — demo track (owner request) — AI analyzer, component library reuse, pattern pieces, tech pack generator + PDF built ahead of I21–I44 with simplified preflight (daily cap instead of credits), polling instead of SSE, worker writes AI tables directly — ADR-056
 - 2026-10-27 — I20 — server-run validation after each save (no separate client pass), operation router does not call the engine, findings never block, org-scoped routes, 5 working-copy runs kept — ADR-055
 - 2026-10-27 — I19 — I12 APIs reused (change list from compare head→working), `classifyDiff` in garment-model, inspector as a workspace takeover, history as a right-panel tab — ADR-054
@@ -133,6 +134,20 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-11-02 — AI studio v2: editable reconstruction, model registry, tech pack PDF (owner request) — DONE
+
+- Request: reconstruct the garment as editable vector artifacts (not crops), editable flat patterns kept in sync, original vs reconstruction comparison, dynamic model discovery/selection with capability-safe fallback, the Gemini 2.5 errors, and a working tech pack PDF. Owner chose: keys in Settings per organization, vector artifacts canvas, simple model-image presets.
+- Root causes found in the owner's logs: Gemini 404 `models/gemini-3.1-flash is not found for API version v1beta` and 400 `unexpected model name format` (configured ids not available for the key) → fixed by discovery + routing (only listed, capable models are called); PDF `Executable doesn't exist … chrome-headless-shell` (no Playwright browser on Windows) → installed Chrome/Edge auto-detection, re-print endpoint and browser fallback.
+- Built: component `shapes` + `set_component_shapes`; reconstruction from traced outlines / technical-flat panels / boxes, mirrored backs, image placement; editor views Original · Reconstruction · Technical flat · Patterns with shape editing, overlay/side-by-side, export/import, Shape properties; pattern editing; shape → measurement → pattern sync; `packages/ai` models/catalog/router; `packages/secrets`; Settings → AI models; usage rows with operation/subject/attempt/error; tech pack v2 (references, final geometry, piece pages, presets, page numbers, pdfStatus, re-print). ADR-057, docs updated.
+- Tests: ai 17, design-ai 9, design-operations 24, secrets 1; integration 138 (+ai-settings), e2e ai-studio (reconstruction edit → pattern sync → commit R002 → tech pack + PDF download).
+- **Owner actions (Windows):**
+  1. `pnpm install` (new package `@ai-designer/secrets`).
+  2. **`pnpm db:migrate`** — migrations `…_ai_models` (provider keys, AI settings, usage columns) and `…_techpack_pdf_status`.
+  3. To manage keys in the app: Settings → Members → give yourself the **Credential admin** role (two-step verification required), then Settings → **AI models** → paste the Gemini/OpenAI key → _Save & discover_. `.env` keys keep working as the server fallback; you can remove `GEMINI_TEXT_MODEL`/`GEMINI_IMAGE_MODEL` overrides that are not listed for your key.
+  4. PDFs: nothing to do if Chrome or Edge is installed; otherwise `pnpm e2e:install` or set `PDF_CHROMIUM_PATH`. Old tech packs: open one and click **Print the PDF again**.
+  5. Restart `pnpm dev`. Designs created earlier without shapes: open the Reconstruction view → **Create editable shapes**.
+- **Next step:** I21 — generation job management & progress (SSE).
 
 ### 2026-11-02 — AI studio demo track (owner request) — DONE
 

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 
+import { classifyHttpError } from './models.js';
 import { type AiProviderName, AiProviderError, type StructuredRequest } from './types.js';
 
 /** Extracts a JSON value from model text (handles ```json fences and leading prose). */
@@ -75,20 +76,5 @@ export function toBase64(data: Uint8Array): string {
 
 /** Maps an HTTP failure to an error kind (never includes request headers or keys). */
 export function httpError(provider: AiProviderName, status: number, body: string): AiProviderError {
-  const detail = body.slice(0, 300).replace(/\s+/g, ' ');
-  if (status === 401 || status === 403)
-    return new AiProviderError(
-      'auth',
-      `The ${provider} API key was rejected (${status})`,
-      provider,
-    );
-  if (status === 429)
-    return new AiProviderError('rate_limited', `${provider} rate limit or quota reached`, provider);
-  if (status >= 500)
-    return new AiProviderError('unavailable', `${provider} is unavailable (${status})`, provider);
-  return new AiProviderError(
-    'bad_request',
-    `${provider} refused the request (${status}): ${detail}`,
-    provider,
-  );
+  return classifyHttpError(provider, status, body);
 }

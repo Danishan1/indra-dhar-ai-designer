@@ -41,7 +41,10 @@ export function techPackHtml(
 ): string {
   const h = doc.header;
   const views = doc.views.filter(
-    (v) => v.kind === 'flat' || ['front', 'back', 'side'].some((k) => v.key.includes(k)),
+    (v) =>
+      v.kind === 'flat' ||
+      v.kind === 'reconstruction' ||
+      ['front', 'back', 'side'].some((k) => v.key.includes(k)),
   );
   const styled = doc.views.filter((v) => !views.includes(v));
   const sections: string[] = [];
@@ -63,6 +66,10 @@ export function techPackHtml(
       .join('')}</div>
   </section>`);
 
+  if (doc.references?.length)
+    sections.push(
+      `<section><h2>Original reference</h2><p class="muted">As uploaded — the starting point only. The specification below follows the finalized design.</p><div class="grid2">${doc.references.map((v) => figure(v, imageSrc)).join('')}</div></section>`,
+    );
   if (views.length)
     sections.push(
       `<section><h2>Garment views</h2><div class="grid2">${views.map((v) => figure(v, imageSrc)).join('')}</div></section>`,
@@ -114,6 +121,11 @@ export function techPackHtml(
       )
       .join('')}</tbody></table></section>`);
 
+  for (const p of doc.patterns.pieces.filter((x) => x.svg))
+    sections.push(
+      `<section class="piece"><h2>Pattern piece — ${esc(p.name)}</h2><p class="muted">${esc(p.component)} · cut ${p.cutQuantity}${p.onFold ? ' on fold' : ''}${p.mirrored ? ' (pair)' : ''} · seam allowance ${p.seamAllowanceMm ?? '—'} mm · ${esc(p.source)} · ${badge(p.status)} · ${esc(p.pieceId ?? '')}</p><figure class="wide"><div class="svg">${p.svg}</div><figcaption>Solid: seam line · dashed: cutting line (seam allowance) · arrows: grainline · blue dash-dot: fold · dots: notches · bar: 100 mm</figcaption></figure></section>`,
+    );
+
   sections.push(`<section><h2>Construction</h2>${doc.construction.aiDrafted ? '<p class="note">AI-drafted construction notes — review before production.</p>' : '<p class="note">Generic sewing order (no AI draft).</p>'}
     <ol>${doc.construction.steps.map((s) => `<li><strong>${esc(s.title)}</strong>${s.details ? ` — ${esc(s.details)}` : ''}</li>`).join('')}</ol>
     ${doc.construction.stitching.length ? `<h3>Stitching</h3><table class="full"><thead><tr><th>Seam</th><th>Stitch</th><th>Notes</th></tr></thead><tbody>${doc.construction.stitching.map((s) => `<tr><td>${esc(s.seam)}</td><td>${esc(s.stitch)}</td><td>${esc(s.notes)}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -126,6 +138,29 @@ export function techPackHtml(
       .map((m) => `<tr><td>${esc(m.area)}</td><td>${esc(m.item)}</td></tr>`)
       .join('')}</tbody></table></section>`,
   );
+
+  const processing = (
+    doc as {
+      processing?: {
+        history?: {
+          task: string;
+          provider: string;
+          model: string;
+          outcome: string;
+          errorKind: string | null;
+        }[];
+      };
+    }
+  ).processing;
+  if (processing?.history?.length)
+    sections.push(
+      `<section><h2>AI processing record</h2><p class="muted">Which models produced the AI parts of this document (retries and fallbacks included).</p><table class="full"><thead><tr><th>Task</th><th>Provider</th><th>Model</th><th>Outcome</th></tr></thead><tbody>${processing.history
+        .map(
+          (h) =>
+            `<tr><td>${esc(h.task.replaceAll('_', ' '))}</td><td>${esc(h.provider)}</td><td>${esc(h.model)}</td><td>${esc(h.outcome)}${h.errorKind ? ` (${esc(h.errorKind)})` : ''}</td></tr>`,
+        )
+        .join('')}</tbody></table></section>`,
+    );
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>${esc(h.designName)} — tech pack</title><style>
   @page { size: A4; margin: 14mm; }
@@ -143,7 +178,9 @@ export function techPackHtml(
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
   figure { margin: 0; border: 1px solid #e5e7eb; padding: 2mm; break-inside: avoid; }
   figure img, figure .svg svg { width: 100%; height: auto; max-height: 120mm; object-fit: contain; display: block; }
-  figure.small img, figure.small .svg svg { max-height: 40mm; } figure.wide .svg svg { max-height: 170mm; }
+  figure.small img, figure.small .svg svg { max-height: 40mm; } figure.wide .svg svg { max-height: 175mm; }
+  section.piece figure.wide .svg svg { max-height: 220mm; }
+  table, tr, figure, .comp { page-break-inside: avoid; } h2, h3 { page-break-after: avoid; }
   figcaption { font-size: 8.5pt; color: #4b5563; margin-top: 1mm; }
   .noimg { height: 40mm; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
   .components { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }

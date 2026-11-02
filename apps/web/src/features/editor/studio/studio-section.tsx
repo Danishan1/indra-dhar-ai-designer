@@ -64,14 +64,14 @@ export function StudioSection({ component }: { component: DesignComponent }) {
   return (
     <details open className="border-b" data-testid="studio-section">
       <summary className="cursor-pointer px-3 py-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase select-none">
-        Visual &amp; pattern
+        Pattern &amp; reference
       </summary>
       <div className="flex flex-col gap-2 px-3 pb-3">
         {visual ? (
           // eslint-disable-next-line @next/next/no-img-element -- authorized API stream
           <img
             src={assetContentUrl(active.id, visual.assetId, 'thumb_256')}
-            alt={`${component.displayName} in your image`}
+            alt={`${component.displayName} in your image (reference)`}
             className="h-24 w-24 rounded-md border bg-white object-contain"
             data-testid="component-visual"
           />

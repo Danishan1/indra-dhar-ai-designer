@@ -482,6 +482,12 @@ class Applier {
           s.patternPieces = s.patternPieces.filter((p) => !removed.has(p.componentId));
         return;
       }
+      case 'set_component_shapes': {
+        const c = this.component(op.componentId);
+        if (op.shapes.length) c.shapes = op.shapes;
+        else delete c.shapes;
+        return;
+      }
       case 'replace_pattern_pieces': {
         const c = this.component(op.componentId);
         const pieces = op.pieces.map((p) => ({ ...p, componentId: c.componentId }));

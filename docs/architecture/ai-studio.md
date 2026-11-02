@@ -1,4 +1,4 @@
-# AI studio — analyzer, component library reuse, patterns, tech packs (ADR-056)
+# AI studio — reconstruction, library reuse, patterns, models, tech packs (ADR-056, ADR-057)
 
 The demo track that takes a garment from images to a tech pack. The structured garment model stays
 the source of truth; AI output is never `confirmed`, and nothing missing is invented.
@@ -10,6 +10,46 @@ images ──► design.analysis (worker) ──► review (web) ──► desig
                 └► crops (assets)                    artifacts (matchSignature)   techpack.generate (worker)
                                                                                      └► document + PDF
 ```
+
+## Reconstruct, don't crop (ADR-057)
+
+The analyzer rebuilds the garment as **editable vector artifacts**. Each component has `shapes`
+(`garment-model/src/schema/shape.ts`): a closed path normalized to a box in garment-frame
+millimetres (origin top-centre of the body, x right, y down — the technical-flat frame), one per
+view, with curve handles, layer, style, inner details and `source` + `confidence`
+(`observed` = traced by the model on the image · `template` = technical-flat geometry ·
+`inferred` = AI guess / mirrored back · `user`). `links` say which measurement a box side drives.
+
+| Step                                                                   | Where                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------ |
+| Model traces an outline per component, normalized to its region        | `prompts.ts` (decomposition)                           |
+| Outline → mm (scale: estimated body length ÷ body height on the image) | `reconstruct.ts` `observedShapes`                      |
+| Missing outlines → technical-flat panels (shirts/T-shirts) or a box    | `reconstruct.ts` `reconstructShapes`                   |
+| Image placement for the overlay comparison                             | `sources[].placement`                                  |
+| Edit (move/resize/rotate/points/curves/layers, export/import)          | `web/features/editor/studio/reconstruction-canvas.tsx` |
+| Shape → measurement → pattern (one undo step)                          | `web/features/editor/studio/shape-sync.ts`             |
+| Pattern editing (points, SA, cut, grain, fold)                         | `web/features/editor/studio/pattern-editor.tsx`        |
+
+Pattern pieces keep `componentId` (artifact → pieces, several per component). Rule-based
+(`parametric`) pieces are redrafted when linked measurements change; traced/extracted pieces are
+scaled with the shape and marked `needs_review` — an arbitrary 2D shape is never presented as a
+manufacturing pattern.
+
+## Models: discovery, capabilities, routing (ADR-057)
+
+- `packages/ai/src/models.ts`: `discoverGeminiModels` (`GET v1beta/models`, key in
+  `x-goog-api-key`, `supportedGenerationMethods`), `discoverOpenAiModels` (`GET /v1/models`),
+  per-model capabilities, `OPERATION_REQUIREMENTS`, `classifyHttpError`, `modelChain`.
+- `catalog.ts` `planChain`: preference (Settings) → `.env` model if listed → ranked compatible
+  models (recent successes/failures from `ai_usage_records`) → other providers when allowed.
+- `router.ts` `routedProvider`: busy → retry with backoff; unknown/unsupported model or invalid
+  output → next compatible model; bad key / permission / quota → skip that provider; refusal →
+  stop. History is stored with the analysis/tech pack (`processing`) and every call is a usage row.
+- Keys: Settings → **AI models** (`credentials.manage`, Credential admin role + MFA); encrypted with
+  `@ai-designer/secrets` (shared with the worker); `.env` keys are the server fallback.
+- Routes: `GET/PUT orgs/:orgId/ai/settings`, `PUT ai/providers/key`, `POST ai/providers/key/remove`,
+  `POST ai/providers/refresh`, `POST ai/models/test` (listed + capable + live JSON probe; image
+  models are checked from the listing only).
 
 ## Packages
 
@@ -57,11 +97,31 @@ pieces, details; preview = crop). Scope is organization with `artifact.publish`,
 - `/techpacks/:id` — progress, then the document (same HTML as the PDF in a script-less iframe) and
   **Download PDF**.
 
+## Tech pack v2 (ADR-057)
+
+Inputs: the committed revision (final shapes, measurements, pattern pieces, fabrics) **and** the
+original uploads (`references`). Document: original reference · garment front/back from the final
+geometry (+ technical flats for shirts) · AI images (references: final drawing first, original
+second; presets model/pose/background/view) · components with their shape drawing · BOM ·
+measurements · pattern sheet + one dimensioned page per piece (100 mm scale bar) · construction ·
+missing information · AI processing record. PDF: Chromium (Playwright's, else installed
+Chrome/Edge/Chromium, or `PDF_CHROMIUM_PATH`), page-numbered footer, `pdfStatus`/`pdfError`,
+`POST techpacks/:id/pdf` to print again, plus a browser **Print / Save as PDF** fallback.
+
+## Busy providers (503 / 429)
+
+Layered, so a demand spike does not fail a job: (1) the Gemini adapter retries each call with
+backoff; (2) then tries the fallback models (`GEMINI_FALLBACK_*_MODELS`); (3) `resilientProvider`
+waits `AI_BUSY_WAIT_MS × round` for `AI_BUSY_RETRIES` rounds, showing "Gemini is busy — trying again
+in 20 s" as the job stage; (4) then switches once to `AI_FALLBACK_PROVIDER` if its key is set.
+Every attempt is metered. A failed analysis offers **Try again with the same images** (optionally
+with another provider) — no re-upload.
+
 ## Configuration
 
 `.env` (see `.env.example`): `AI_PROVIDER` (`gemini` | `openai` | `fake`), `GEMINI_API_KEY`,
 `GEMINI_TEXT_MODEL`, `GEMINI_IMAGE_MODEL`, `OPENAI_API_KEY`, `OPENAI_TEXT_MODEL`,
-`OPENAI_IMAGE_MODEL`, `AI_DAILY_REQUEST_LIMIT`, `AI_TIMEOUT_MS`, `PDF_CHROMIUM_PATH` (optional;
+`OPENAI_IMAGE_MODEL`, `GEMINI_FALLBACK_TEXT_MODELS`, `GEMINI_FALLBACK_IMAGE_MODELS`, `AI_BUSY_RETRIES`, `AI_BUSY_WAIT_MS`, `AI_FALLBACK_PROVIDER`, `AI_DAILY_REQUEST_LIMIT`, `AI_TIMEOUT_MS`, `PDF_CHROMIUM_PATH` (optional;
 default is Playwright's browser from `pnpm e2e:install`). Model names change — set them here.
 
 ## Tests

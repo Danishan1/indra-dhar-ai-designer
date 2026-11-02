@@ -16,6 +16,48 @@ type Part = {
   region?: [number, number, number, number];
 };
 
+/** Plausible outlines per type, normalized to the region (the fake "traces" these). */
+const OUTLINES: Record<string, { x: number; y: number; smooth?: boolean }[]> = {
+  garment_body: [
+    { x: 0.32, y: 0 },
+    { x: 0.68, y: 0 },
+    { x: 0.95, y: 0.06 },
+    { x: 0.92, y: 0.3, smooth: true },
+    { x: 0.95, y: 1 },
+    { x: 0.05, y: 1 },
+    { x: 0.08, y: 0.3, smooth: true },
+    { x: 0.05, y: 0.06 },
+  ],
+  sleeve: [
+    { x: 0.55, y: 0 },
+    { x: 1, y: 0.1, smooth: true },
+    { x: 0.75, y: 1 },
+    { x: 0.2, y: 0.95 },
+    { x: 0, y: 0.15 },
+  ],
+  collar: [
+    { x: 0, y: 0.2 },
+    { x: 0.5, y: 0.45, smooth: true },
+    { x: 1, y: 0.2 },
+    { x: 0.85, y: 1 },
+    { x: 0.5, y: 0.6, smooth: true },
+    { x: 0.15, y: 1 },
+  ],
+  pocket: [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 0.85 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.85 },
+  ],
+};
+const RECT_OUTLINE = [
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 1, y: 1 },
+  { x: 0, y: 1 },
+];
+
 const SHIRT: Part[] = [
   {
     key: 'body',
@@ -305,6 +347,15 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
               height: p.region[3],
             }
           : null,
+        outline: p.region ? (OUTLINES[p.componentType] ?? RECT_OUTLINE) : null,
+        view: p.region ? 'front' : null,
+        details:
+          p.componentType === 'placket' && p.region
+            ? [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map((y) => ({
+                kind: 'button',
+                points: [{ x: 0.5, y }],
+              }))
+            : [],
         fabricKey: fabrics.length
           ? (p.key === 'collar' || p.key.endsWith('cuff')) && fabrics[1]
             ? fabrics[1].key

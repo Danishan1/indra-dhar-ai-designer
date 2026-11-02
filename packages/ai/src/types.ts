@@ -93,7 +93,11 @@ export type AiErrorKind =
   | 'invalid_response'
   | 'refused'
   | 'unsupported'
-  | 'bad_request';
+  | 'bad_request'
+  /** Quota or billing limit of the account — another model of the same provider will not help. */
+  | 'quota'
+  /** The model id is unknown, retired or not enabled for this key/API version. */
+  | 'model_unavailable';
 
 /** Failures with a kind the caller can act on; messages never contain credentials. */
 export class AiProviderError extends Error {

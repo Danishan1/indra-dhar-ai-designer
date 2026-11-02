@@ -63,8 +63,18 @@ export function decompositionPrompt(input: {
     '   (body_length, chest_width = half chest across, shoulder_width, sleeve_length, cuff_width,',
     '   collar_height, placket_width, waist_width, hip_width, inseam, leg_opening, skirt_length,',
     '   waistband_height). Mark measurementSource "pattern" only when read from an uploaded pattern.',
-    '5. region: where the component is in an image, normalized 0–1 (x, y = top-left), choose the',
-    '   clearest sketch/reference image.',
+    '5. RECONSTRUCT, DO NOT CROP: we rebuild the garment as editable vector parts that together',
+    '   look like the original. For every component give:',
+    '   - region: its bounding box on the clearest sketch/reference image, normalized 0–1',
+    '     (x, y = top-left; imageIndex = that image);',
+    '   - outline: 6–40 points tracing the visible outer edge of that component, clockwise,',
+    '     normalized to its OWN region box (0,0 = box top-left, 1,1 = box bottom-right); add',
+    '     "smooth": true on points where the edge curves (collar points, armholes, hems);',
+    '   - view: "front" or "back" (which side of the garment the image shows);',
+    '   - details: inner lines in the same box coordinates: stitch lines, fold lines, darts,',
+    '     button positions ("button" with one point each), buttonholes.',
+    '   Parts overlap like real garments (sleeves meet the body at the armhole, the collar sits on',
+    '   the neckline). Trace what you see; keep proportions; do not invent hidden parts.',
     '6. For every fabric image, describe the fabric (key like "fabric_a", hex color, pattern,',
     '   texture, likely material only if reasonably identifiable) and suggest fabricKey per',
     '   component when obvious (main body fabric, contrast collar…).',
@@ -81,7 +91,7 @@ export const DECOMPOSITION_SHAPE = `{
   "garment": { "category": "woven_shirt", "label": "Men's long-sleeve shirt", "audience": "men", "silhouette": "regular", "description": "…", "confidence": 0.8 },
   "inputs": [{ "index": 0, "role": "sketch", "notes": "front view line drawing" }],
   "components": [
-    { "key": "body", "componentType": "garment_body", "name": "Shirt body", "side": "none", "parentKey": null, "description": "…", "attributes": {}, "measurementsMm": { "body_length": 760, "chest_width": 560 }, "measurementSource": "estimated", "region": { "imageIndex": 0, "x": 0.1, "y": 0.05, "width": 0.8, "height": 0.9 }, "fabricKey": "fabric_a", "confidence": 0.8 },
+    { "key": "body", "componentType": "garment_body", "name": "Shirt body", "side": "none", "parentKey": null, "description": "…", "attributes": {}, "measurementsMm": { "body_length": 760, "chest_width": 560 }, "measurementSource": "estimated", "region": { "imageIndex": 0, "x": 0.25, "y": 0.08, "width": 0.5, "height": 0.85 }, "outline": [{ "x": 0.3, "y": 0 }, { "x": 0.7, "y": 0 }, { "x": 1, "y": 0.08 }, { "x": 1, "y": 0.3, "smooth": true }, { "x": 1, "y": 1 }, { "x": 0, "y": 1 }, { "x": 0, "y": 0.3, "smooth": true }, { "x": 0, "y": 0.08 }], "view": "front", "details": [{ "kind": "stitch", "points": [{ "x": 0, "y": 0.95 }, { "x": 1, "y": 0.95 }] }], "fabricKey": "fabric_a", "confidence": 0.8 },
     { "key": "left_cuff", "componentType": "cuff", "name": "Left cuff", "side": "left", "parentKey": "left_sleeve", "description": "…", "attributes": { "cuff_type": "barrel" }, "measurementsMm": { "cuff_width": 65 }, "measurementSource": "estimated", "region": null, "fabricKey": null, "confidence": 0.6 }
   ],
   "fabrics": [{ "key": "fabric_a", "imageIndex": 1, "name": "Blue oxford", "color": "#4a6fa5", "pattern": "solid", "texture": "basket weave", "likelyMaterial": "cotton", "weight": "medium", "notes": "" }],
@@ -132,12 +142,50 @@ export const TECHPACK_TEXT_SHAPE = `{
   "careNotes": ["Machine wash 30 °C"]
 }`;
 
-/** Image prompts: always anchored to the finalized design description. */
+/** Presentation presets for the mannequin / model images (ADR-057). */
+export interface Presentation {
+  model: 'female' | 'male' | 'child' | 'none';
+  pose: 'standing_front' | 'three_quarter' | 'walking';
+  background: 'studio_white' | 'light_grey' | 'lifestyle';
+  view: 'front' | 'back';
+}
+
+export const DEFAULT_PRESENTATION: Presentation = {
+  model: 'female',
+  pose: 'standing_front',
+  background: 'studio_white',
+  view: 'front',
+};
+
+const BACKGROUND = {
+  studio_white: 'plain white studio background, soft even light',
+  light_grey: 'plain light-grey studio background, soft even light',
+  lifestyle:
+    'simple, uncluttered lifestyle setting with natural light (the garment stays the focus)',
+} as const;
+const POSE = {
+  standing_front: 'standing straight, facing the camera',
+  three_quarter: 'standing in a relaxed three-quarter turn',
+  walking: 'mid-stride walking pose',
+} as const;
+const MODEL = {
+  female: 'an adult female model',
+  male: 'an adult male model',
+  child: 'a child model (age-appropriate, fully clothed, neutral pose)',
+  none: 'an invisible / ghost mannequin (no person visible)',
+} as const;
+
+/**
+ * Image prompts — always anchored to the finalized structured design (the source of truth); the
+ * reference images passed with them are the final reconstruction (and the original upload).
+ */
 export function imagePrompt(
   kind: 'front' | 'back' | 'side' | 'mannequin' | 'model',
   description: string,
+  presentation: Presentation = DEFAULT_PRESENTATION,
 ): string {
-  const base = `Garment design (the finalized structured design — reproduce it faithfully, do not add or remove details): ${description}`;
+  const base = `Garment design (the finalized structured design — reproduce it faithfully: same silhouette, proportions, component placement, colours and details; do not add or remove anything): ${description}\nThe first reference image is the finalized garment drawing; follow it over any other reference.`;
+  const facing = presentation.view === 'back' ? 'BACK view (seen from behind)' : 'FRONT view';
   switch (kind) {
     case 'front':
       return `${base}\nCreate a clean, realistic product rendering of the garment, FRONT view, flat on a plain white background, even studio light, no person, no text.`;
@@ -146,8 +194,8 @@ export function imagePrompt(
     case 'side':
       return `${base}\nCreate a clean, realistic product rendering of the garment, SIDE view, on a plain white background, no person, no text.`;
     case 'mannequin':
-      return `${base}\nShow the garment worn by a neutral grey dress form / mannequin, full garment visible, plain light background, studio light, no text.`;
+      return `${base}\nShow the garment worn by a neutral grey dress form / mannequin, ${facing}, full garment visible, ${BACKGROUND[presentation.background]}, no text.`;
     case 'model':
-      return `${base}\nShow the garment worn by a realistic human model in a simple studio setting, full garment visible, natural pose, neutral background, no text, no logos.`;
+      return `${base}\nShow the garment worn by ${MODEL[presentation.model]}, ${POSE[presentation.pose]}, ${facing}, full garment visible, ${BACKGROUND[presentation.background]}, no text, no logos.`;
   }
 }

@@ -84,4 +84,19 @@ export class TechPacksController {
   get(@Req() req: Request, @Param('techPackId') techPackId: string) {
     return this.techPacks.get(authzContext(req), techPackId);
   }
+
+  @Post('pdf')
+  @Idempotent()
+  @RequirePermission('design.export', { resource: TECH_PACK })
+  @Endpoint({
+    summary: 'Print the tech pack PDF again from the stored document (no AI calls)',
+    tags: ['ai-studio'],
+    params: techPackParamsSchema,
+    response: techPackSummarySchema,
+    successStatus: 202,
+    errors: ['NOT_FOUND', 'PERMISSION_DENIED', 'INVALID_STATE_TRANSITION'],
+  })
+  reprint(@Req() req: Request, @Param('techPackId') techPackId: string) {
+    return this.techPacks.reprintPdf(authzContext(req), techPackId);
+  }
 }

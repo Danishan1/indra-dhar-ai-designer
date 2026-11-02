@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { sourcePlacementSchema } from './shape.js';
+
 /**
  * Flat pattern pieces (demo track, ADR-056). A garment **component** (a cuff) and its **pattern
  * piece(s)** (the flat cutting template) are different things: pieces point at their component.
@@ -73,6 +75,8 @@ export const designSourceSchema = z.object({
   assetId: z.string().trim().min(1).max(200),
   role: z.enum(DesignSourceRoles),
   label: z.string().max(120).nullable().default(null),
+  /** Where the image sits in the garment frame, for the overlay comparison (ADR-057). */
+  placement: sourcePlacementSchema.optional(),
 });
 export type DesignSource = z.infer<typeof designSourceSchema>;
 

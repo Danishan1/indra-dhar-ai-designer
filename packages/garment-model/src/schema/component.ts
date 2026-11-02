@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { sourceRegionSchema } from './pattern.js';
 import { coordinateSpaceSchema } from './placement.js';
 import { propertyKeySchema, propertyValueSchema } from './property-value.js';
+import { componentShapeSchema } from './shape.js';
 
 export const COMPONENT_ID_PATTERN = /^cmp_[a-z0-9]{8,32}$/;
 export const componentIdSchema = z
@@ -55,6 +56,8 @@ export const designComponentSchema = z.looseObject({
   tags: z.array(z.string().trim().min(1).max(40)).max(30).default([]),
   /** Where the component appears in a source image (AI analysis, ADR-056). */
   sourceRegion: sourceRegionSchema.optional(),
+  /** Editable reconstruction geometry, one shape per view (ADR-057). */
+  shapes: z.array(componentShapeSchema).max(4).optional(),
   /** Editor-only flags: not physical properties, excluded from semantic diff/hash (FR-EDT-024). */
   visible: z.boolean().default(true),
   locked: z.boolean().default(false),

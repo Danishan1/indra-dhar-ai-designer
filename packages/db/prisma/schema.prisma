@@ -317,6 +317,8 @@ model Organization {
   designAnalyses    DesignAnalysis[]
   techPacks         TechPack[]
   aiUsageRecords    AiUsageRecord[]
+  aiProviderConnections AiProviderConnection[]
+  aiSettings        AiSettings?
   validationFindings ValidationFinding[]
 
   @@map("organizations")
@@ -942,6 +944,9 @@ model TechPack {
   /// TechPackDocument
   document       Json?
   pdfAssetId     String?        @map("pdf_asset_id") @db.Uuid
+  /// none | printing | ready | failed (ADR-057)
+  pdfStatus      String         @default("none") @map("pdf_status")
+  pdfError       String?        @map("pdf_error")
   error          Json?
   createdBy      String?        @map("created_by") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -972,9 +977,59 @@ model AiUsageRecord {
   latencyMs      Int          @default(0) @map("latency_ms")
   /// succeeded | failed | outcome_unknown
   outcome        String
+  /// AiOperation (garment_reconstruction, image_generation, …) — ADR-057
+  operation      String?
+  /// design_analysis | tech_pack (what the call was for) + its id
+  subjectType    String?      @map("subject_type")
+  subjectId      String?      @map("subject_id") @db.Uuid
+  /// 1-based attempt within the task (retries and fallbacks increase it)
+  attempt        Int          @default(1)
+  errorKind      String?      @map("error_kind")
+  /// Short, key-free provider message
+  errorMessage   String?      @map("error_message")
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, provider, model, createdAt])
   @@map("ai_usage_records")
+}
+
+/// An organization's AI provider key (ADR-057): encrypted with SecretsService, never returned.
+model AiProviderConnection {
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  /// gemini | openai
+  provider       String
+  /// SecretsService envelope (context `ai-provider:<org>:<provider>`)
+  encryptedKey   String       @map("encrypted_key")
+  /// Last 4 characters, for display
+  keyHint        String       @map("key_hint")
+  /// connected | invalid | error
+  status         String
+  lastError      String?      @map("last_error")
+  /// DiscoveredModel[] from the provider's model listing
+  models         Json         @default("[]")
+  checkedAt      DateTime?    @map("checked_at") @db.Timestamptz(6)
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@map("ai_provider_connections")
+}
+
+/// Per-organization AI model preferences (ADR-057): operation → model or auto, fallback switch.
+model AiSettings {
+  organizationId String       @id @map("organization_id") @db.Uuid
+  /// { [operation]: { provider, model } | "auto" }
+  preferences    Json         @default("{}")
+  /// Allow falling back to compatible models of other connected providers
+  crossProviderFallback Boolean @default(true) @map("cross_provider_fallback")
+  updatedBy      String?      @map("updated_by") @db.Uuid
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_settings")
 }

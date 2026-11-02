@@ -3367,10 +3367,2205 @@
         "x-required-permission": "organization.update"
       }
     },
+    "/v1/orgs/{orgId}/ai/models/test": {
+      "post": {
+        "operationId": "Ai_test",
+        "summary": "Test one model for one operation (listed, capable, live structured answer)",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "gemini",
+                      "openai",
+                      "fake"
+                    ]
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "image_analysis",
+                      "garment_reconstruction",
+                      "pattern_interpretation",
+                      "techpack_documentation",
+                      "image_generation"
+                    ]
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "provider",
+                  "operation",
+                  "model"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "type": "string",
+                      "enum": [
+                        "gemini",
+                        "openai",
+                        "fake"
+                      ]
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "operation": {
+                      "type": "string",
+                      "enum": [
+                        "image_analysis",
+                        "garment_reconstruction",
+                        "pattern_interpretation",
+                        "techpack_documentation",
+                        "image_generation"
+                      ]
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "ok": {
+                            "type": "boolean"
+                          },
+                          "detail": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "ok",
+                          "detail"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "latencyMs": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "provider",
+                    "model",
+                    "operation",
+                    "checks",
+                    "latencyMs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "credentials.manage"
+      }
+    },
+    "/v1/orgs/{orgId}/ai/providers/key": {
+      "put": {
+        "operationId": "Ai_saveKey",
+        "summary": "Save an organization API key: validated by listing the provider’s models, stored encrypted",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "gemini",
+                      "openai"
+                    ]
+                  },
+                  "apiKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "provider",
+                  "apiKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "gemini",
+                              "openai",
+                              "fake"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "organization",
+                              "server",
+                              "builtin",
+                              "none"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "invalid",
+                              "error",
+                              "not_configured"
+                            ]
+                          },
+                          "keyHint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "checkedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "capabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "vision",
+                                      "multi_image",
+                                      "structured_output",
+                                      "image_generation",
+                                      "image_editing"
+                                    ]
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "inputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "outputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "stage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stable",
+                                    "preview",
+                                    "experimental"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "id",
+                                "displayName",
+                                "capabilities",
+                                "methods",
+                                "inputTokenLimit",
+                                "outputTokenLimit",
+                                "stage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "source",
+                          "status",
+                          "keyHint",
+                          "checkedAt",
+                          "lastError",
+                          "models"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "image_analysis",
+                          "garment_reconstruction",
+                          "pattern_interpretation",
+                          "techpack_documentation",
+                          "image_generation"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "gemini",
+                                  "openai",
+                                  "fake"
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "crossProviderFallback": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "string",
+                            "enum": [
+                              "image_analysis",
+                              "garment_reconstruction",
+                              "pattern_interpretation",
+                              "techpack_documentation",
+                              "image_generation"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "text",
+                                "vision",
+                                "multi_image",
+                                "structured_output",
+                                "image_generation",
+                                "image_editing"
+                              ]
+                            }
+                          },
+                          "compatible": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "effective": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "operation",
+                          "label",
+                          "requirements",
+                          "compatible",
+                          "effective"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "preferences",
+                    "crossProviderFallback",
+                    "operations",
+                    "canManage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "credentials.manage"
+      }
+    },
+    "/v1/orgs/{orgId}/ai/providers/key/remove": {
+      "post": {
+        "operationId": "Ai_removeKey",
+        "summary": "Remove the organization API key (the server key, if any, is used again)",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "gemini",
+                      "openai"
+                    ]
+                  }
+                },
+                "required": [
+                  "provider"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "gemini",
+                              "openai",
+                              "fake"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "organization",
+                              "server",
+                              "builtin",
+                              "none"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "invalid",
+                              "error",
+                              "not_configured"
+                            ]
+                          },
+                          "keyHint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "checkedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "capabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "vision",
+                                      "multi_image",
+                                      "structured_output",
+                                      "image_generation",
+                                      "image_editing"
+                                    ]
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "inputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "outputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "stage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stable",
+                                    "preview",
+                                    "experimental"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "id",
+                                "displayName",
+                                "capabilities",
+                                "methods",
+                                "inputTokenLimit",
+                                "outputTokenLimit",
+                                "stage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "source",
+                          "status",
+                          "keyHint",
+                          "checkedAt",
+                          "lastError",
+                          "models"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "image_analysis",
+                          "garment_reconstruction",
+                          "pattern_interpretation",
+                          "techpack_documentation",
+                          "image_generation"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "gemini",
+                                  "openai",
+                                  "fake"
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "crossProviderFallback": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "string",
+                            "enum": [
+                              "image_analysis",
+                              "garment_reconstruction",
+                              "pattern_interpretation",
+                              "techpack_documentation",
+                              "image_generation"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "text",
+                                "vision",
+                                "multi_image",
+                                "structured_output",
+                                "image_generation",
+                                "image_editing"
+                              ]
+                            }
+                          },
+                          "compatible": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "effective": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "operation",
+                          "label",
+                          "requirements",
+                          "compatible",
+                          "effective"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "preferences",
+                    "crossProviderFallback",
+                    "operations",
+                    "canManage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "credentials.manage"
+      }
+    },
+    "/v1/orgs/{orgId}/ai/providers/refresh": {
+      "post": {
+        "operationId": "Ai_refresh",
+        "summary": "Re-discover the provider’s models and re-check the key",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "gemini",
+                      "openai"
+                    ]
+                  }
+                },
+                "required": [
+                  "provider"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "gemini",
+                              "openai",
+                              "fake"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "organization",
+                              "server",
+                              "builtin",
+                              "none"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "invalid",
+                              "error",
+                              "not_configured"
+                            ]
+                          },
+                          "keyHint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "checkedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "capabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "vision",
+                                      "multi_image",
+                                      "structured_output",
+                                      "image_generation",
+                                      "image_editing"
+                                    ]
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "inputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "outputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "stage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stable",
+                                    "preview",
+                                    "experimental"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "id",
+                                "displayName",
+                                "capabilities",
+                                "methods",
+                                "inputTokenLimit",
+                                "outputTokenLimit",
+                                "stage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "source",
+                          "status",
+                          "keyHint",
+                          "checkedAt",
+                          "lastError",
+                          "models"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "image_analysis",
+                          "garment_reconstruction",
+                          "pattern_interpretation",
+                          "techpack_documentation",
+                          "image_generation"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "gemini",
+                                  "openai",
+                                  "fake"
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "crossProviderFallback": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "string",
+                            "enum": [
+                              "image_analysis",
+                              "garment_reconstruction",
+                              "pattern_interpretation",
+                              "techpack_documentation",
+                              "image_generation"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "text",
+                                "vision",
+                                "multi_image",
+                                "structured_output",
+                                "image_generation",
+                                "image_editing"
+                              ]
+                            }
+                          },
+                          "compatible": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "effective": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "operation",
+                          "label",
+                          "requirements",
+                          "compatible",
+                          "effective"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "preferences",
+                    "crossProviderFallback",
+                    "operations",
+                    "canManage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "credentials.manage"
+      }
+    },
+    "/v1/orgs/{orgId}/ai/settings": {
+      "get": {
+        "operationId": "Ai_settings",
+        "summary": "AI providers, discovered models with capabilities, per-operation model preferences and the fallback order (ADR-057). Keys are never returned.",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "gemini",
+                              "openai",
+                              "fake"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "organization",
+                              "server",
+                              "builtin",
+                              "none"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "invalid",
+                              "error",
+                              "not_configured"
+                            ]
+                          },
+                          "keyHint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "checkedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "capabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "vision",
+                                      "multi_image",
+                                      "structured_output",
+                                      "image_generation",
+                                      "image_editing"
+                                    ]
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "inputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "outputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "stage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stable",
+                                    "preview",
+                                    "experimental"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "id",
+                                "displayName",
+                                "capabilities",
+                                "methods",
+                                "inputTokenLimit",
+                                "outputTokenLimit",
+                                "stage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "source",
+                          "status",
+                          "keyHint",
+                          "checkedAt",
+                          "lastError",
+                          "models"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "image_analysis",
+                          "garment_reconstruction",
+                          "pattern_interpretation",
+                          "techpack_documentation",
+                          "image_generation"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "gemini",
+                                  "openai",
+                                  "fake"
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "crossProviderFallback": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "string",
+                            "enum": [
+                              "image_analysis",
+                              "garment_reconstruction",
+                              "pattern_interpretation",
+                              "techpack_documentation",
+                              "image_generation"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "text",
+                                "vision",
+                                "multi_image",
+                                "structured_output",
+                                "image_generation",
+                                "image_editing"
+                              ]
+                            }
+                          },
+                          "compatible": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "effective": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "operation",
+                          "label",
+                          "requirements",
+                          "compatible",
+                          "effective"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "preferences",
+                    "crossProviderFallback",
+                    "operations",
+                    "canManage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "organization.view"
+      },
+      "put": {
+        "operationId": "Ai_updateSettings",
+        "summary": "Choose the model (or automatic) per operation and whether to fall back across providers",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "preferences": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "enum": [
+                        "image_analysis",
+                        "garment_reconstruction",
+                        "pattern_interpretation",
+                        "techpack_documentation",
+                        "image_generation"
+                      ]
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "auto"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "gemini",
+                                "openai",
+                                "fake"
+                              ]
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "crossProviderFallback": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "preferences",
+                  "crossProviderFallback"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "gemini",
+                              "openai",
+                              "fake"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "organization",
+                              "server",
+                              "builtin",
+                              "none"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "invalid",
+                              "error",
+                              "not_configured"
+                            ]
+                          },
+                          "keyHint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "checkedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "capabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "vision",
+                                      "multi_image",
+                                      "structured_output",
+                                      "image_generation",
+                                      "image_editing"
+                                    ]
+                                  }
+                                },
+                                "methods": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "inputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "outputTokenLimit": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "stage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "stable",
+                                    "preview",
+                                    "experimental"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "id",
+                                "displayName",
+                                "capabilities",
+                                "methods",
+                                "inputTokenLimit",
+                                "outputTokenLimit",
+                                "stage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "source",
+                          "status",
+                          "keyHint",
+                          "checkedAt",
+                          "lastError",
+                          "models"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "image_analysis",
+                          "garment_reconstruction",
+                          "pattern_interpretation",
+                          "techpack_documentation",
+                          "image_generation"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "auto"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "gemini",
+                                  "openai",
+                                  "fake"
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "model"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "crossProviderFallback": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "string",
+                            "enum": [
+                              "image_analysis",
+                              "garment_reconstruction",
+                              "pattern_interpretation",
+                              "techpack_documentation",
+                              "image_generation"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "requirements": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "text",
+                                "vision",
+                                "multi_image",
+                                "structured_output",
+                                "image_generation",
+                                "image_editing"
+                              ]
+                            }
+                          },
+                          "compatible": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "effective": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "gemini",
+                                    "openai",
+                                    "fake"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                }
+                              },
+                              "required": [
+                                "provider",
+                                "model"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "operation",
+                          "label",
+                          "requirements",
+                          "compatible",
+                          "effective"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canManage": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "providers",
+                    "preferences",
+                    "crossProviderFallback",
+                    "operations",
+                    "canManage"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "credentials.manage"
+      }
+    },
     "/v1/orgs/{orgId}/ai/status": {
       "get": {
         "operationId": "Ai_status",
-        "summary": "AI providers available on this server (no secrets) and today’s usage",
+        "summary": "AI providers usable by this organization (no secrets) and today’s usage",
         "tags": [
           "ai"
         ],
@@ -16463,6 +18658,21 @@
                               }
                             ]
                           },
+                          "pdfStatus": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "printing",
+                              "ready",
+                              "failed"
+                            ]
+                          },
+                          "pdfError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "error": {
                             "anyOf": [
                               {
@@ -16517,6 +18727,8 @@
                           "stage",
                           "provider",
                           "pdfAssetId",
+                          "pdfStatus",
+                          "pdfError",
                           "error",
                           "createdAt",
                           "completedAt"
@@ -16654,6 +18866,53 @@
                   "modelImages": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "presentation": {
+                    "default": {
+                      "model": "female",
+                      "pose": "standing_front",
+                      "background": "studio_white",
+                      "view": "front"
+                    },
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "default": "female",
+                        "type": "string",
+                        "enum": [
+                          "female",
+                          "male",
+                          "child",
+                          "none"
+                        ]
+                      },
+                      "pose": {
+                        "default": "standing_front",
+                        "type": "string",
+                        "enum": [
+                          "standing_front",
+                          "three_quarter",
+                          "walking"
+                        ]
+                      },
+                      "background": {
+                        "default": "studio_white",
+                        "type": "string",
+                        "enum": [
+                          "studio_white",
+                          "light_grey",
+                          "lifestyle"
+                        ]
+                      },
+                      "view": {
+                        "default": "front",
+                        "type": "string",
+                        "enum": [
+                          "front",
+                          "back"
+                        ]
+                      }
+                    }
                   }
                 }
               }
@@ -16724,6 +18983,21 @@
                         }
                       ]
                     },
+                    "pdfStatus": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "printing",
+                        "ready",
+                        "failed"
+                      ]
+                    },
+                    "pdfError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "error": {
                       "anyOf": [
                         {
@@ -16778,6 +19052,8 @@
                     "stage",
                     "provider",
                     "pdfAssetId",
+                    "pdfStatus",
+                    "pdfError",
                     "error",
                     "createdAt",
                     "completedAt"
@@ -27096,6 +29372,21 @@
                         }
                       ]
                     },
+                    "pdfStatus": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "printing",
+                        "ready",
+                        "failed"
+                      ]
+                    },
+                    "pdfError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "error": {
                       "anyOf": [
                         {
@@ -27164,6 +29455,8 @@
                     "stage",
                     "provider",
                     "pdfAssetId",
+                    "pdfStatus",
+                    "pdfError",
                     "error",
                     "createdAt",
                     "completedAt",
@@ -27232,6 +29525,260 @@
         ],
         "x-authorization": "permission",
         "x-required-permission": "design.view"
+      }
+    },
+    "/v1/orgs/{orgId}/techpacks/{techPackId}/pdf": {
+      "post": {
+        "operationId": "TechPacks_reprint",
+        "summary": "Print the tech pack PDF again from the stored document (no AI calls)",
+        "tags": [
+          "ai-studio"
+        ],
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "techPackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Retry-safe key; the first successful response is replayed for 24h.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "displayId": {
+                      "type": "string"
+                    },
+                    "designId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "revisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "revisionLabel": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "succeeded",
+                        "failed"
+                      ]
+                    },
+                    "stage": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "provider": {
+                      "type": "string",
+                      "enum": [
+                        "gemini",
+                        "openai",
+                        "fake"
+                      ]
+                    },
+                    "pdfAssetId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pdfStatus": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "printing",
+                        "ready",
+                        "failed"
+                      ]
+                    },
+                    "pdfError": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "message": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "message",
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "displayId",
+                    "designId",
+                    "revisionId",
+                    "revisionLabel",
+                    "status",
+                    "stage",
+                    "provider",
+                    "pdfAssetId",
+                    "pdfStatus",
+                    "pdfError",
+                    "error",
+                    "createdAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error: VALIDATION_FAILED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: PERMISSION_DENIED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: IDEMPOTENCY_CONFLICT, INVALID_STATE_TRANSITION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error: INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "x-authorization": "permission",
+        "x-required-permission": "design.export"
       }
     },
     "/v1/orgs/{orgId}/validation-runs/{runId}": {

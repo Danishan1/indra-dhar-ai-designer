@@ -56,6 +56,9 @@ importers:
       '@ai-designer/pattern-model':
         specifier: workspace:*
         version: link:../../packages/pattern-model
+      '@ai-designer/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -313,6 +316,9 @@ importers:
       '@ai-designer/pattern-model':
         specifier: workspace:*
         version: link:../../packages/pattern-model
+      '@ai-designer/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       bullmq:
         specifier: 6.4.0
         version: 6.4.0(ioredis@6.0.0)(pg@8.23.1)
@@ -719,6 +725,27 @@ importers:
       '@ai-designer/config':
         specifier: workspace:*
         version: link:../config
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/secrets:
+    devDependencies:
+      '@ai-designer/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
       eslint:
         specifier: 10.13.0
         version: 10.13.0(jiti@2.7.0)

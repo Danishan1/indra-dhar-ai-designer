@@ -92,7 +92,9 @@ export class TechPacksService implements OnModuleInit {
       designId,
     );
     const project = await this.projects.get(ctx, design.projectId);
-    const provider = await this.ai.preflight(ctx, body.provider, expectedCalls(body.modelImages));
+    const provider = await this.ai.preflight(ctx, body.provider, expectedCalls(body.modelImages), [
+      'techpack_documentation',
+    ]);
     const row = await this.prisma.$transaction(async (tx) => {
       const id = newId();
       await tx.techPack.create({
@@ -107,6 +109,7 @@ export class TechPacksService implements OnModuleInit {
           provider,
           options: {
             modelImages: body.modelImages,
+            presentation: body.presentation,
             revisionLabel: revisionLabel(revision.revisionNumber),
             designName: design.name,
             designDisplayId: design.displayId,
@@ -156,6 +159,28 @@ export class TechPacksService implements OnModuleInit {
     };
   }
 
+  /** Prints the PDF again from the stored document (no AI calls; the document is unchanged). */
+  async reprintPdf(ctx: AuthzContext, techPackId: string): Promise<TechPackSummary> {
+    const row = await this.prisma.techPack.findFirst({
+      where: { id: techPackId, organizationId: ctx.organizationId },
+    });
+    if (!row) throw AppError.notFound('Tech pack');
+    if (row.status !== 'succeeded' || !row.document)
+      throw new AppError('INVALID_STATE_TRANSITION', 'The tech pack is not finished yet');
+    if (row.pdfStatus === 'printing') return this.summary(row);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.jobs.create(
+        { kind: JobKinds.techPackGenerate, payload: { techPackId, pdfOnly: true }, maxAttempts: 2 },
+        tx,
+      );
+      return tx.techPack.update({
+        where: { id: row.id },
+        data: { pdfStatus: 'printing', pdfError: null },
+      });
+    });
+    return this.summary(updated);
+  }
+
   private summary(row: TechPackRow): TechPackSummary {
     const error = row.error as { message?: string; kind?: string } | null;
     const options = row.options as { revisionLabel?: string };
@@ -169,6 +194,8 @@ export class TechPacksService implements OnModuleInit {
       stage: row.stage,
       provider: row.provider as TechPackSummary['provider'],
       pdfAssetId: row.pdfAssetId,
+      pdfStatus: row.pdfStatus as TechPackSummary['pdfStatus'],
+      pdfError: row.pdfError,
       error: error
         ? { message: error.message ?? 'Generation failed', kind: error.kind ?? null }
         : null,

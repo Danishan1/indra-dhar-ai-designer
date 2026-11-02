@@ -13,7 +13,6 @@ import {
   type PropertyValue,
   type RandomBytes,
   SCHEMA_VERSION,
-  validateDesignState,
 } from '@ai-designer/garment-model';
 import { draftComponentPieces, pieceFromNormalizedOutline } from '@ai-designer/pattern-model';
 
@@ -29,6 +28,8 @@ import {
   MEASUREMENT_PROPERTY,
   normalizeAttributeValue,
 } from './library-match.js';
+import { type ImageSize, observedShapes, reconstructShapes } from './reconstruct.js';
+import { repairDesignState } from './repair.js';
 
 /**
  * Analysis → canonical garment state (ADR-056). Everything the AI said is stored as `inferred`
@@ -66,6 +67,8 @@ export interface BuildInput {
   fabricAssignments?: Readonly<Record<string, string | null>>;
   actor: { userId: string; now: string };
   randomBytes?: RandomBytes;
+  /** Pixel size per input image index (for the reconstruction scale). */
+  imageSizes?: readonly (ImageSize | null)[];
 }
 
 export interface BuildResult {
@@ -73,6 +76,8 @@ export interface BuildResult {
   /** component key → component id */
   componentIds: Record<string, string>;
   notes: string[];
+  /** Blocking problems the repair could not resolve (empty when the state is valid). */
+  problems: string[];
 }
 
 const aiValue = (
@@ -131,6 +136,9 @@ export function buildDesignState(input: BuildInput): BuildResult {
       measurementsMm: {},
       measurementSource: 'estimated',
       region: null,
+      outline: null,
+      view: null,
+      details: [],
       fabricKey: null,
       confidence: analysis.garment.confidence,
     };
@@ -426,18 +434,59 @@ export function buildDesignState(input: BuildInput): BuildResult {
   }
   state.patternPieces = pieces;
 
-  // Keep the result structurally valid: drop anything the validator refuses (never block the user).
-  const check = validateDesignState(state);
-  if (!check.ok) {
-    const bad = check.findings.filter((f) => f.outcome === 'error');
-    notes.push(...bad.map((f) => `Adjusted: ${f.message}`));
-    for (const f of bad) {
-      const m = f.path ? /^components\[(cmp_[a-z0-9]+)\]\.properties\.(.+)$/.exec(f.path) : null;
-      if (m) {
-        const comp = state.components.find((x) => x.componentId === m[1]);
-        if (comp) comp.properties[m[2]!] = missingValue();
-      }
-    }
+  // Editable reconstruction: vector shapes per component (observed outline > template > box).
+  const observed = input.imageSizes
+    ? observedShapes({
+        decomposition: analysis,
+        imageSizes: input.imageSizes,
+        componentIds: ids,
+        viewOf: (i) =>
+          analysis.inputs.find((x) => x.index === i)?.notes.match(/\bback\b/i) ? 'back' : 'front',
+      })
+    : null;
+  const recon = reconstructShapes(state, observed);
+  if (observed && state.sources)
+    state.sources = state.sources.map((src, k) => {
+      const placement = observed.placements.get(input.sources[k]!.index);
+      return placement ? { ...src, placement } : src;
+    });
+  if (recon.inferred)
+    notes.push(
+      `${recon.inferred} part(s) had no traced outline and start as simple shapes — reshape them in the editor`,
+    );
+  // Parts without a drafting rule get a provisional piece from their traced outline.
+  for (const c of state.components) {
+    if (pieces.some((p) => p.componentId === c.componentId)) continue;
+    if (
+      ['garment_body', 'neckline', 'hem', 'front_body_panel', 'back_body_panel'].includes(
+        c.componentType,
+      )
+    )
+      continue;
+    const shape = c.shapes?.find((x) => x.view === 'front' && x.source === 'observed');
+    if (!shape) continue;
+    pieces.push(
+      pieceFromNormalizedOutline({
+        componentId: c.componentId,
+        name: c.displayName,
+        points: shape.path,
+        widthMm: shape.width,
+        heightMm: shape.height,
+        source: 'inferred',
+        method: 'ai_outline',
+        ...(input.randomBytes ? { randomBytes: input.randomBytes } : {}),
+      }),
+    );
   }
-  return { state, componentIds: ids, notes };
+  state.patternPieces = pieces;
+
+  // Keep the result structurally valid: resolve anything the validator refuses (never block the user).
+  const repaired = repairDesignState(state, input.randomBytes);
+  notes.push(...repaired.notes);
+  return {
+    state: repaired.state,
+    componentIds: ids,
+    notes,
+    problems: repaired.remaining.map((f) => f.message),
+  };
 }

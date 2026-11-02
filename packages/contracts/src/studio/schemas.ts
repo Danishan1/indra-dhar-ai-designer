@@ -96,6 +96,20 @@ export const createTechPackRequestSchema = z.object({
   provider: aiProviderNameSchema.optional(),
   /** Generate the mannequin and model images (more AI calls). */
   modelImages: z.boolean().default(true),
+  /** Presentation presets for the mannequin / model images (ADR-057). */
+  presentation: z
+    .object({
+      model: z.enum(['female', 'male', 'child', 'none']).default('female'),
+      pose: z.enum(['standing_front', 'three_quarter', 'walking']).default('standing_front'),
+      background: z.enum(['studio_white', 'light_grey', 'lifestyle']).default('studio_white'),
+      view: z.enum(['front', 'back']).default('front'),
+    })
+    .default({
+      model: 'female',
+      pose: 'standing_front',
+      background: 'studio_white',
+      view: 'front',
+    }),
 });
 export type CreateTechPackRequest = z.input<typeof createTechPackRequestSchema>;
 
@@ -109,6 +123,9 @@ export const techPackSummarySchema = z.object({
   stage: z.string().nullable(),
   provider: aiProviderNameSchema,
   pdfAssetId: z.uuid().nullable(),
+  /** none = not printed yet · printing · ready · failed (the document is still complete). */
+  pdfStatus: z.enum(['none', 'printing', 'ready', 'failed']),
+  pdfError: z.string().nullable(),
   error: z.object({ message: z.string(), kind: z.string().nullable() }).nullable(),
   createdAt: isoDateTimeSchema,
   completedAt: isoDateTimeSchema.nullable(),
@@ -123,3 +140,105 @@ export type TechPack = z.infer<typeof techPackSchema>;
 
 export const techPackListResponseSchema = z.object({ items: z.array(techPackSummarySchema) });
 export const techPackParamsSchema = z.object({ orgId: z.uuid(), techPackId: z.uuid() });
+
+// ── AI providers & models (ADR-057) ──────────────────────────────────────────
+
+export const AiOperationKeys = [
+  'image_analysis',
+  'garment_reconstruction',
+  'pattern_interpretation',
+  'techpack_documentation',
+  'image_generation',
+] as const;
+export const aiOperationSchema = z.enum(AiOperationKeys);
+export type AiOperationKey = z.infer<typeof aiOperationSchema>;
+
+export const aiModelCapabilitySchema = z.enum([
+  'text',
+  'vision',
+  'multi_image',
+  'structured_output',
+  'image_generation',
+  'image_editing',
+]);
+
+export const aiModelSchema = z.object({
+  provider: aiProviderNameSchema,
+  id: z.string(),
+  displayName: z.string(),
+  capabilities: z.array(aiModelCapabilitySchema),
+  methods: z.array(z.string()),
+  inputTokenLimit: z.number().nullable(),
+  outputTokenLimit: z.number().nullable(),
+  stage: z.enum(['stable', 'preview', 'experimental']),
+});
+export type AiModel = z.infer<typeof aiModelSchema>;
+
+export const modelRefSchema = z.object({
+  provider: aiProviderNameSchema,
+  model: z.string().trim().min(1).max(200),
+});
+export type ModelRefBody = z.infer<typeof modelRefSchema>;
+
+export const modelPreferenceSchema = z.union([z.literal('auto'), modelRefSchema]);
+
+export const aiProviderConnectionSchema = z.object({
+  provider: aiProviderNameSchema,
+  /** organization = key saved in Settings; server = key from the server's .env; none = no key. */
+  source: z.enum(['organization', 'server', 'builtin', 'none']),
+  status: z.enum(['connected', 'invalid', 'error', 'not_configured']),
+  keyHint: z.string().nullable(),
+  checkedAt: isoDateTimeSchema.nullable(),
+  lastError: z.string().nullable(),
+  models: z.array(aiModelSchema),
+});
+export type AiProviderConnection = z.infer<typeof aiProviderConnectionSchema>;
+
+export const aiSettingsSchema = z.object({
+  providers: z.array(aiProviderConnectionSchema),
+  preferences: z.partialRecord(aiOperationSchema, modelPreferenceSchema),
+  crossProviderFallback: z.boolean(),
+  operations: z.array(
+    z.object({
+      operation: aiOperationSchema,
+      label: z.string(),
+      requirements: z.array(aiModelCapabilitySchema),
+      compatible: z.array(modelRefSchema),
+      /** The order models would be tried in now (preference, then automatic fallbacks). */
+      effective: z.array(modelRefSchema),
+    }),
+  ),
+  canManage: z.boolean(),
+});
+export type AiSettings = z.infer<typeof aiSettingsSchema>;
+
+export const keyedProviderSchema = z.enum(['gemini', 'openai']);
+
+export const providerRequestSchema = z.object({ provider: keyedProviderSchema });
+
+export const saveProviderKeyRequestSchema = z.object({
+  provider: keyedProviderSchema,
+  apiKey: z.string().trim().min(8, { message: 'Paste the full API key' }).max(500),
+});
+
+export const updateAiSettingsRequestSchema = z.object({
+  preferences: z.partialRecord(aiOperationSchema, modelPreferenceSchema),
+  crossProviderFallback: z.boolean(),
+});
+
+export const testModelRequestSchema = z.object({
+  provider: aiProviderNameSchema,
+  operation: aiOperationSchema,
+  model: z.string().trim().min(1).max(200),
+});
+
+export const testModelResponseSchema = z.object({
+  ok: z.boolean(),
+  provider: aiProviderNameSchema,
+  model: z.string(),
+  operation: aiOperationSchema,
+  /** listed | capability | live (what was checked) */
+  checks: z.array(z.object({ name: z.string(), ok: z.boolean(), detail: z.string() })),
+  latencyMs: z.number().int(),
+});
+export type TestModelResponse = z.infer<typeof testModelResponseSchema>;

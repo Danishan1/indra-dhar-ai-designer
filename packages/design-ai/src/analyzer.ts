@@ -66,6 +66,8 @@ export interface AnalysisResult {
   libraryReuseFor: string[];
   provider: string;
   models: { text: string; image: string };
+  /** Pixel size per input image (set by the worker; scale of the reconstruction). */
+  imageSizes?: ({ width: number; height: number } | null)[];
 }
 
 export async function analyzeDesign(

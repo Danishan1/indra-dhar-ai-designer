@@ -140,7 +140,7 @@ export class AnalysisService implements OnModuleInit {
         );
       inputs.push({ assetId: asset.id, role: input.role, fileName: asset.fileName });
     }
-    const provider = await this.ai.preflight(ctx, body.provider, 2);
+    const provider = await this.ai.preflight(ctx, body.provider, 2, ['garment_reconstruction']);
     const row = await this.prisma.$transaction(async (tx) => {
       const id = newId();
       const created = await tx.designAnalysis.create({
@@ -285,9 +285,20 @@ export class AnalysisService implements OnModuleInit {
       decisions,
       fabrics,
       fabricAssignments: body.fabricAssignments,
+      ...(result.imageSizes ? { imageSizes: result.imageSizes } : {}),
       actor: { userId: ctx.userId, now: new Date().toISOString() },
     });
     notes.push(...built.notes);
+    if (built.problems.length)
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `The analysed garment could not be turned into a valid design: ${built.problems.slice(0, 3).join('; ')}`,
+        {
+          issues: built.problems
+            .slice(0, 20)
+            .map((message) => ({ path: 'analysis', message, code: 'design_invalid' })),
+        },
+      );
     const design = await this.designs.createFromState(ctx, row.projectId, {
       name: body.name,
       state: built.state,

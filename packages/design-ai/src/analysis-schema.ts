@@ -93,6 +93,45 @@ export const analysisComponentSchema = z.object({
     'estimated',
   ),
   region: regionSchema.nullable().default(null),
+  /**
+   * Editable reconstruction (ADR-057): the component's visible outline traced on the image,
+   * normalized to `region` (0–1), clockwise; `smooth` marks curved points.
+   */
+  outline: z
+    .array(
+      z.object({
+        x: z.coerce.number().min(-0.2).max(1.2),
+        y: z.coerce.number().min(-0.2).max(1.2),
+        smooth: z.boolean().optional(),
+      }),
+    )
+    .min(3)
+    .max(80)
+    .nullable()
+    .catch(null)
+    .default(null),
+  view: lenient(['front', 'back'] as const, 'front')
+    .nullable()
+    .default(null),
+  /** Stitch lines, buttons, folds inside the region (normalized like the outline). */
+  details: z
+    .array(
+      z.object({
+        kind: lenient(['stitch', 'line', 'fold', 'button', 'buttonhole', 'dart'] as const, 'line'),
+        points: z
+          .array(
+            z.object({
+              x: z.coerce.number().min(-0.2).max(1.2),
+              y: z.coerce.number().min(-0.2).max(1.2),
+            }),
+          )
+          .min(1)
+          .max(60),
+      }),
+    )
+    .max(20)
+    .catch([])
+    .default([]),
   fabricKey: z.string().max(60).nullable().default(null),
   confidence: unit.default(0.6),
 });

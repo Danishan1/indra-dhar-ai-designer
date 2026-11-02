@@ -2,14 +2,20 @@
 
 import { type TechPackDocument, techPackHtml } from '@ai-designer/design-ai';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangleIcon, ArrowLeftIcon, DownloadIcon, Loader2Icon } from 'lucide-react';
+import {
+  AlertTriangleIcon,
+  ArrowLeftIcon,
+  DownloadIcon,
+  Loader2Icon,
+  PrinterIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
 import { PageHeader } from '@/components/shell/page-header';
 import { ErrorState, LoadingState } from '@/components/states/states';
 import { Button } from '@/components/ui/button';
-import { assetContentUrl, assetsApi } from '@/features/assets/api';
+import { assetContentUrl } from '@/features/assets/api';
 import { designsApi } from '@/features/designs/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { queryKeys } from '@/lib/query/keys';
@@ -26,7 +32,10 @@ export function TechPackPage({ techPackId }: { techPackId: string }) {
     queryKey: queryKeys.org(active.id).techPack(techPackId),
     queryFn: ({ signal }) => studioApi.techPack(active.id, techPackId, signal),
     refetchInterval: (q) =>
-      q.state.data && (q.state.data.status === 'queued' || q.state.data.status === 'running')
+      q.state.data &&
+      (q.state.data.status === 'queued' ||
+        q.state.data.status === 'running' ||
+        q.state.data.pdfStatus === 'printing')
         ? 1500
         : false,
   });
@@ -36,12 +45,42 @@ export function TechPackPage({ techPackId }: { techPackId: string }) {
     queryFn: ({ signal }) => designsApi.get(active.id, designId!, signal),
     enabled: !!designId,
   });
+  // Same-origin, authorized stream → a real file download with a proper name in every browser.
   const download = useMutation({
     mutationFn: async (assetId: string) => {
-      const { url } = await assetsApi.signedUrl(active.id, assetId, 'original');
-      window.open(url, '_blank', 'noopener');
+      const res = await fetch(assetContentUrl(active.id, assetId, 'original'), {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`The PDF could not be downloaded (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${techPack.data?.displayId ?? 'tech-pack'}-${techPack.data?.revisionLabel ?? ''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
     },
   });
+  const reprint = useMutation({
+    mutationFn: () => studioApi.reprintPdf(active.id, techPackId),
+    onSuccess: () => void techPack.refetch(),
+  });
+  /** Browser fallback: the complete document in a print window (Save as PDF). */
+  const printInBrowser = () => {
+    if (!html) return;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(
+      html.replace(
+        '</body>',
+        '<script>window.onload=()=>setTimeout(()=>window.print(),300)</' + 'script></body>',
+      ),
+    );
+    w.document.close();
+  };
   const html = useMemo(() => {
     const doc = techPack.data?.document as TechPackDocument | null | undefined;
     if (!doc) return null;
@@ -72,14 +111,24 @@ export function TechPackPage({ techPackId }: { techPackId: string }) {
                 </Link>
               </Button>
             ) : null}
-            {tp.pdfAssetId ? (
+            {tp.status === 'succeeded' ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={printInBrowser}
+                data-testid="print-browser"
+              >
+                <PrinterIcon /> Print / Save as PDF
+              </Button>
+            ) : null}
+            {tp.pdfStatus === 'ready' && tp.pdfAssetId ? (
               <Button
                 size="sm"
                 onClick={() => download.mutate(tp.pdfAssetId!)}
                 disabled={download.isPending}
                 data-testid="download-pdf"
               >
-                <DownloadIcon /> Download PDF
+                <DownloadIcon /> {download.isPending ? 'Downloading…' : 'Download PDF'}
               </Button>
             ) : null}
           </>
@@ -105,9 +154,36 @@ export function TechPackPage({ techPackId }: { techPackId: string }) {
         </div>
       ) : html ? (
         <div className="flex-1 bg-muted/40 p-4">
-          {!tp.pdfAssetId ? (
-            <p className="mb-2 text-[13px] text-status-needs-review">
-              The PDF could not be printed on the server; the document below is complete.
+          {tp.pdfStatus === 'printing' ? (
+            <p
+              className="mb-2 flex items-center gap-2 text-[13px]"
+              role="status"
+              data-testid="pdf-printing"
+            >
+              <Loader2Icon className="size-4 animate-spin" /> Printing the PDF…
+            </p>
+          ) : tp.pdfStatus !== 'ready' ? (
+            <div
+              className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-status-needs-review/50 p-2 text-[13px]"
+              data-testid="pdf-failed"
+            >
+              <span>
+                The PDF could not be printed on the server{tp.pdfError ? `: ${tp.pdfError}` : '.'}{' '}
+                The document below is complete.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => reprint.mutate()}
+                disabled={reprint.isPending}
+              >
+                Print the PDF again
+              </Button>
+            </div>
+          ) : null}
+          {download.isError ? (
+            <p role="alert" className="mb-2 text-[13px] text-destructive">
+              {download.error.message}
             </p>
           ) : null}
           <iframe

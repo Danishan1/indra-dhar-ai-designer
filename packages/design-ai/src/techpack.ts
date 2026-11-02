@@ -10,6 +10,7 @@ import { offsetOutline, patternSheetSvg } from '@ai-designer/pattern-model';
 
 import type { TechPackText } from './analysis-schema.js';
 import { ATTRIBUTE_PROPERTY } from './library-match.js';
+import { componentShapeSvg, pieceDetailSvg } from './techpack-vector.js';
 
 /**
  * Tech pack document (ADR-056): built **only** from a finalized (committed) design revision. AI
@@ -20,7 +21,7 @@ import { ATTRIBUTE_PROPERTY } from './library-match.js';
 export interface TechPackImage {
   key: string;
   title: string;
-  kind: 'flat' | 'ai' | 'crop' | 'pattern';
+  kind: 'flat' | 'ai' | 'crop' | 'pattern' | 'original' | 'reconstruction';
   assetId?: string | null;
   /** Inline SVG (technical flats, pattern sheets). */
   svg?: string | null;
@@ -55,6 +56,8 @@ export interface TechPackDocument {
   disclaimer: string;
   description: string;
   descriptionSource: 'ai_draft' | 'design';
+  /** The images the design was started from — references only, never the specification. */
+  references: TechPackImage[];
   views: TechPackImage[];
   components: {
     componentId: string;
@@ -98,6 +101,9 @@ export interface TechPackDocument {
       source: string;
       status: string;
       notes: string[];
+      pieceId: string;
+      /** Dimensioned vector drawing with a 10 cm scale bar. */
+      svg: string;
     }[];
   };
   construction: {
@@ -125,6 +131,7 @@ export interface TechPackInput {
   text: TechPackText | null;
   views: TechPackImage[];
   componentImages: Readonly<Record<string, TechPackImage>>;
+  references?: TechPackImage[];
 }
 
 const human = (s: string) => s.replaceAll('_', ' ');
@@ -227,7 +234,20 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
         fabric,
         measurements: dims,
         patternPieces: pieces.filter((p) => p.componentId === c.componentId).length,
-        image: input.componentImages[c.componentId] ?? null,
+        image:
+          (() => {
+            const svg = componentShapeSvg(c);
+            return svg
+              ? {
+                  key: `shape_${c.componentId}`,
+                  title: c.displayName,
+                  kind: 'reconstruction' as const,
+                  svg,
+                }
+              : null;
+          })() ??
+          input.componentImages[c.componentId] ??
+          null,
       };
     });
 
@@ -408,6 +428,8 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
       source: p.source,
       status: p.status,
       notes: p.notes,
+      pieceId: p.pieceId,
+      svg: pieceDetailSvg(p),
     };
   });
   if (!pieces.length) missing.push({ area: 'Patterns', item: 'No pattern pieces in the design' });
@@ -435,6 +457,7 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
       text?.description ||
       (typeof meta['description'] === 'string' ? meta['description'] : garmentLabel),
     descriptionSource: text?.description ? 'ai_draft' : 'design',
+    references: input.references ?? [],
     views: input.views,
     components,
     bom,

@@ -16,6 +16,7 @@ import { PreferenceKeys, readPreference, writePreference } from '@/lib/local-pre
 
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
+import { ShapeSection } from '../studio/shape-section';
 import { StudioSection } from '../studio/studio-section';
 import { ComponentFindings } from '../validation/component-findings';
 
@@ -285,6 +286,7 @@ function ComponentProperties({
 
       {multi ? null : <ComponentFindings componentId={first.componentId} />}
       {multi ? null : <ArtifactsSection component={first} />}
+      {multi ? null : <ShapeSection component={first} />}
       {multi ? null : <StudioSection component={first} />}
 
       {groups.map(([group, list]) => {

@@ -16,6 +16,7 @@ const ITEMS: { href: string; label: string; permission?: PermissionKey }[] = [
     label: 'Security policy',
     permission: 'security_policy.manage',
   },
+  { href: '/settings/ai', label: 'AI models', permission: 'organization.view' },
   { href: '/settings/audit', label: 'Audit log', permission: 'audit.view' },
   { href: '/settings/security', label: 'Your security' },
 ];

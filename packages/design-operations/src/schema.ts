@@ -9,6 +9,7 @@ import {
   propertyKeySchema,
   relationshipTypeSchema,
   unitSchema,
+  componentShapeSchema,
   patternPieceSchema,
 } from '@ai-designer/garment-model';
 import { z } from 'zod';
@@ -88,6 +89,13 @@ export const replacePatternPiecesSchema = z.object({
   type: z.literal('replace_pattern_pieces'),
   componentId: id,
   pieces: z.array(patternPieceSchema).max(20),
+});
+
+/** Replaces the editable reconstruction shapes of a component (ADR-057). */
+export const setComponentShapesSchema = z.object({
+  type: z.literal('set_component_shapes'),
+  componentId: id,
+  shapes: z.array(componentShapeSchema).max(4),
 });
 
 export const renameComponentSchema = z.object({
@@ -197,6 +205,7 @@ const singleClientOperations = [
   setComponentLockSchema,
   renameComponentSchema,
   replacePatternPiecesSchema,
+  setComponentShapesSchema,
   attachArtifactSchema,
   replaceArtifactSchema,
   detachArtifactSchema,

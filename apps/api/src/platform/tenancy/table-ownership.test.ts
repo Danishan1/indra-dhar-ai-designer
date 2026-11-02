@@ -41,6 +41,8 @@ const OWNERS: Record<string, string | string[]> = {
   designAnalysis: 'modules/analysis',
   techPack: 'modules/techpacks',
   aiUsageRecord: 'modules/ai',
+  aiProviderConnection: 'modules/ai',
+  aiSettings: 'modules/ai',
 };
 
 /** Dev-only scripts that look rows up read-only; all their writes go through module services. */

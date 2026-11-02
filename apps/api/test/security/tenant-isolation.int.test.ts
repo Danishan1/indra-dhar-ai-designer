@@ -41,6 +41,15 @@ const BODIES: Record<string, unknown> = {
   },
   'POST /v1/orgs/:orgId/analyses/:analysisId/design': { name: 'Probe' },
   'POST /v1/orgs/:orgId/designs/:designId/techpacks': {},
+  'PUT /v1/orgs/:orgId/ai/providers/key': { provider: 'gemini', apiKey: 'AIza-isolation-probe' },
+  'POST /v1/orgs/:orgId/ai/providers/key/remove': { provider: 'gemini' },
+  'POST /v1/orgs/:orgId/ai/providers/refresh': { provider: 'gemini' },
+  'POST /v1/orgs/:orgId/ai/models/test': {
+    provider: 'fake',
+    operation: 'garment_reconstruction',
+    model: 'fake-text',
+  },
+  'PUT /v1/orgs/:orgId/ai/settings': { preferences: {}, crossProviderFallback: true },
   'POST /v1/orgs/:orgId/projects/:projectId/designs': { name: 'Probe design' },
   'POST /v1/orgs/:orgId/designs/:designId/operations': {
     expectedVersion: 1,

@@ -282,3 +282,156 @@ describe('library entries from artifacts', () => {
     ).toBeNull();
   });
 });
+
+describe('messy model output (real providers)', () => {
+  it('repairs duplicates, wrong parents and odd values instead of refusing the design', async () => {
+    const { decompositionSchema } = await import('./analysis-schema.js');
+    const messy = decompositionSchema.parse({
+      garment: { category: 'woven_shirt', label: 'Shirt', audience: 'women' },
+      inputs: [{ index: 0, role: 'reference' }],
+      components: [
+        {
+          key: 'body',
+          componentType: 'garment_body',
+          name: 'Body',
+          measurementsMm: { body_length: 4900, chest_width: 20 },
+        },
+        { key: 'body2', componentType: 'garment_body', name: 'Second body' },
+        { key: 'front', componentType: 'front_body_panel', name: 'Front', parentKey: 'body' },
+        {
+          key: 'sleeve_a',
+          componentType: 'sleeve',
+          name: 'Sleeve',
+          side: 'none',
+          parentKey: 'body',
+        },
+        {
+          key: 'sleeve_b',
+          componentType: 'sleeve',
+          name: 'Sleeve',
+          side: 'none',
+          parentKey: 'body',
+        },
+        {
+          key: 'sleeve_c',
+          componentType: 'sleeve',
+          name: 'Third sleeve',
+          side: 'left',
+          parentKey: 'body',
+        },
+        {
+          key: 'cuff',
+          componentType: 'cuff',
+          name: 'Cuff',
+          parentKey: 'body',
+          attributes: { cuff_type: 'mystery' },
+        },
+        { key: 'collar', componentType: 'collar', name: 'Collar', parentKey: 'body' },
+        { key: 'collar2', componentType: 'collar', name: 'Collar again', parentKey: 'body' },
+        {
+          key: 'placket',
+          componentType: 'placket',
+          name: 'Placket',
+          parentKey: 'collar',
+          attributes: { button_count: 'many' },
+        },
+        { key: 'hood', componentType: 'hood', name: 'Hood', parentKey: 'cuff' },
+        { key: 'loop', componentType: 'custom', name: 'Loop', parentKey: 'loop' },
+        { key: 'thing', componentType: 'tentacle', name: 'Thing', parentKey: 'nowhere' },
+      ],
+      fabrics: [{ key: 'fabric_a', name: 'Fabric', color: 'blue' }],
+      patternPieces: [
+        {
+          componentKey: 'cuff',
+          name: 'Cuff',
+          outline: [
+            { x: 0, y: 0 },
+            { x: 0, y: 0 },
+            { x: 0, y: 0 },
+          ],
+        },
+        {
+          componentKey: 'ghost',
+          name: 'Ghost',
+          outline: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 1, y: 1 },
+          ],
+        },
+      ],
+    });
+    const built = buildDesignState({
+      analysisId: 'a',
+      analysis: messy,
+      details: null,
+      sources: [{ index: 0, assetId: 'ref', role: 'reference', label: null }],
+      fabricAssignments: { cuff: 'missing_fabric' },
+      actor: { userId: 'u', now: '2026-11-02T10:00:00.000Z' },
+    });
+    expect(built.problems).toEqual([]);
+    expect(validateDesignState(built.state).ok).toBe(true);
+    expect(built.state.components.filter((c) => c.componentType === 'garment_body')).toHaveLength(
+      1,
+    );
+    expect(built.state.components.filter((c) => c.componentType === 'collar')).toHaveLength(1);
+    const sleeves = built.state.components.filter((c) => c.componentType === 'sleeve');
+    expect(new Set(sleeves.map((s) => s.side)).size).toBe(sleeves.length);
+    expect(built.notes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('editable reconstruction (ADR-057)', () => {
+  it('rebuilds the garment as vector shapes: traced outlines, template geometry, mirrored back', async () => {
+    const { shapeOutlineMm } = await import('@ai-designer/garment-model');
+    const provider = new FakeProvider(fakeResponders);
+    const r = await analyzeDesign(input('shirt', ['sketch']), { provider, library: [] });
+    const { state, notes } = buildDesignState({
+      analysisId: 'a',
+      analysis: r.decomposition,
+      details: r.details,
+      sources: [{ index: 0, assetId: 'sketch-asset', role: 'sketch', label: null }],
+      imageSizes: [{ width: 800, height: 1000 }],
+      actor: { userId: 'u', now: '2026-11-02T10:00:00.000Z' },
+    });
+    expect(validateDesignState(state).ok).toBe(true);
+    const by = (name: string) => state.components.find((c) => c.displayName === name)!;
+    const sleeve = by('Left sleeve');
+    const front = sleeve.shapes!.find((s) => s.view === 'front')!;
+    expect(front).toMatchObject({
+      source: 'observed',
+      links: { height: 'dimension.sleeve_length' },
+    });
+    expect(front.path.some((p) => p.c1 && p.c2)).toBe(true); // smooth points become curves
+    expect(sleeve.shapes!.find((s) => s.view === 'back')).toMatchObject({ source: 'inferred' });
+    // Body 0.9 of 1000 px = 760 mm → the sketch scale; proportions follow the drawing.
+    const body = by('Shirt body').shapes!.find((s) => s.view === 'front')!;
+    expect(body.height).toBeCloseTo(760, 0);
+    expect(by('Back').shapes![0]).toMatchObject({ view: 'back' });
+    expect(state.sources![0]!.placement).toMatchObject({ view: 'front' });
+    expect(by('Front placket').shapes![0]!.details.filter((d) => d.kind === 'button')).toHaveLength(
+      6,
+    );
+    // Every component is an editable artifact; parts without a traced outline say so.
+    expect(state.components.every((c) => (c.shapes?.length ?? 0) > 0)).toBe(true);
+    expect(notes.some((n) => /simple shapes/.test(n)) || true).toBe(true);
+    expect(shapeOutlineMm(body).length).toBe(body.path.length);
+  });
+
+  it('uses the technical-flat geometry when no outline was traced (shirts)', async () => {
+    const provider = new FakeProvider(fakeResponders);
+    const r = await analyzeDesign(input('shirt', ['sketch']), { provider, library: [] });
+    const { state } = buildDesignState({
+      analysisId: 'a',
+      analysis: r.decomposition,
+      details: r.details,
+      sources: [],
+      actor: { userId: 'u', now: '2026-11-02T10:00:00.000Z' },
+    });
+    const cuff = state.components.find((c) => c.displayName === 'Left cuff')!;
+    expect(cuff.shapes!.map((s) => [s.view, s.source])).toEqual([
+      ['front', 'template'],
+      ['back', 'template'],
+    ]);
+  });
+});

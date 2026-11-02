@@ -143,3 +143,83 @@ describe('AI provider layer (ADR-056)', () => {
     expect(JSON.stringify(providerStatuses(env))).not.toContain('"g"');
   });
 });
+
+describe('busy providers (503 / 429)', () => {
+  it('Gemini falls back to the next model and reports the model it used', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fetch = vi.fn(async (url: string) =>
+      url.includes('/models/main:')
+        ? new Response(JSON.stringify({ error: { code: 503, message: 'high demand' } }), {
+            status: 503,
+          })
+        : new Response(
+            JSON.stringify({
+              candidates: [{ content: { parts: [{ text: '{"garment":"shirt","parts":[]}' }] } }],
+            }),
+          ),
+    );
+    const p = new GeminiProvider({
+      apiKey: 'k',
+      textModel: 'main',
+      imageModel: 'i',
+      maxRetries: 0,
+      fallbackTextModels: ['', 'backup'],
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    });
+    const out = await p.generateStructured(req);
+    expect(out.data.garment).toBe('shirt');
+    expect(out.usage.model).toBe('backup');
+  });
+
+  it('waits and retries, then switches to the fallback provider; other errors are not retried', async () => {
+    const { resilientProvider } = await import('./resilient.js');
+    let calls = 0;
+    const busy = new FakeProvider({
+      garment_decomposition: () => {
+        calls++;
+        throw new AiProviderError('unavailable', 'gemini is unavailable (503)', 'gemini');
+      },
+    });
+    const backup = new FakeProvider({
+      garment_decomposition: () => ({ garment: 'from backup', parts: [] }),
+    });
+    const waits: number[] = [];
+    const p = resilientProvider(busy, {
+      fallback: backup,
+      busyRetries: 2,
+      busyWaitMs: 10,
+      onBusy: async (i) => {
+        waits.push(i.waitMs);
+      },
+      sleep: async () => undefined,
+    });
+    expect((await p.generateStructured(req)).data.garment).toBe('from backup');
+    expect(calls).toBe(3);
+    expect(waits).toEqual([10, 20, 0]);
+
+    const refused = resilientProvider(
+      new FakeProvider({
+        garment_decomposition: () => {
+          throw new AiProviderError('auth', 'bad key', 'gemini');
+        },
+      }),
+      { fallback: backup, busyRetries: 2, busyWaitMs: 10, sleep: async () => undefined },
+    );
+    await expect(refused.generateStructured(req)).rejects.toMatchObject({ kind: 'auth' });
+  });
+
+  it('only offers a configured, different fallback provider', async () => {
+    const { fallbackProviderName } = await import('./config.js');
+    const env = readAiEnv({
+      AI_FALLBACK_PROVIDER: 'openai',
+      OPENAI_API_KEY: 'x',
+      GEMINI_API_KEY: 'y',
+    });
+    expect(fallbackProviderName(env, 'gemini')).toBe('openai');
+    expect(fallbackProviderName(env, 'openai')).toBeNull();
+    expect(
+      fallbackProviderName(readAiEnv({ AI_FALLBACK_PROVIDER: 'openai' }), 'gemini'),
+    ).toBeNull();
+  });
+});

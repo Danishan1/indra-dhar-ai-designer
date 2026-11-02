@@ -808,3 +808,43 @@ describe('pattern pieces (ADR-056)', () => {
     ).toContain('id.duplicate');
   });
 });
+
+describe('reconstruction shapes (ADR-057)', () => {
+  it('sets and clears the editable shapes of a component and undoes exactly', () => {
+    const s = shirt();
+    const cuff = find(s, 'cuff', 'left');
+    const shape = {
+      view: 'front' as const,
+      x: 10,
+      y: 600,
+      width: 120,
+      height: 65,
+      path: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0, c2: { x: 1.1, y: 0.5 } },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ],
+      source: 'observed' as const,
+    };
+    const r = ok(s, {
+      type: 'set_component_shapes',
+      componentId: cuff.componentId,
+      shapes: [shape],
+    });
+    const after = r.state.components.find((c) => c.componentId === cuff.componentId)!;
+    expect(after.shapes?.[0]).toMatchObject({ width: 120, layer: 0, rotation: 0 });
+    const back = applyOperation(r.state, invert(s, r.state) as Operation, ctx());
+    expect(
+      back.ok && back.state.components.find((c) => c.componentId === cuff.componentId)!.shapes,
+    ).toBeUndefined();
+    const cleared = ok(r.state, {
+      type: 'set_component_shapes',
+      componentId: cuff.componentId,
+      shapes: [],
+    });
+    expect(
+      cleared.state.components.find((c) => c.componentId === cuff.componentId)!.shapes,
+    ).toBeUndefined();
+  });
+});

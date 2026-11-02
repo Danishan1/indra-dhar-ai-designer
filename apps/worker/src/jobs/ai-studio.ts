@@ -3,10 +3,22 @@ import {
   type AiImageInput,
   type AiProvider,
   AiProviderError,
+  type AiProviderName,
   type AiTask,
   type AiUsage,
-  createProvider,
+  type AttemptRecord,
+  createAdapter,
+  type DiscoveredModel,
+  discoverModels,
+  FAKE_MODELS,
+  healthFrom,
+  type ModelPreferences,
+  type ModelRef,
+  planChain,
   readAiEnv,
+  AiRoutingError,
+  routedProvider,
+  TASK_OPERATION,
 } from '@ai-designer/ai';
 import { type Provenance } from '@ai-designer/contracts';
 import { newId, type PrismaClient } from '@ai-designer/db';
@@ -30,6 +42,10 @@ import {
   techPackTextPrompt,
   techPackTextSchema,
   technicalFlats,
+  type TechPackDocument,
+  reconstructionSvg,
+  DEFAULT_PRESENTATION,
+  type Presentation,
 } from '@ai-designer/design-ai';
 import {
   canonicalJson,
@@ -39,6 +55,7 @@ import {
   sha256Hex,
 } from '@ai-designer/garment-model';
 import { type AssetProcessingDeps, processAsset, storeGeneratedAsset } from '@ai-designer/media';
+import { createSecretCipher } from '@ai-designer/secrets';
 import type { Logger } from 'pino';
 import sharp from 'sharp';
 import { z } from 'zod';
@@ -59,21 +76,24 @@ export interface AiStudioDeps {
   aiEnv?: AiEnv;
   /** Chromium for PDFs; undefined = Playwright's installed browser. */
   pdfChromiumPath?: string;
-  /** Test hook: override the provider. */
-  providerFactory?: (name: AiEnv['AI_PROVIDER']) => AiProvider;
+  /** Test hook: override the adapter per provider. */
+  providerFactory?: (name: AiProviderName) => AiProvider;
 }
-
-type ProviderName = AiEnv['AI_PROVIDER'];
 
 const MAX_INPUT_EDGE = 1600;
 
+export type UsageOutcome = 'succeeded' | 'failed' | 'outcome_unknown';
+export type UsageSink = (
+  usage: AiUsage,
+  outcome: UsageOutcome,
+  error?: AiProviderError | null,
+) => Promise<void>;
+
 /** Records every provider call (succeeded / failed / outcome_unknown) — never free when unknown. */
-export function meteredProvider(
-  inner: AiProvider,
-  record: (usage: AiUsage, outcome: 'succeeded' | 'failed' | 'outcome_unknown') => Promise<void>,
-): AiProvider {
+export function meteredProvider(inner: AiProvider, record: UsageSink): AiProvider {
   const failure = async (task: AiTask, model: string, started: number, err: unknown) => {
-    const unknown = err instanceof AiProviderError ? err.kind === 'unavailable' : true;
+    const e = err instanceof AiProviderError ? err : null;
+    const unknown = e ? e.kind === 'unavailable' : true;
     await record(
       {
         provider: inner.name,
@@ -85,6 +105,7 @@ export function meteredProvider(
         latencyMs: Date.now() - started,
       },
       unknown ? 'outcome_unknown' : 'failed',
+      e,
     ).catch(() => undefined);
   };
   return {
@@ -116,8 +137,17 @@ export function meteredProvider(
   };
 }
 
-function usageRecorder(prisma: PrismaClient, organizationId: string, jobId: string) {
-  return async (usage: AiUsage, outcome: string) => {
+/** One AI processing record per provider call (ADR-057): operation, subject, attempt, error. */
+function usageRecorder(
+  prisma: PrismaClient,
+  organizationId: string,
+  jobId: string,
+  subject: { type: 'design_analysis' | 'tech_pack'; id: string },
+): UsageSink {
+  const attempts = new Map<string, number>();
+  return async (usage, outcome, error) => {
+    const n = (attempts.get(usage.task) ?? 0) + 1;
+    attempts.set(usage.task, n);
     await prisma.aiUsageRecord.create({
       data: {
         id: newId(),
@@ -126,23 +156,143 @@ function usageRecorder(prisma: PrismaClient, organizationId: string, jobId: stri
         provider: usage.provider,
         model: usage.model,
         task: usage.task,
+        operation: TASK_OPERATION[usage.task],
+        subjectType: subject.type,
+        subjectId: subject.id,
+        attempt: n,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         images: usage.images,
         latencyMs: Math.round(usage.latencyMs),
         outcome,
+        errorKind: error?.kind ?? null,
+        errorMessage: error?.message.slice(0, 300) ?? null,
       },
     });
   };
 }
 
-function providerFor(deps: AiStudioDeps, name: string): AiProvider {
-  const env = deps.aiEnv ?? readAiEnv(process.env);
-  const n = name as ProviderName;
-  return deps.providerFactory ? deps.providerFactory(n) : createProvider(env, n, fakeResponders);
+const PROVIDER_LABEL: Record<string, string> = { gemini: 'Gemini', openai: 'OpenAI', fake: 'Demo' };
+const keyContext = (organizationId: string, provider: string) =>
+  `ai-provider:${organizationId}:${provider}`;
+const serverDiscovery = new Map<string, { at: number; models: DiscoveredModel[] }>();
+
+/** Models and keys usable by an organization: its own encrypted keys first, then `.env` keys. */
+async function loadCatalog(
+  prisma: PrismaClient,
+  env: AiEnv,
+  organizationId: string,
+): Promise<{ catalog: DiscoveredModel[]; keys: Partial<Record<string, string>> }> {
+  const cipher = createSecretCipher({
+    masterKey: process.env['SECRETS_MASTER_KEY'],
+    devSecret: process.env['BETTER_AUTH_SECRET'],
+  });
+  const rows = await prisma.aiProviderConnection.findMany({ where: { organizationId } });
+  const catalog: DiscoveredModel[] = [...FAKE_MODELS];
+  const keys: Partial<Record<string, string>> = { fake: 'fake' };
+  for (const provider of ['gemini', 'openai'] as const) {
+    const row = rows.find((r) => r.provider === provider);
+    if (row) {
+      if (row.status !== 'connected') continue;
+      keys[provider] = cipher.decrypt(row.encryptedKey, keyContext(organizationId, provider));
+      catalog.push(...(row.models as unknown as DiscoveredModel[]));
+      continue;
+    }
+    const key = provider === 'gemini' ? env.GEMINI_API_KEY : env.OPENAI_API_KEY;
+    if (!key) continue;
+    keys[provider] = key;
+    let cached = serverDiscovery.get(provider);
+    if (!cached || Date.now() - cached.at > 10 * 60_000) {
+      try {
+        cached = { at: Date.now(), models: await discoverModels(provider, key) };
+      } catch {
+        cached = { at: Date.now(), models: [] };
+      }
+      serverDiscovery.set(provider, cached);
+    }
+    catalog.push(...cached.models);
+  }
+  return { catalog, keys };
 }
 
-function errorOf(err: unknown): { message: string; kind: string | null } {
+/**
+ * The provider for a job (ADR-057): each task runs on the best compatible model for its operation
+ * (organization preference → `.env` default → automatic ranking), with retries while a vendor is
+ * busy and capability-safe fallback to other compatible models. Every call is metered; the
+ * returned `history` is stored with the result.
+ */
+async function studioProvider(
+  deps: AiStudioDeps,
+  organizationId: string,
+  requested: string,
+  opts: { record: UsageSink; stage: (text: string) => Promise<void> },
+): Promise<AiProvider & { history: AttemptRecord[]; chains: Partial<Record<AiTask, ModelRef[]>> }> {
+  const env = deps.aiEnv ?? readAiEnv(process.env);
+  const prisma = deps.assets.prisma;
+  const [{ catalog, keys }, settings, recent] = await Promise.all([
+    loadCatalog(prisma, env, organizationId),
+    prisma.aiSettings.findUnique({ where: { organizationId } }),
+    prisma.aiUsageRecord.findMany({
+      where: { organizationId, createdAt: { gte: new Date(Date.now() - 24 * 3600_000) } },
+      select: { provider: true, model: true, outcome: true, errorMessage: true },
+      take: 500,
+    }),
+  ]);
+  const plan = {
+    catalog,
+    preferences: (settings?.preferences as ModelPreferences | undefined) ?? {},
+    provider: requested as AiProviderName,
+    env,
+    health: healthFrom(recent),
+    crossProviderFallback: settings?.crossProviderFallback ?? true,
+  };
+  const chains: Partial<Record<AiTask, ModelRef[]>> = {};
+  const router = routedProvider({
+    chainFor: (task) => (chains[task] ??= planChain(plan, TASK_OPERATION[task])),
+    create: (ref) =>
+      meteredProvider(
+        deps.providerFactory
+          ? deps.providerFactory(ref.provider)
+          : createAdapter(ref, keys[ref.provider] ?? '', env, fakeResponders),
+        opts.record,
+      ),
+    busyRetries: env.AI_BUSY_RETRIES,
+    busyWaitMs: env.AI_BUSY_WAIT_MS,
+    onBusy: async ({ provider, model, waitMs, next }) =>
+      opts.stage(
+        next
+          ? `${model} could not be used — continuing with ${PROVIDER_LABEL[next.provider] ?? next.provider} ${next.model}`
+          : `${PROVIDER_LABEL[provider] ?? provider} (${model}) is busy right now — trying again in ${Math.round(waitMs / 1000)} s`,
+      ),
+  });
+  return Object.assign(router, { chains });
+}
+
+function errorOf(err: unknown): {
+  message: string;
+  kind: string | null;
+  history?: AttemptRecord[];
+} {
+  const history = err instanceof AiRoutingError ? { history: err.history } : {};
+  return { ...errorBase(err), ...history };
+}
+
+function errorBase(err: unknown): { message: string; kind: string | null } {
+  if (err instanceof AiProviderError && err.kind === 'auth')
+    return {
+      message: `${PROVIDER_LABEL[err.provider] ?? err.provider} rejected the API key or denied access. Check the key in Settings → AI. (${err.message.slice(0, 200)})`,
+      kind: err.kind,
+    };
+  if (err instanceof AiProviderError && err.kind === 'quota')
+    return {
+      message: `${PROVIDER_LABEL[err.provider] ?? err.provider} quota or billing limit reached for this key. (${err.message.slice(0, 200)})`,
+      kind: err.kind,
+    };
+  if (err instanceof AiProviderError && (err.kind === 'unavailable' || err.kind === 'rate_limited'))
+    return {
+      message: `${PROVIDER_LABEL[err.provider] ?? err.provider} is overloaded or rate limited right now (we retried several times). Try again in a few minutes, or choose another provider.`,
+      kind: err.kind,
+    };
   if (err instanceof AiProviderError) return { message: err.message.slice(0, 500), kind: err.kind };
   return {
     message: (err instanceof Error ? err.message : String(err)).slice(0, 500),
@@ -272,10 +422,13 @@ export function designAnalysisHandler(deps: AiStudioDeps): JobHandler {
         images.push({ index, role: input.role, fileName: input.fileName, image: img.image });
       }
       const library = await loadLibrary(prisma, row.organizationId, row.createdBy);
-      const provider = meteredProvider(
-        providerFor(deps, row.provider),
-        usageRecorder(prisma, row.organizationId, ctx.job.id),
-      );
+      const provider = await studioProvider(deps, row.organizationId, row.provider, {
+        record: usageRecorder(prisma, row.organizationId, ctx.job.id, {
+          type: 'design_analysis',
+          id: row.id,
+        }),
+        stage,
+      });
       const result = await analyzeDesign(
         { images, notes: row.notes, garmentHint: row.garmentHint, audience: row.audience },
         { provider, library, progress: stage },
@@ -287,7 +440,13 @@ export function designAnalysisHandler(deps: AiStudioDeps): JobHandler {
         data: {
           status: 'succeeded',
           stage: null,
-          result: JSON.parse(JSON.stringify(result)) as object,
+          result: JSON.parse(
+            JSON.stringify({
+              ...result,
+              imageSizes: loaded.map((l) => (l ? { width: l.width, height: l.height } : null)),
+              processing: { chains: provider.chains, history: provider.history },
+            }),
+          ) as object,
           crops,
           completedAt: new Date(),
         },
@@ -300,7 +459,12 @@ export function designAnalysisHandler(deps: AiStudioDeps): JobHandler {
       ctx.logger.warn({ err, analysisId }, 'design analysis failed');
       await prisma.designAnalysis.update({
         where: { id: row.id },
-        data: { status: 'failed', stage: null, error: errorOf(err), completedAt: new Date() },
+        data: {
+          status: 'failed',
+          stage: null,
+          error: errorOf(err) as object,
+          completedAt: new Date(),
+        },
       });
       return { failed: errorOf(err).kind ?? 'error' };
     }
@@ -352,10 +516,11 @@ async function cropComponents(
 
 // ── techpack.generate ───────────────────────────────────────────────────────
 
-const techPackPayload = z.object({ techPackId: z.uuid() });
+const techPackPayload = z.object({ techPackId: z.uuid(), pdfOnly: z.boolean().optional() });
 
 interface TechPackOptions {
   modelImages?: boolean;
+  presentation?: Presentation;
   revisionLabel?: string;
   designName?: string;
   designDisplayId?: string;
@@ -418,12 +583,28 @@ const IMAGE_TASK: Record<ImageKind, AiTask> = {
 
 export function techPackHandler(deps: AiStudioDeps): JobHandler {
   return async (ctx: JobHandlerContext) => {
-    const { techPackId } = techPackPayload.parse(ctx.payload);
+    const payload = techPackPayload.parse(ctx.payload);
+    const { techPackId } = payload;
     const prisma = deps.assets.prisma;
     const row = await prisma.techPack.findUnique({ where: { id: techPackId } });
     if (!row) return { skipped: 'not_found' };
-    if (row.status === 'succeeded' || row.status === 'failed') return { skipped: row.status };
     const options = row.options as TechPackOptions;
+    if (payload.pdfOnly) {
+      if (row.status !== 'succeeded' || !row.document) return { skipped: 'not_ready' };
+      const doc = row.document as unknown as TechPackDocument;
+      const dataUris = await dataUrisFor(deps, row.organizationId, doc);
+      const pdf = await printPdf(deps, row, doc, options, dataUris, ctx.job.id, ctx.logger);
+      await prisma.techPack.update({
+        where: { id: row.id },
+        data: {
+          pdfAssetId: pdf.assetId ?? row.pdfAssetId,
+          pdfStatus: pdf.assetId ? 'ready' : 'failed',
+          pdfError: pdf.error,
+        },
+      });
+      return { pdf: !!pdf.assetId };
+    }
+    if (row.status === 'succeeded' || row.status === 'failed') return { skipped: row.status };
     const stage = async (text: string) => {
       await prisma.techPack.update({
         where: { id: row.id },
@@ -445,10 +626,13 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
       });
       const state = readAnyVersion(revision.snapshot).state;
       const artifacts = await artifactNames(prisma, row.organizationId, state);
-      const provider = meteredProvider(
-        providerFor(deps, row.provider),
-        usageRecorder(prisma, row.organizationId, ctx.job.id),
-      );
+      const provider = await studioProvider(deps, row.organizationId, row.provider, {
+        record: usageRecorder(prisma, row.organizationId, ctx.job.id, {
+          type: 'tech_pack',
+          id: row.id,
+        }),
+        stage,
+      });
       const projectId = design?.projectId ?? null;
       const dataUris = new Map<string, string>();
       const store = async (
@@ -466,19 +650,53 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
           createdBy: row.createdBy,
         });
 
-      // Reference image for the AI: the technical flat (G2) or the uploaded sketch/reference.
+      // Final geometry first: the editable reconstruction (and the technical flat for shirts).
+      const reconstructed = (['front', 'back'] as const)
+        .map((view) => ({ view, svg: reconstructionSvg(state, view) }))
+        .filter((v): v is { view: 'front' | 'back'; svg: string } => !!v.svg)
+        .map((v): TechPackImage => ({
+          key: `garment_${v.view}`,
+          title: `Garment — ${v.view} (final geometry)`,
+          kind: 'reconstruction',
+          svg: v.svg,
+        }));
       const flats = technicalFlats(state);
-      let reference: AiImageInput | null = null;
-      if (flats[0]?.svg) {
-        const png = await sharp(Buffer.from(flats[0].svg)).resize({ width: 1024 }).png().toBuffer();
-        reference = { mediaType: 'image/png', data: new Uint8Array(png), label: 'technical flat' };
-      } else {
-        const src = (state.sources ?? []).find(
-          (s) => s.role === 'sketch' || s.role === 'reference',
+      // Original uploads: references for the document and the image model.
+      const references: TechPackImage[] = [];
+      let original: AiImageInput | null = null;
+      for (const src of (state.sources ?? []).filter(
+        (x) => x.role === 'sketch' || x.role === 'reference',
+      )) {
+        const img = await loadImage(deps, row.organizationId, src.assetId).catch(() => null);
+        if (!img) continue;
+        dataUris.set(
+          src.assetId,
+          `data:${img.image.mediaType};base64,${img.buffer.toString('base64')}`,
         );
-        const img = src ? await loadImage(deps, row.organizationId, src.assetId) : null;
-        if (img) reference = { ...img.image, label: src!.role };
+        references.push({
+          key: `original_${src.assetId}`,
+          title: src.label ? `Original — ${src.label}` : `Original ${src.role}`,
+          kind: 'original',
+          assetId: src.assetId,
+        });
+        original ??= { ...img.image, label: `original ${src.role} (reference only)` };
       }
+      // The image model follows the final drawing; the original only helps with look and feel.
+      let reference: AiImageInput | null = null;
+      const drawing = reconstructed[0]?.svg ?? flats[0]?.svg;
+      if (drawing) {
+        const png = await sharp(Buffer.from(drawing))
+          .resize({ width: 1024 })
+          .flatten({ background: '#ffffff' })
+          .png()
+          .toBuffer();
+        reference = {
+          mediaType: 'image/png',
+          data: new Uint8Array(png),
+          label: 'finalized garment drawing',
+        };
+      }
+      const imageRefs = [reference, original].filter((x): x is AiImageInput => !!x);
 
       await stage('Drafting construction notes');
       let text: TechPackText | null = null;
@@ -488,7 +706,7 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
             task: 'techpack_text',
             system: ANALYST_SYSTEM,
             prompt: techPackTextPrompt({ state, summary: designSummary(state, artifacts) }),
-            images: reference ? [reference] : [],
+            images: imageRefs,
             schema: techPackTextSchema,
             shapeHint: TECHPACK_TEXT_SHAPE,
           })
@@ -508,8 +726,8 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
         try {
           const out = await provider.generateImage({
             task: IMAGE_TASK[kind],
-            prompt: imagePrompt(kind, description),
-            referenceImages: reference ? [reference] : [],
+            prompt: imagePrompt(kind, description, options.presentation ?? DEFAULT_PRESENTATION),
+            referenceImages: imageRefs,
             aspect: 'portrait',
           });
           // Normalize (the fake returns SVG placeholders) to PNG for storage and the PDF.
@@ -561,58 +779,191 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
         },
         artifacts,
         text,
-        views: [...flats, ...aiViews],
+        views: [...reconstructed, ...flats, ...aiViews],
         componentImages,
+        references,
       });
 
+      const finalDocument = {
+        ...document,
+        processing: { chains: provider.chains, history: provider.history },
+      };
       await stage('Printing the PDF');
-      let pdfAssetId: string | null = null;
-      try {
-        const html = techPackHtml(document, (img) =>
-          img.assetId ? (dataUris.get(img.assetId) ?? null) : null,
-        );
-        const pdf = await renderPdf(html, deps.pdfChromiumPath);
-        const name = `${options.designDisplayId ?? 'design'}-${options.revisionLabel ?? ''}-tech-pack.pdf`;
-        pdfAssetId = await store(pdf, name, 'export');
-      } catch (err) {
-        ctx.logger.warn({ err, techPackId }, 'tech pack PDF failed (document kept)');
-      }
+      const pdf = await printPdf(
+        deps,
+        row,
+        finalDocument,
+        options,
+        dataUris,
+        ctx.job.id,
+        ctx.logger,
+      );
 
       await prisma.techPack.update({
         where: { id: row.id },
         data: {
           status: 'succeeded',
           stage: null,
-          document: JSON.parse(JSON.stringify(document)) as object,
-          pdfAssetId,
+          document: JSON.parse(JSON.stringify(finalDocument)) as object,
+          pdfAssetId: pdf.assetId,
+          pdfStatus: pdf.assetId ? 'ready' : 'failed',
+          pdfError: pdf.error,
           completedAt: new Date(),
         },
       });
-      return { pdf: pdfAssetId !== null, images: aiViews.filter((v) => v.assetId).length };
+      return { pdf: pdf.assetId !== null, images: aiViews.filter((v) => v.assetId).length };
     } catch (err) {
       ctx.logger.warn({ err, techPackId }, 'tech pack generation failed');
       await prisma.techPack.update({
         where: { id: row.id },
-        data: { status: 'failed', stage: null, error: errorOf(err), completedAt: new Date() },
+        data: {
+          status: 'failed',
+          stage: null,
+          error: errorOf(err) as object,
+          completedAt: new Date(),
+        },
       });
       return { failed: errorOf(err).kind ?? 'error' };
     }
   };
 }
 
-/** HTML → A4 PDF with headless Chromium (no network: everything is inlined). */
-export async function renderPdf(html: string, executablePath?: string): Promise<Buffer> {
+/** Data URIs for every stored image a document references (PDF is printed offline). */
+async function dataUrisFor(
+  deps: AiStudioDeps,
+  organizationId: string,
+  doc: TechPackDocument,
+): Promise<Map<string, string>> {
+  const ids = new Set<string>();
+  const add = (img: TechPackImage | null | undefined) => {
+    if (img?.assetId) ids.add(img.assetId);
+  };
+  doc.views.forEach(add);
+  (doc.references ?? []).forEach(add);
+  doc.components.forEach((c) => add(c.image));
+  const out = new Map<string, string>();
+  for (const id of ids) {
+    const img = await loadImage(deps, organizationId, id).catch(() => null);
+    if (img) out.set(id, `data:${img.image.mediaType};base64,${img.buffer.toString('base64')}`);
+  }
+  return out;
+}
+
+/** Prints and stores the PDF; failures are reported, never fatal (the document stays usable). */
+async function printPdf(
+  deps: AiStudioDeps,
+  row: { id: string; organizationId: string; designId: string; createdBy: string | null },
+  doc: TechPackDocument,
+  options: TechPackOptions,
+  dataUris: Map<string, string>,
+  jobId: string,
+  logger: Logger,
+): Promise<{ assetId: string | null; error: string | null }> {
+  try {
+    const html = techPackHtml(doc, (img) =>
+      img.assetId ? (dataUris.get(img.assetId) ?? null) : null,
+    );
+    const footer = `${options.designName ?? 'Design'} · ${options.designDisplayId ?? ''} · ${options.revisionLabel ?? ''}`;
+    const pdf = await renderPdf(html, deps.pdfChromiumPath, footer);
+    const design = await deps.assets.prisma.design.findFirst({
+      where: { id: row.designId },
+      select: { projectId: true },
+    });
+    const name = `${options.designDisplayId ?? 'design'}-${options.revisionLabel ?? ''}-tech-pack.pdf`;
+    const assetId = await storeImage(deps, {
+      organizationId: row.organizationId,
+      projectId: design?.projectId ?? null,
+      buffer: pdf,
+      fileName: name,
+      assetType: 'export',
+      provenance: { sourceType: 'export', sourceEntityId: row.id, jobId },
+      createdBy: row.createdBy,
+    });
+    return { assetId, error: null };
+  } catch (err) {
+    logger.warn({ err, techPackId: row.id }, 'tech pack PDF failed (document kept)');
+    const msg = (err as Error).message ?? String(err);
+    return {
+      assetId: null,
+      error: /Executable doesn't exist|no browser|Chromium/i.test(msg)
+        ? 'No Chrome/Chromium was found on the server to print the PDF. Install Chrome or Edge, run `pnpm e2e:install`, or set PDF_CHROMIUM_PATH — or use “Print / Save as PDF” in the browser.'
+        : msg.slice(0, 300),
+    };
+  }
+}
+
+/** Installed Chrome / Edge / Chromium executables to try when Playwright's browser is missing. */
+export function browserCandidates(
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+): string[] {
+  if (platform === 'win32') {
+    const roots = [
+      env['PROGRAMFILES'],
+      env['PROGRAMFILES(X86)'],
+      env['ProgramFiles(x86)'],
+      env['LOCALAPPDATA'],
+    ].filter(Boolean) as string[];
+    return roots.flatMap((r) => [
+      `${r}\\Google\\Chrome\\Application\\chrome.exe`,
+      `${r}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${r}\\Chromium\\Application\\chrome.exe`,
+    ]);
+  }
+  if (platform === 'darwin')
+    return [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    ];
+  return [
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/microsoft-edge',
+    '/opt/pw-browsers/chromium',
+  ];
+}
+
+/** HTML → A4 PDF with headless Chromium (no network: everything is inlined), page numbers in the footer. */
+export async function renderPdf(
+  html: string,
+  executablePath?: string,
+  footer = '',
+): Promise<Buffer> {
   const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch({
-    ...(executablePath ? { executablePath } : {}),
-    args: ['--no-sandbox'],
-  });
+  const { existsSync } = await import('node:fs');
+  const tries = [executablePath, undefined, ...browserCandidates().filter((p) => existsSync(p))];
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let lastError: unknown = null;
+  for (const path of [...new Set(tries)]) {
+    if (path === undefined && tries[0]) continue; // an explicit path was given
+    try {
+      browser = await chromium.launch({
+        ...(path ? { executablePath: path } : {}),
+        args: ['--no-sandbox'],
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (!browser) throw lastError instanceof Error ? lastError : new Error('No Chromium available');
+  const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   try {
     const context = await browser.newContext({ javaScriptEnabled: false, offline: true });
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: 'load', timeout: 60_000 });
     return Buffer.from(
-      await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true }),
+      await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: `<div style="font-family:Helvetica,Arial,sans-serif;font-size:8px;color:#6b7280;width:100%;padding:0 14mm;display:flex;justify-content:space-between"><span>${esc(footer)}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+      }),
     );
   } finally {
     await browser.close();

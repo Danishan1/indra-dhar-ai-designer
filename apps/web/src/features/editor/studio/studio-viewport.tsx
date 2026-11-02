@@ -1,7 +1,7 @@
 'use client';
 
 import { geometryCapability } from '@ai-designer/garment-render';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { assetContentUrl } from '@/features/assets/api';
@@ -11,20 +11,23 @@ import { cn } from '@/lib/utils';
 import { GarmentCanvas } from '../canvas/garment-canvas';
 import { useEditor } from '../store-context';
 
-import { PatternSheet } from './pattern-svg';
+import { PatternEditor } from './pattern-editor';
+import { ReconstructionCanvas } from './reconstruction-canvas';
 
-type Mode = 'garment' | 'patterns' | 'reference';
+type Mode = 'original' | 'reconstruction' | 'flat' | 'patterns';
 
 const MODE_LABELS: Record<Mode, string> = {
-  garment: 'Garment',
+  original: 'Original',
+  reconstruction: 'Reconstruction',
+  flat: 'Technical flat',
   patterns: 'Patterns',
-  reference: 'Reference',
 };
 
 /**
- * Garment view and Pattern view of the same structured design (ADR-056), plus the uploaded
- * reference images with component regions. All three select the same components — the views stay
- * in sync because they are drawn from the one design state.
+ * Views of the one garment project (ADR-057): the untouched original upload, the editable vector
+ * reconstruction, the parametric technical flat (shirts / T-shirts) and the flat patterns. They
+ * share the design state and the selection — never separate editors — so switching keeps every
+ * change.
  */
 export function StudioViewport() {
   const state = useEditor((s) => s.display);
@@ -33,18 +36,22 @@ export function StudioViewport() {
     (s) => s.role === 'sketch' || s.role === 'reference',
   );
   const drawable = geometryCapability(state) === 'G2';
+  const hasShapes = state.components.some((c) => c.shapes?.length);
   const modes: Mode[] = [
-    'garment',
+    ...(sources.length ? (['original'] as const) : []),
+    ...(hasShapes || !drawable ? (['reconstruction'] as const) : []),
+    ...(drawable ? (['flat'] as const) : []),
     ...(pieces.length ? (['patterns'] as const) : []),
-    ...(sources.length ? (['reference'] as const) : []),
   ];
   const [chosen, setChosen] = useState<Mode | null>(null);
   const mode: Mode =
     chosen && modes.includes(chosen)
       ? chosen
-      : !drawable && sources.length
-        ? 'reference'
-        : 'garment';
+      : hasShapes
+        ? 'reconstruction'
+        : drawable
+          ? 'flat'
+          : (modes[0] ?? 'reconstruction');
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
@@ -52,7 +59,7 @@ export function StudioViewport() {
         <div
           role="group"
           aria-label="Design view"
-          className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 rounded-md border bg-panel/95 p-0.5 shadow-sm"
+          className="flex justify-center border-b bg-panel/95 p-0.5"
         >
           {modes.map((m) => (
             <Button
@@ -69,50 +76,17 @@ export function StudioViewport() {
           ))}
         </div>
       ) : null}
-      {mode === 'garment' ? (
-        <GarmentCanvas />
-      ) : mode === 'patterns' ? (
-        <PatternView />
-      ) : (
-        <ReferenceView />
-      )}
-    </div>
-  );
-}
-
-function PatternView() {
-  const state = useEditor((s) => s.display);
-  const selected = useEditor((s) => s.selection.ids);
-  const select = useEditor((s) => s.select);
-  const clear = useEditor((s) => s.clearSelection);
-  const pieces = useMemo(() => state.patternPieces ?? [], [state.patternPieces]);
-  const highlight = useMemo(() => new Set(selected), [selected]);
-  const pieceOwner = useMemo(
-    () => new Map(pieces.map((p) => [p.pieceId, p.componentId])),
-    [pieces],
-  );
-  const provisional = pieces.filter((p) => p.status !== 'confirmed').length;
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-muted/30" data-testid="pattern-view">
-      <div
-        className="min-h-0 flex-1 cursor-pointer overflow-auto p-6"
-        onClick={(e) => {
-          const g = (e.target as Element).closest('[data-piece-id]');
-          const owner = g ? pieceOwner.get(g.getAttribute('data-piece-id') ?? '') : undefined;
-          if (owner) select(owner, e.shiftKey ? 'toggle' : 'replace');
-          else clear();
-        }}
-      >
-        <PatternSheet
-          pieces={pieces}
-          highlight={highlight}
-          className="mx-auto h-full max-w-5xl rounded-md border bg-white shadow-sm"
-        />
+      <div className="relative min-h-0 flex-1">
+        {mode === 'flat' ? (
+          <GarmentCanvas />
+        ) : mode === 'patterns' ? (
+          <PatternEditor />
+        ) : mode === 'original' ? (
+          <ReferenceView />
+        ) : (
+          <ReconstructionCanvas />
+        )}
       </div>
-      <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">
-        {pieces.length} pieces · {provisional} provisional · seam line solid, seam allowance dashed,
-        grainline arrows, notches and fold lines marked · single base size
-      </p>
     </div>
   );
 }

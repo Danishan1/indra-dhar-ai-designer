@@ -152,14 +152,196 @@ export function AnalysisReviewPage({
               Check the provider’s API key in the server configuration.
             </p>
           ) : null}
-          <Button asChild>
-            <Link href={`/projects/${projectId}/ai/new`}>Try again</Link>
-          </Button>
+          <RetryAnalysis projectId={projectId} analysis={a} />
         </div>
       </div>
     );
 
   return <Review projectId={projectId} analysis={a} back={back} />;
+}
+
+/** Runs the same images again (optionally with another provider) — no re-upload needed. */
+function RetryAnalysis({ projectId, analysis }: { projectId: string; analysis: Analysis }) {
+  const { active } = useOrganization();
+  const router = useRouter();
+  const [provider, setProvider] = useState<string>(analysis.provider);
+  const key = useRef(newIdempotencyKey());
+  const status = useQuery({
+    queryKey: queryKeys.org(active.id).aiStatus(),
+    queryFn: ({ signal }) => studioApi.aiStatus(active.id, signal),
+  });
+  const configured = (status.data?.providers ?? []).filter((p) => p.configured);
+  const retry = useMutation({
+    mutationFn: () =>
+      studioApi.createAnalysis(
+        active.id,
+        projectId,
+        {
+          inputs: analysis.inputs.map((i) => ({ assetId: i.assetId, role: i.role })),
+          ...(analysis.notes ? { notes: analysis.notes } : {}),
+          ...(analysis.garmentHint ? { garmentHint: analysis.garmentHint } : {}),
+          ...(analysis.audience
+            ? { audience: analysis.audience as 'men' | 'women' | 'kids' | 'unisex' }
+            : {}),
+          provider: provider as 'gemini' | 'openai' | 'fake',
+        },
+        key.current,
+      ),
+    onSuccess: (next) => {
+      key.current = newIdempotencyKey();
+      router.push(`/projects/${projectId}/analyses/${next.id}`);
+    },
+  });
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center gap-2">
+        {configured.length > 1 ? (
+          <SimpleSelect
+            aria-label="AI provider for the retry"
+            className="h-9 w-56"
+            value={provider}
+            onValueChange={setProvider}
+            options={configured.map((p) => ({
+              value: p.name,
+              label:
+                p.name === 'fake'
+                  ? 'Demo (offline, no real AI)'
+                  : `${p.name === 'gemini' ? 'Google Gemini' : 'OpenAI'} · ${p.models.text}`,
+            }))}
+          />
+        ) : null}
+        <Button
+          onClick={() => retry.mutate()}
+          disabled={retry.isPending}
+          data-testid="retry-analysis"
+        >
+          {retry.isPending ? 'Starting…' : 'Try again with the same images'}
+        </Button>
+      </div>
+      {retry.isError ? (
+        <p role="alert" className="text-[13px] text-destructive">
+          {retry.error.message}
+        </p>
+      ) : null}
+      <Link href={`/projects/${projectId}/ai/new`} className="text-[13px] underline">
+        Start over with other images
+      </Link>
+    </div>
+  );
+}
+
+/** The component as a vector outline (what the editor will get), with the reference crop small. */
+function OutlinePreview({
+  component: c,
+  crop,
+  orgId,
+}: {
+  component: AnalysisComponent;
+  crop: string | undefined;
+  orgId: string;
+}) {
+  const w = c.region ? Math.max(0.02, c.region.width) : 1;
+  const h = c.region ? Math.max(0.02, c.region.height) : 1;
+  const k = 64 / Math.max(w, h);
+  return (
+    <div className="relative size-[72px]" data-testid="component-outline">
+      <svg
+        viewBox={`-4 -4 ${w * k + 8} ${h * k + 8}`}
+        className="size-full rounded-md border bg-white"
+        aria-label={`${c.name} outline`}
+      >
+        {c.outline ? (
+          <polygon
+            points={c.outline.map((p) => `${p.x * w * k},${p.y * h * k}`).join(' ')}
+            fill="#e2e8f0"
+            stroke="#1f2937"
+            strokeWidth={1.5}
+          />
+        ) : (
+          <rect width={w * k} height={h * k} fill="none" stroke="#9ca3af" strokeDasharray="4 3" />
+        )}
+      </svg>
+      {crop ? (
+        <AssetImg
+          orgId={orgId}
+          assetId={crop}
+          alt={`${c.name} in your image`}
+          className="absolute right-0 bottom-0 size-6"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Original next to the vector reconstruction the analysis produced (before any editing). */
+function ReconstructionPreview({
+  orgId,
+  analysis,
+  result,
+}: {
+  orgId: string;
+  analysis: Analysis;
+  result: AnalysisResult;
+}) {
+  const d = result.decomposition;
+  const traced = d.components.filter((c) => c.region && c.outline);
+  const img = traced[0]?.region?.imageIndex ?? 0;
+  const size = result.imageSizes?.[img] ?? { width: 1000, height: 1000 };
+  const input = analysis.inputs[img];
+  const onImage = traced.filter((c) => c.region!.imageIndex === img);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-3" data-testid="reconstruction-preview">
+        <figure className="flex flex-col gap-1">
+          {input ? (
+            <AssetImg
+              orgId={orgId}
+              assetId={input.assetId}
+              alt="Original"
+              className="aspect-square w-full"
+              variant="preview_1024"
+            />
+          ) : null}
+          <figcaption className="text-[11px] text-muted-foreground">Original</figcaption>
+        </figure>
+        <figure className="flex flex-col gap-1">
+          <svg
+            viewBox={`0 0 ${size.width} ${size.height}`}
+            className="aspect-square w-full rounded-md border bg-white"
+            aria-label="Editable reconstruction preview"
+          >
+            {onImage.map((c) => {
+              const r = c.region!;
+              return (
+                <polygon
+                  key={c.key}
+                  points={c
+                    .outline!.map(
+                      (p) =>
+                        `${(r.x + p.x * r.width) * size.width},${(r.y + p.y * r.height) * size.height}`,
+                    )
+                    .join(' ')}
+                  fill="#f1f5f9"
+                  fillOpacity={0.85}
+                  stroke="#1f2937"
+                  strokeWidth={Math.max(size.width, size.height) / 300}
+                >
+                  <title>{c.name}</title>
+                </polygon>
+              );
+            })}
+          </svg>
+          <figcaption className="text-[11px] text-muted-foreground">
+            Editable reconstruction · {onImage.length} traced parts
+            {d.components.length - traced.length > 0
+              ? ` · ${d.components.length - traced.length} from templates`
+              : ''}
+          </figcaption>
+        </figure>
+      </div>
+      <InputStrip orgId={orgId} analysis={analysis} />
+    </div>
+  );
 }
 
 function InputStrip({ orgId, analysis }: { orgId: string; analysis: Analysis }) {
@@ -284,7 +466,7 @@ function Review({
               </span>
             </div>
             {d.garment.description ? <p className="text-[13px]">{d.garment.description}</p> : null}
-            <InputStrip orgId={active.id} analysis={analysis} />
+            <ReconstructionPreview orgId={active.id} analysis={analysis} result={result} />
           </section>
 
           <section className="flex flex-col gap-3" aria-label="Components">
@@ -313,16 +495,7 @@ function Review({
                     style={{ marginLeft: depth * 16 }}
                     data-testid="analysis-component"
                   >
-                    {crop ? (
-                      <AssetImg
-                        orgId={active.id}
-                        assetId={crop}
-                        alt={c.name}
-                        className="size-[72px]"
-                      />
-                    ) : (
-                      <div className="size-[72px] rounded-md border bg-muted/40" />
-                    )}
+                    <OutlinePreview component={c} crop={crop} orgId={active.id} />
                     <div className="flex min-w-0 flex-col gap-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{c.name}</span>
