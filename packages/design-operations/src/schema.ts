@@ -9,6 +9,7 @@ import {
   propertyKeySchema,
   relationshipTypeSchema,
   unitSchema,
+  patternPieceSchema,
 } from '@ai-designer/garment-model';
 import { z } from 'zod';
 
@@ -77,6 +78,16 @@ export const setComponentLockSchema = z.object({
   type: z.literal('set_component_lock'),
   componentId: id,
   locked: z.boolean(),
+});
+
+/**
+ * Replaces the flat pattern pieces of one component (ADR-056): redraft from measurements, accept a
+ * library pattern, or confirm pieces. Pieces of other components are untouched.
+ */
+export const replacePatternPiecesSchema = z.object({
+  type: z.literal('replace_pattern_pieces'),
+  componentId: id,
+  pieces: z.array(patternPieceSchema).max(20),
 });
 
 export const renameComponentSchema = z.object({
@@ -185,6 +196,7 @@ const singleClientOperations = [
   setComponentVisibilitySchema,
   setComponentLockSchema,
   renameComponentSchema,
+  replacePatternPiecesSchema,
   attachArtifactSchema,
   replaceArtifactSchema,
   detachArtifactSchema,

@@ -25,6 +25,8 @@ export const workerEnvSchema = z
     ASSET_MAX_PIXELS: z.coerce.number().int().min(1_000_000).default(50_000_000),
     /** Malware scanner for uploads (ADR-029): none until ClamAV in I47; eicar-test for tests. */
     ASSET_SCANNER: z.enum(['none', 'eicar-test']).default('none'),
+    /** Chromium used to print tech pack PDFs (ADR-056); default: Playwright's installed browser. */
+    PDF_CHROMIUM_PATH: z.string().min(1).optional(),
     WORKER_ID: z.string().min(1).default(`${hostname()}-${process.pid}`),
     WORKER_CONCURRENCY_SYSTEM: z.coerce.number().int().min(1).max(32).default(2),
     WORKER_CONCURRENCY_EVENTS: z.coerce.number().int().min(1).max(64).default(4),

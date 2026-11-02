@@ -11,7 +11,16 @@ import { projectStatusSchema } from '../projects/schemas.js';
  */
 
 /** How a new design starts. Keys match `@ai-designer/garment-model` templates, plus `blank`. */
-export const DesignTemplates = ['woven_shirt', 'knit_tshirt', 'blank'] as const;
+export const DesignTemplates = [
+  'woven_shirt',
+  'knit_tshirt',
+  'dress',
+  'skirt',
+  'trousers',
+  'jacket',
+  'hoodie',
+  'blank',
+] as const;
 export const designTemplateSchema = z.enum(DesignTemplates);
 export type DesignTemplate = z.infer<typeof designTemplateSchema>;
 

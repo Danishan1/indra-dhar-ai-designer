@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { LayersIcon, PlusIcon } from 'lucide-react';
+import { LayersIcon, PlusIcon, SparklesIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -23,8 +23,17 @@ import { NewDesignDialog } from './new-design-dialog';
 
 const when = (iso: string) => new Date(iso).toLocaleString();
 
-export const categoryLabel = (c: string | null) =>
-  c === 'woven_shirt' ? 'Woven shirt' : c === 'knit_tshirt' ? 'Knit T-shirt' : 'Not chosen yet';
+const CATEGORY_LABELS: Record<string, string> = {
+  woven_shirt: 'Woven shirt',
+  knit_tshirt: 'Knit T-shirt',
+  dress: 'Dress',
+  skirt: 'Skirt',
+  trousers: 'Trousers',
+  jacket: 'Jacket',
+  hoodie: 'Hoodie',
+};
+
+export const categoryLabel = (c: string | null) => (c && CATEGORY_LABELS[c]) || 'Not chosen yet';
 
 /** Designs of a project (project overview tab). */
 export function DesignsTab({ projectId, editable }: { projectId: string; editable: boolean }) {
@@ -36,9 +45,18 @@ export function DesignsTab({ projectId, editable }: { projectId: string; editabl
   });
   const mayCreate = editable && can('design.create');
   const newButton = mayCreate ? (
-    <Button size="sm" onClick={() => setOpen(true)}>
-      <PlusIcon /> New design
-    </Button>
+    <div className="flex gap-2">
+      {can('design.generate') ? (
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/projects/${projectId}/ai/new`}>
+            <SparklesIcon /> New design with AI
+          </Link>
+        </Button>
+      ) : null}
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <PlusIcon /> New design
+      </Button>
+    </div>
   ) : null;
 
   return (
@@ -51,7 +69,7 @@ export function DesignsTab({ projectId, editable }: { projectId: string; editabl
         <EmptyState
           icon={<LayersIcon />}
           title="No designs yet"
-          description="Start from a woven shirt or knit T-shirt template, or a blank design."
+          description="Start from your sketches, photos and fabrics with AI, or from a template."
           action={newButton}
         />
       ) : (

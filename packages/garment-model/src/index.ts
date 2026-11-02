@@ -11,6 +11,7 @@ export * from './clone.js';
 export * from './schema/entity-ref.js';
 export * from './schema/property-value.js';
 export * from './schema/placement.js';
+export * from './schema/pattern.js';
 export * from './schema/component.js';
 export * from './schema/relationship.js';
 export * from './schema/constraint.js';

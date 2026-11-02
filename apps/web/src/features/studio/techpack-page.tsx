@@ -1,0 +1,124 @@
+'use client';
+
+import { type TechPackDocument, techPackHtml } from '@ai-designer/design-ai';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { AlertTriangleIcon, ArrowLeftIcon, DownloadIcon, Loader2Icon } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo } from 'react';
+
+import { PageHeader } from '@/components/shell/page-header';
+import { ErrorState, LoadingState } from '@/components/states/states';
+import { Button } from '@/components/ui/button';
+import { assetContentUrl, assetsApi } from '@/features/assets/api';
+import { designsApi } from '@/features/designs/api';
+import { useOrganization } from '@/features/organizations/organization-provider';
+import { queryKeys } from '@/lib/query/keys';
+
+import { studioApi } from './api';
+
+/**
+ * A generated tech pack (Component 3, ADR-056): progress while the worker builds it, then the
+ * document itself (the same printable HTML as the PDF, rendered without scripts) and the PDF.
+ */
+export function TechPackPage({ techPackId }: { techPackId: string }) {
+  const { active } = useOrganization();
+  const techPack = useQuery({
+    queryKey: queryKeys.org(active.id).techPack(techPackId),
+    queryFn: ({ signal }) => studioApi.techPack(active.id, techPackId, signal),
+    refetchInterval: (q) =>
+      q.state.data && (q.state.data.status === 'queued' || q.state.data.status === 'running')
+        ? 1500
+        : false,
+  });
+  const designId = techPack.data?.designId;
+  const design = useQuery({
+    queryKey: queryKeys.org(active.id).design(designId ?? ''),
+    queryFn: ({ signal }) => designsApi.get(active.id, designId!, signal),
+    enabled: !!designId,
+  });
+  const download = useMutation({
+    mutationFn: async (assetId: string) => {
+      const { url } = await assetsApi.signedUrl(active.id, assetId, 'original');
+      window.open(url, '_blank', 'noopener');
+    },
+  });
+  const html = useMemo(() => {
+    const doc = techPack.data?.document as TechPackDocument | null | undefined;
+    if (!doc) return null;
+    return techPackHtml(doc, (img) =>
+      img.assetId ? assetContentUrl(active.id, img.assetId, 'preview_1024') : null,
+    );
+  }, [techPack.data?.document, active.id]);
+
+  if (techPack.isPending) return <LoadingState />;
+  if (techPack.isError)
+    return <ErrorState error={techPack.error} onRetry={() => void techPack.refetch()} />;
+  const tp = techPack.data;
+  const editor = design.data
+    ? `/projects/${design.data.projectId}/designs/${design.data.id}`
+    : undefined;
+
+  return (
+    <div className="flex h-full flex-col">
+      <PageHeader
+        title={`Tech pack · ${design.data?.name ?? tp.displayId}`}
+        description={`${tp.displayId} · revision ${tp.revisionLabel} · ${tp.provider}`}
+        actions={
+          <>
+            {editor ? (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={editor}>
+                  <ArrowLeftIcon /> Back to the design
+                </Link>
+              </Button>
+            ) : null}
+            {tp.pdfAssetId ? (
+              <Button
+                size="sm"
+                onClick={() => download.mutate(tp.pdfAssetId!)}
+                disabled={download.isPending}
+                data-testid="download-pdf"
+              >
+                <DownloadIcon /> Download PDF
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+      {tp.status === 'queued' || tp.status === 'running' ? (
+        <div className="mx-auto flex max-w-xl flex-col items-center gap-3 p-10 text-center">
+          <Loader2Icon className="size-8 animate-spin text-primary" aria-hidden />
+          <p className="text-sm font-medium" role="status" data-testid="techpack-stage">
+            {tp.stage ?? 'Working…'}
+          </p>
+          <p className="text-[13px] text-muted-foreground">
+            The tech pack documents revision {tp.revisionLabel} exactly as committed — the design is
+            not changed. Missing information is listed, never invented.
+          </p>
+        </div>
+      ) : tp.status === 'failed' ? (
+        <div className="mx-auto flex max-w-xl flex-col items-center gap-3 p-10 text-center">
+          <AlertTriangleIcon className="size-8 text-destructive" aria-hidden />
+          <p role="alert" className="text-sm">
+            {tp.error?.message ?? 'Generation failed.'}
+          </p>
+        </div>
+      ) : html ? (
+        <div className="flex-1 bg-muted/40 p-4">
+          {!tp.pdfAssetId ? (
+            <p className="mb-2 text-[13px] text-status-needs-review">
+              The PDF could not be printed on the server; the document below is complete.
+            </p>
+          ) : null}
+          <iframe
+            title="Tech pack document"
+            srcDoc={html}
+            sandbox="allow-same-origin"
+            className="mx-auto block h-[calc(100vh-10rem)] w-full max-w-[900px] rounded-md border bg-white shadow-sm"
+            data-testid="techpack-document"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -38,6 +38,11 @@ import { WorkingCopyService } from './working-copy.service.js';
 const TEMPLATE_LABELS: Record<string, string> = {
   woven_shirt: 'Woven shirt',
   knit_tshirt: 'Knit T-shirt',
+  dress: 'Dress',
+  skirt: 'Skirt',
+  trousers: 'Trousers',
+  jacket: 'Jacket',
+  hoodie: 'Hoodie',
 };
 
 /** A design with no components yet; the category is chosen later. */
@@ -149,6 +154,27 @@ export class DesignsService implements OnModuleInit {
       state,
       summary,
       template: body.template,
+      duplicatedFromDesignId: null,
+    });
+    return this.get(ctx, design.id);
+  }
+
+  /**
+   * A design from a prepared state (AI design analyzer, ADR-056): validated like any save, R001 is
+   * committed with the given summary.
+   */
+  async createFromState(
+    ctx: AuthzContext,
+    projectId: string,
+    body: { name: string; state: GarmentDesignState; summary: string },
+  ): Promise<DesignView> {
+    await this.projects.requireWorkable(ctx.organizationId, projectId);
+    const design = await this.createWithState(ctx, {
+      projectId,
+      name: body.name,
+      state: body.state,
+      summary: body.summary,
+      template: 'ai_analysis',
       duplicatedFromDesignId: null,
     });
     return this.get(ctx, design.id);

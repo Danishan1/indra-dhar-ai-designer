@@ -509,6 +509,28 @@ function checkRelationships(
   }
 }
 
+/** Pattern pieces belong to an existing component and have unique ids (ADR-056). */
+function checkPatternPieces(state: GarmentDesignState, out: Findings): void {
+  const ids = new Set(state.components.map((c) => c.componentId));
+  const seen = new Set<string>();
+  for (const p of state.patternPieces ?? []) {
+    if (seen.has(p.pieceId))
+      out.add('id.duplicate', 'error', null, `Pattern piece id ${p.pieceId} is used twice`);
+    seen.add(p.pieceId);
+    if (!ids.has(p.componentId))
+      out.add(
+        'pattern.component_missing',
+        'error',
+        comp(p.componentId),
+        `Pattern piece "${p.name}" belongs to a component that does not exist`,
+        {
+          path: `patternPieces[${p.pieceId}]`,
+          resolution: 'Remove the piece or restore its component',
+        },
+      );
+  }
+}
+
 /**
  * Structural validation (type safety, references, hierarchy, units, evidence rules). Business
  * constraint sets are I20; passing here never implies manufacturing feasibility (CST-006).
@@ -551,6 +573,7 @@ export function validateDesignState(
   }
   checkComponents(catalog, state, opts, out);
   checkRelationships(catalog, state, opts, out);
+  checkPatternPieces(state, out);
 
   return { ok: !hasBlockingFindings(out.list), state, findings: out.list };
 }

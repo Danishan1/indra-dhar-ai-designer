@@ -28,12 +28,26 @@ import { designsApi, newIdempotencyKey } from './api';
 const TEMPLATES = [
   { value: 'woven_shirt', label: 'Woven shirt' },
   { value: 'knit_tshirt', label: 'Knit T-shirt' },
+  { value: 'dress', label: 'Dress' },
+  { value: 'skirt', label: 'Skirt' },
+  { value: 'trousers', label: 'Trousers' },
+  { value: 'jacket', label: 'Jacket' },
+  { value: 'hoodie', label: 'Hoodie' },
   { value: 'blank', label: 'Blank (choose parts later)' },
 ];
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Give the design a name').max(120, 'At most 120 characters'),
-  template: z.enum(['woven_shirt', 'knit_tshirt', 'blank']),
+  template: z.enum([
+    'woven_shirt',
+    'knit_tshirt',
+    'dress',
+    'skirt',
+    'trousers',
+    'jacket',
+    'hoodie',
+    'blank',
+  ]),
 });
 type Values = z.infer<typeof schema>;
 const EMPTY: Values = { name: '', template: 'woven_shirt' };

@@ -2,6 +2,13 @@ import { GarmentModelError } from '../errors.js';
 import type { GarmentDesignState } from '../schema/design-state.js';
 
 import { createKnitTshirt } from './knit-tshirt.js';
+import {
+  createDress,
+  createHoodie,
+  createJacket,
+  createSkirt,
+  createTrousers,
+} from './more-garments.js';
 import { createWovenShirt, type WovenShirtOptions } from './woven-shirt.js';
 
 export { createKnitTshirt, createWovenShirt };
@@ -10,6 +17,11 @@ export type { WovenShirtOptions };
 const FACTORIES: Record<string, (opts?: WovenShirtOptions) => GarmentDesignState> = {
   woven_shirt: createWovenShirt,
   knit_tshirt: createKnitTshirt,
+  dress: createDress,
+  skirt: createSkirt,
+  trousers: createTrousers,
+  jacket: createJacket,
+  hoodie: createHoodie,
 };
 
 export const TEMPLATE_KEYS: readonly string[] = Object.keys(FACTORIES);

@@ -756,3 +756,55 @@ describe('component and fabric artifacts (I18)', () => {
     ).toThrow();
   });
 });
+
+describe('pattern pieces (ADR-056)', () => {
+  const piece = (componentId: string, pieceId = 'pat_aaaaaaaaaaaa') => ({
+    pieceId,
+    componentId,
+    name: 'Cuff',
+    outline: [
+      { x: 0, y: 0 },
+      { x: 250, y: 0 },
+      { x: 250, y: 130 },
+      { x: 0, y: 130 },
+    ],
+    source: 'generated' as const,
+  });
+
+  it('replaces only the pieces of one component, undoes exactly, and goes away with it', () => {
+    const s = shirt();
+    const cuff = find(s, 'cuff', 'left');
+    const other = find(s, 'cuff', 'right');
+    const r1 = ok(s, {
+      type: 'replace_pattern_pieces',
+      componentId: other.componentId,
+      pieces: [piece(other.componentId, 'pat_bbbbbbbbbbbb')],
+    });
+    const r2 = ok(r1.state, {
+      type: 'replace_pattern_pieces',
+      componentId: cuff.componentId,
+      pieces: [piece('cmp_ignoredxxxxx')],
+    });
+    expect(r2.state.patternPieces?.map((p) => p.componentId)).toEqual([
+      other.componentId,
+      cuff.componentId,
+    ]);
+    // The root patch carries the pieces to the editor; the inverse restores them.
+    expect(applyEntityPatch(r1.state, r2.after).patternPieces).toEqual(r2.state.patternPieces);
+    const back = applyOperation(r2.state, invert(r1.state, r2.state) as Operation, ctx());
+    expect(back.ok && back.state.patternPieces).toEqual(r1.state.patternPieces);
+    const removed = ok(r2.state, {
+      type: 'remove_component',
+      componentId: cuff.componentId,
+      cascade: true,
+    });
+    expect(removed.state.patternPieces?.map((p) => p.componentId)).toEqual([other.componentId]);
+    expect(
+      blocked(r1.state, {
+        type: 'replace_pattern_pieces',
+        componentId: cuff.componentId,
+        pieces: [piece(cuff.componentId, 'pat_bbbbbbbbbbbb')],
+      }),
+    ).toContain('id.duplicate');
+  });
+});

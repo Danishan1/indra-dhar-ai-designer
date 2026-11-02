@@ -477,6 +477,36 @@ class Applier {
         const gone = new Set(touching.map((r) => r.relationshipId));
         s.components = s.components.filter((c) => !removed.has(c.componentId));
         s.relationships = s.relationships.filter((r) => !gone.has(r.relationshipId));
+        // A component's pattern pieces go with it.
+        if (s.patternPieces)
+          s.patternPieces = s.patternPieces.filter((p) => !removed.has(p.componentId));
+        return;
+      }
+      case 'replace_pattern_pieces': {
+        const c = this.component(op.componentId);
+        const pieces = op.pieces.map((p) => ({ ...p, componentId: c.componentId }));
+        const ids = new Set<string>();
+        for (const p of pieces) {
+          if (ids.has(p.pieceId))
+            throw new Blocked([
+              finding(
+                'id.duplicate',
+                `Pattern piece id ${p.pieceId} is used twice`,
+                comp(c.componentId),
+              ),
+            ]);
+          ids.add(p.pieceId);
+        }
+        const others = (s.patternPieces ?? []).filter((p) => p.componentId !== c.componentId);
+        if (others.some((p) => ids.has(p.pieceId)))
+          throw new Blocked([
+            finding(
+              'id.duplicate',
+              'A pattern piece id is already used by another component',
+              comp(c.componentId),
+            ),
+          ]);
+        s.patternPieces = [...others, ...pieces];
         return;
       }
       case 'set_component_visibility':

@@ -16,6 +16,7 @@ import { PreferenceKeys, readPreference, writePreference } from '@/lib/local-pre
 
 import { useScene } from '../canvas/scene-context';
 import { useEditor } from '../store-context';
+import { StudioSection } from '../studio/studio-section';
 import { ComponentFindings } from '../validation/component-findings';
 
 import { ArtifactsSection } from './artifacts-section';
@@ -284,6 +285,7 @@ function ComponentProperties({
 
       {multi ? null : <ComponentFindings componentId={first.componentId} />}
       {multi ? null : <ArtifactsSection component={first} />}
+      {multi ? null : <StudioSection component={first} />}
 
       {groups.map(([group, list]) => {
         const visible = list.filter((d) => showAdvanced || !d.ui.advanced);

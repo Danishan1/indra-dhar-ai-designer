@@ -9,7 +9,7 @@
 | **Current iteration** | **I21 — Generation job management & progress (SSE)** (next)                                          |
 | Status                | `todo`                                                                                               |
 | Branch                | `main`                                                                                               |
-| Last updated          | 2026-10-27 (I20 finished, M3 reached)                                                                |
+| Last updated          | 2026-11-02 (AI studio demo track, ADR-056)                                                           |
 | Blockers              | None. Owner input welcome on ADR-008, ADR-009, ADR-010, ADR-011; please confirm ADR-021 (SeaweedFS). |
 
 ## Status legend
@@ -102,12 +102,14 @@ _(Claude lists here any Open ADR it resolved with a default while the owner was 
 
 - ADR-021 — object storage: SeaweedFS chosen by default (2026-10-22, I02).
 - ADR-017 — organization + one default workspace; workspace UI deferred (2026-10-23, I06).
+- ADR-056 — AI studio defaults: Gemini `gemini-2.5-flash` / `gemini-2.5-flash-image`, OpenAI `gpt-4.1-mini` / `gpt-image-1` (env-configurable), daily cap 300 requests per organization (2026-11-02).
 - ADR-015 — Zustand 5.0.15 for editor state accepted by default (2026-10-27, I15).
 
 ## Deviations from plan
 
 _(date — iteration — what changed — why — ADR link)_
 
+- 2026-11-02 — demo track (owner request) — AI analyzer, component library reuse, pattern pieces, tech pack generator + PDF built ahead of I21–I44 with simplified preflight (daily cap instead of credits), polling instead of SSE, worker writes AI tables directly — ADR-056
 - 2026-10-27 — I20 — server-run validation after each save (no separate client pass), operation router does not call the engine, findings never block, org-scoped routes, 5 working-copy runs kept — ADR-055
 - 2026-10-27 — I19 — I12 APIs reused (change list from compare head→working), `classifyDiff` in garment-model, inspector as a workspace takeover, history as a right-panel tab — ADR-054
 - 2026-10-27 — I18 — web-side compatibility hints, Parts/Library tabs only, component values proposed on attach, placement patch with rotation/scale, inline SVG previews for saved components — ADR-053
@@ -131,6 +133,19 @@ _(date — iteration — what changed — why — ADR link)_
 ## Session log
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
+
+### 2026-11-02 — AI studio demo track (owner request) — DONE
+
+- Request: present the complete flow — Component 1 (AI design analyzer + component library reuse), editor integration (garment + pattern views), Component 3 (tech pack generator). Owner chose Gemini + OpenAI, shirts/T-shirts + generic families, in-app page + PDF.
+- Built: `packages/ai` (provider interface; Gemini, OpenAI, fake), `packages/design-ai` (decomposition, attribute/geometry library matching, detail pass only for new parts, design-state builder, tech pack document + printable HTML), `packages/pattern-model` (provisional parametric pattern pieces, SVG sheets); garment-model pattern pieces/sources, five more garment templates; op `replace_pattern_pieces`; API modules `ai`, `analysis`, `techpacks`; worker jobs `design.analysis`, `techpack.generate` (crops, AI images, PDF via Chromium); web: New design with AI, review page, editor Garment/Patterns/Reference views + Visual & pattern section + Tech pack button, tech pack page. Docs: ADR-056, `docs/architecture/ai-studio.md`.
+- Tests: unit (ai 6, design-ai 6, pattern-model 5, garment-model 140, design-operations 23), integration `ai-studio` + tenant isolation fixtures, e2e `ai-studio.spec.ts` (full flow through the worker incl. library reuse).
+- **Owner actions (Windows):**
+  1. `pnpm install` (new workspace packages; `sharp`, `playwright-core` in the worker).
+  2. **`pnpm db:migrate`** — migration `…_demo_ai_studio` (tables `design_analyses`, `tech_packs`, `ai_usage_records`; artifact categories).
+  3. Add to `.env` (see `.env.example`): `AI_PROVIDER=gemini` (or `openai`, or `fake` for an offline demo), `GEMINI_API_KEY=…` and/or `OPENAI_API_KEY=…`; optional model overrides `GEMINI_TEXT_MODEL`, `GEMINI_IMAGE_MODEL`, `OPENAI_TEXT_MODEL`, `OPENAI_IMAGE_MODEL`; `AI_DAILY_REQUEST_LIMIT=300`.
+  4. For PDFs: `pnpm e2e:install` once (Chromium), or set `PDF_CHROMIUM_PATH` to a Chrome/Chromium executable.
+  5. `pnpm dev` → project → Designs → **New design with AI** → upload sketch/photo/pattern/fabric → Analyze → review → Create design → editor (Patterns view, Visual & pattern) → **Tech pack** → Download PDF.
+- **Next step:** I21 — generation job management & progress (SSE) (polling in the AI studio can move to SSE then).
 
 ### 2026-10-27 — I20 Design validation engine & findings UI (session 1) — DONE, **M3 reached**
 

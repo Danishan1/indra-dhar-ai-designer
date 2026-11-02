@@ -13,6 +13,10 @@ export const JobKinds = {
   systemNoop: 'system.noop',
   /** Check, scan and derive variants of an uploaded asset (I09). */
   assetProcess: 'asset.process',
+  /** AI design analyzer: decompose uploaded images into a structured garment (ADR-056). */
+  designAnalysis: 'design.analysis',
+  /** AI tech pack generation from a design revision (ADR-056). */
+  techPackGenerate: 'techpack.generate',
 } as const;
 export type JobKind = (typeof JobKinds)[keyof typeof JobKinds] | (string & {});
 

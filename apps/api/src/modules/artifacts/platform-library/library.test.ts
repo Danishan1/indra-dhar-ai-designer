@@ -29,7 +29,18 @@ describe('built-in artifact library (FR-050, ADR-008)', () => {
 
   it('covers every category used by the shirt and T-shirt templates', () => {
     const categories = new Set(PLATFORM_LIBRARY.map((s) => s.category));
-    for (const c of Object.keys(ArtifactCategories))
+    // Categories filled by the AI design analyzer from the organization's own garments (ADR-056).
+    const learned = new Set([
+      'body_panel',
+      'collar_stand',
+      'yoke',
+      'waistband',
+      'skirt_panel',
+      'leg_panel',
+      'hood',
+      'component',
+    ]);
+    for (const c of Object.keys(ArtifactCategories).filter((k) => !learned.has(k)))
       expect(categories.has(c as never), c).toBe(true);
   });
 

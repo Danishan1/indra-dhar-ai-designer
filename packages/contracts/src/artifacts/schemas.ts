@@ -22,6 +22,14 @@ export const ArtifactCategoryKeys = [
   'embroidery',
   'button',
   'artwork',
+  'body_panel',
+  'collar_stand',
+  'yoke',
+  'waistband',
+  'skirt_panel',
+  'leg_panel',
+  'hood',
+  'component',
 ] as const;
 export const artifactCategorySchema = z.enum(ArtifactCategoryKeys);
 export type ArtifactCategoryKey = z.infer<typeof artifactCategorySchema>;

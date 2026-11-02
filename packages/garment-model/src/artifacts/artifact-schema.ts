@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { geometryRefSchema } from '../schema/component.js';
+import { patternPieceSchema } from '../schema/pattern.js';
 import {
   propertyKeySchema,
   propertyValueSchema,
@@ -27,6 +28,15 @@ export const ArtifactCategories = {
   embroidery: 'EMB',
   button: 'BTN',
   artwork: 'ART',
+  // Component library entries made by the AI analyzer (ADR-056).
+  body_panel: 'BDY',
+  collar_stand: 'CST',
+  yoke: 'YOK',
+  waistband: 'WBD',
+  skirt_panel: 'SKT',
+  leg_panel: 'LEG',
+  hood: 'HOD',
+  component: 'GEN',
 } as const;
 export type ArtifactCategory = keyof typeof ArtifactCategories;
 export const ARTIFACT_CATEGORY_KEYS = Object.keys(ArtifactCategories) as ArtifactCategory[];
@@ -100,6 +110,26 @@ export const artifactDefinitionSchema = z.object({
   geometryRefs: z.array(geometryRefSchema).default([]),
   /** 3D model asset (I36). */
   model3dRef: z.string().max(200).nullable().default(null),
+  /**
+   * Component library (ADR-056): what the analyzer compares a newly identified component with
+   * (type, attributes such as `collar_type: spread`, rough dimensions in mm).
+   */
+  matchSignature: z
+    .object({
+      componentType: componentTypeKey,
+      attributes: z.record(z.string().max(60), z.string().max(80)).default({}),
+      dimensionsMm: z.record(z.string().max(60), z.number().finite()).default({}),
+    })
+    .optional(),
+  /** Flat pattern pieces of the component (componentId is replaced when used). */
+  patternPieces: z.array(patternPieceSchema).max(20).optional(),
+  /** Construction notes and description gathered when the entry was created. */
+  details: z
+    .object({
+      description: z.string().max(2000).default(''),
+      constructionNotes: z.array(z.string().max(400)).max(20).default([]),
+    })
+    .optional(),
 });
 export type ArtifactDefinition = z.infer<typeof artifactDefinitionSchema>;
 export type ArtifactDefinitionInput = z.input<typeof artifactDefinitionSchema>;

@@ -15,10 +15,11 @@ export const IdPrefixes = {
   relationship: 'rel',
   constraint: 'cst',
   binding: 'bnd',
+  pattern: 'pat',
 } as const;
 export type IdKind = keyof typeof IdPrefixes;
 
-export const ID_PATTERN = /^(cmp|rel|cst|bnd)_[a-z0-9]{8,32}$/;
+export const ID_PATTERN = /^(cmp|rel|cst|bnd|pat)_[a-z0-9]{8,32}$/;
 
 /** Unbiased: bytes ≥ 252 (the largest multiple of 36 below 256) are rejected. */
 export function createId(kind: IdKind, randomBytes: RandomBytes = defaultRandomBytes): string {
@@ -37,6 +38,7 @@ export const createComponentId = (r?: RandomBytes) => createId('component', r);
 export const createRelationshipId = (r?: RandomBytes) => createId('relationship', r);
 export const createConstraintId = (r?: RandomBytes) => createId('constraint', r);
 export const createBindingId = (r?: RandomBytes) => createId('binding', r);
+export const createPatternPieceId = (r?: RandomBytes) => createId('pattern', r);
 
 /** Deterministic generator for tests and fixtures: `cmp_000000000001`, `cmp_000000000002`, … */
 export function sequentialRandomBytes(): RandomBytes {

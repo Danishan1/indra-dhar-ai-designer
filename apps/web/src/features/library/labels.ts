@@ -13,6 +13,14 @@ export const CATEGORY_LABELS: Record<ArtifactCategoryKey, string> = {
   embroidery: 'Embroidery',
   button: 'Buttons',
   artwork: 'Artwork',
+  body_panel: 'Body panels',
+  collar_stand: 'Collar stands',
+  yoke: 'Yokes',
+  waistband: 'Waistbands',
+  skirt_panel: 'Skirt panels',
+  leg_panel: 'Trouser legs',
+  hood: 'Hoods',
+  component: 'Other components',
 };
 
 export const SCOPE_LABELS: Record<Artifact['ownerScope'], string> = {

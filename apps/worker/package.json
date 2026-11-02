@@ -25,13 +25,20 @@
     "vitest": "5.0.5"
   },
   "dependencies": {
+    "@ai-designer/ai": "workspace:*",
     "@ai-designer/contracts": "workspace:*",
     "@ai-designer/db": "workspace:*",
+    "@ai-designer/design-ai": "workspace:*",
+    "@ai-designer/garment-model": "workspace:*",
+    "@ai-designer/garment-render": "workspace:*",
     "@ai-designer/logger": "workspace:*",
     "@ai-designer/media": "workspace:*",
+    "@ai-designer/pattern-model": "workspace:*",
     "bullmq": "6.4.0",
     "ioredis": "6.0.0",
     "pino": "10.4.0",
+    "playwright-core": "1.64.0",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   }
 }

@@ -36,7 +36,6 @@ import { queryKeys } from '@/lib/query/keys';
 import { cn } from '@/lib/utils';
 
 import { editorApi } from './api';
-import { GarmentCanvas } from './canvas/garment-canvas';
 import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
 import { SaveStatusChip } from './components/save-status';
@@ -58,6 +57,8 @@ import {
   selectUndoLabel,
 } from './store';
 import { EditorStoreProvider, useEditor, useEditorStore } from './store-context';
+import { StudioViewport } from './studio/studio-viewport';
+import { TechPackButton } from './studio/techpack-button';
 import { ValidationProvider } from './validation/validation-context';
 import { ValidationPanel, ValidationTabCount } from './validation/validation-panel';
 
@@ -135,7 +136,7 @@ function Editor() {
         tools={<EditorTools />}
         hierarchy={<LeftPanelContent />}
         hierarchyHeader={<LeftPanelTabs />}
-        viewport={<GarmentCanvas />}
+        viewport={<StudioViewport />}
         properties={<RightPanelContent />}
         propertiesHeader={<RightPanelTabs />}
         takeover={inspect ? <RevisionInspector inspect={inspect} /> : undefined}
@@ -232,6 +233,7 @@ function EditorHeader() {
       ) : null}
       <div className="ml-auto flex items-center gap-2">
         <SaveStatusConnected />
+        <TechPackButton />
         <CommitButton />
       </div>
     </>

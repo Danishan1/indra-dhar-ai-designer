@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { sourceRegionSchema } from './pattern.js';
 import { coordinateSpaceSchema } from './placement.js';
 import { propertyKeySchema, propertyValueSchema } from './property-value.js';
 
@@ -52,6 +53,8 @@ export const designComponentSchema = z.looseObject({
   geometryRefs: z.array(geometryRefSchema).default([]),
   assetRefs: z.array(assetRefSchema).default([]),
   tags: z.array(z.string().trim().min(1).max(40)).max(30).default([]),
+  /** Where the component appears in a source image (AI analysis, ADR-056). */
+  sourceRegion: sourceRegionSchema.optional(),
   /** Editor-only flags: not physical properties, excluded from semantic diff/hash (FR-EDT-024). */
   visible: z.boolean().default(true),
   locked: z.boolean().default(false),

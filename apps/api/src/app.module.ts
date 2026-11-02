@@ -1,5 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 
+import { AiModule } from './modules/ai/ai.module.js';
+import { AnalysisModule } from './modules/analysis/analysis.module.js';
 import { ArtifactsModule } from './modules/artifacts/artifacts.module.js';
 import { AssetsModule } from './modules/assets/assets.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -10,6 +12,7 @@ import { IdentityModule } from './modules/identity/identity.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
 import { OrganizationsModule } from './modules/organizations/organizations.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
+import { TechPacksModule } from './modules/techpacks/techpacks.module.js';
 import { ValidationModule } from './modules/validation/validation.module.js';
 import { type AppConfig } from './platform/config/app-config.js';
 import { AppConfigModule } from './platform/config/config.module.js';
@@ -36,6 +39,9 @@ const FEATURE_MODULES: DynamicModule['imports'] = [
   ArtifactsModule,
   OperationsModule,
   ValidationModule,
+  AiModule,
+  AnalysisModule,
+  TechPacksModule,
   OrganizationsModule,
 ];
 

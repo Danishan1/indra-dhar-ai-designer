@@ -26,12 +26,18 @@ importers:
 
   apps/api:
     dependencies:
+      '@ai-designer/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@ai-designer/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@ai-designer/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ai-designer/design-ai':
+        specifier: workspace:*
+        version: link:../../packages/design-ai
       '@ai-designer/design-operations':
         specifier: workspace:*
         version: link:../../packages/design-operations
@@ -47,6 +53,9 @@ importers:
       '@ai-designer/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@ai-designer/pattern-model':
+        specifier: workspace:*
+        version: link:../../packages/pattern-model
       '@nestjs/common':
         specifier: 12.2.0
         version: 12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -144,6 +153,9 @@ importers:
       '@ai-designer/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ai-designer/design-ai':
+        specifier: workspace:*
+        version: link:../../packages/design-ai
       '@ai-designer/design-operations':
         specifier: workspace:*
         version: link:../../packages/design-operations
@@ -159,6 +171,9 @@ importers:
       '@ai-designer/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@ai-designer/pattern-model':
+        specifier: workspace:*
+        version: link:../../packages/pattern-model
       '@hookform/resolvers':
         specifier: 5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(effect@3.20.0)(react-hook-form@7.89.0(@types/react@19.3.0)(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
@@ -271,18 +286,33 @@ importers:
 
   apps/worker:
     dependencies:
+      '@ai-designer/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@ai-designer/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@ai-designer/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ai-designer/design-ai':
+        specifier: workspace:*
+        version: link:../../packages/design-ai
+      '@ai-designer/garment-model':
+        specifier: workspace:*
+        version: link:../../packages/garment-model
+      '@ai-designer/garment-render':
+        specifier: workspace:*
+        version: link:../../packages/garment-render
       '@ai-designer/logger':
         specifier: workspace:*
         version: link:../../packages/logger
       '@ai-designer/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@ai-designer/pattern-model':
+        specifier: workspace:*
+        version: link:../../packages/pattern-model
       bullmq:
         specifier: 6.4.0
         version: 6.4.0(ioredis@6.0.0)(pg@8.23.1)
@@ -292,6 +322,12 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      playwright-core:
+        specifier: 1.64.0
+        version: 1.64.0
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@24.19.2)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -314,6 +350,31 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/ai:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@ai-designer/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -416,6 +477,40 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/design-ai:
+    dependencies:
+      '@ai-designer/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@ai-designer/garment-model':
+        specifier: workspace:*
+        version: link:../garment-model
+      '@ai-designer/garment-render':
+        specifier: workspace:*
+        version: link:../garment-render
+      '@ai-designer/pattern-model':
+        specifier: workspace:*
+        version: link:../pattern-model
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@ai-designer/config':
+        specifier: workspace:*
+        version: link:../config
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -614,6 +709,28 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@24.19.2)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/pattern-model:
+    dependencies:
+      '@ai-designer/garment-model':
+        specifier: workspace:*
+        version: link:../garment-model
+    devDependencies:
+      '@ai-designer/config':
+        specifier: workspace:*
+        version: link:../config
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@24.19.2)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/test-utils:
     devDependencies:

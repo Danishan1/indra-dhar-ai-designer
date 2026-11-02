@@ -65,6 +65,7 @@ export async function startWorker(
         buckets: { originals: env.S3_BUCKET_ORIGINALS, derived: env.S3_BUCKET_DERIVED },
         maxPixels: env.ASSET_MAX_PIXELS,
       },
+      aiStudio: env.PDF_CHROMIUM_PATH ? { pdfChromiumPath: env.PDF_CHROMIUM_PATH } : {},
     }),
     workerId: env.WORKER_ID,
     logger,

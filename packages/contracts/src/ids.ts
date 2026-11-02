@@ -25,6 +25,18 @@ export const DisplayIdPrefixes = {
   embroidery: 'EMB',
   button: 'BTN',
   artwork: 'ART',
+  // Component library categories (ADR-056)
+  body_panel: 'BDY',
+  collar_stand: 'CST',
+  yoke: 'YOK',
+  waistband: 'WBD',
+  skirt_panel: 'SKT',
+  leg_panel: 'LEG',
+  hood: 'HOD',
+  genericComponent: 'GEN',
+  // AI design analyzer and tech packs (ADR-056)
+  analysis: 'ANL',
+  techPack: 'TPK',
 } as const;
 
 export type DisplayIdPrefix = (typeof DisplayIdPrefixes)[keyof typeof DisplayIdPrefixes];
@@ -42,6 +54,14 @@ const PAD: Partial<Record<string, number>> = {
   EMB: 4,
   BTN: 4,
   ART: 4,
+  BDY: 4,
+  CST: 4,
+  YOK: 4,
+  WBD: 4,
+  SKT: 4,
+  LEG: 4,
+  HOD: 4,
+  GEN: 4,
 };
 
 /** `formatDisplayId('PRJ', 123)` → `PRJ-000123`; artifact prefixes use 4 digits (`SLV-0007`). */

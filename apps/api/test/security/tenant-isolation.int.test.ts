@@ -1,3 +1,4 @@
+import { newId } from '@ai-designer/db';
 import {
   checkTenantIsolation,
   createTenant,
@@ -10,6 +11,7 @@ import type { Redis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AUTHZ_METADATA, type AuthzDeclaration } from '../../src/platform/authz/decorators.js';
+import { PrismaService } from '../../src/platform/prisma/prisma.service.js';
 import { REDIS } from '../../src/platform/redis/redis.module.js';
 import { startTestApp } from '../integration/app-factory.js';
 
@@ -34,6 +36,11 @@ const BODIES: Record<string, unknown> = {
     actions: ['project.view'],
   },
   'POST /v1/orgs/:orgId/projects': { name: 'Isolation probe' },
+  'POST /v1/orgs/:orgId/projects/:projectId/analyses': {
+    inputs: [{ assetId: '0197b0a0-0000-7000-8000-000000000000', role: 'sketch' }],
+  },
+  'POST /v1/orgs/:orgId/analyses/:analysisId/design': { name: 'Probe' },
+  'POST /v1/orgs/:orgId/designs/:designId/techpacks': {},
   'POST /v1/orgs/:orgId/projects/:projectId/designs': { name: 'Probe design' },
   'POST /v1/orgs/:orgId/designs/:designId/operations': {
     expectedVersion: 1,
@@ -89,6 +96,8 @@ describe('cross-tenant isolation', () => {
   const artifacts = new Map<string, { id: string; currentRevisionId: string }>();
   const operationIds = new Map<string, string>();
   const runIds = new Map<string, string>();
+  const analysisIds = new Map<string, string>();
+  const techPackIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -102,7 +111,42 @@ describe('cross-tenant isolation', () => {
     artifactRevisionId: artifacts.get(t.orgId)?.currentRevisionId ?? '',
     operationId: operationIds.get(t.orgId) ?? '',
     runId: runIds.get(t.orgId) ?? '',
+    analysisId: analysisIds.get(t.orgId) ?? '',
+    techPackId: techPackIds.get(t.orgId) ?? '',
   });
+
+  /** AI studio rows are inserted directly (creating them needs processed images / the worker). */
+  async function startAiStudio(t: TenantFixture): Promise<void> {
+    const prisma = app.get(PrismaService);
+    const analysisId = newId();
+    await prisma.designAnalysis.create({
+      data: {
+        id: analysisId,
+        organizationId: t.orgId,
+        projectId: projectIds.get(t.orgId)!,
+        displayId: `ANL-${analysisId.slice(-6)}`,
+        status: 'succeeded',
+        inputs: [],
+        provider: 'fake',
+        result: {},
+      },
+    });
+    analysisIds.set(t.orgId, analysisId);
+    const techPackId = newId();
+    const design = designs.get(t.orgId)!;
+    await prisma.techPack.create({
+      data: {
+        id: techPackId,
+        organizationId: t.orgId,
+        designId: design.id,
+        revisionId: design.headRevisionId,
+        displayId: `TPK-${techPackId.slice(-6)}`,
+        status: 'queued',
+        provider: 'fake',
+      },
+    });
+    techPackIds.set(t.orgId, techPackId);
+  }
 
   async function startArtifact(t: TenantFixture): Promise<void> {
     const res = await t.owner.client.post(`/v1/orgs/${t.orgId}/artifacts`, {
@@ -170,6 +214,8 @@ describe('cross-tenant isolation', () => {
     await startUpload(b);
     await startArtifact(a);
     await startArtifact(b);
+    await startAiStudio(a);
+    await startAiStudio(b);
   }, 120_000);
 
   afterAll(async () => {
@@ -203,7 +249,7 @@ describe('cross-tenant isolation', () => {
   it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
       routes: routes.filter((r) =>
-        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId/.test(
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId|:analysisId|:techPackId/.test(
           r.path,
         ),
       ),

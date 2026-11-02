@@ -40,6 +40,17 @@ const TSHIRT = {
   'dimension.neckline_width': r([150, 260], [90, 400]),
 } as const;
 
+/** Lower-body measurements (added with the demo-track garment families, ADR-056). */
+const LOWER = {
+  'dimension.waist_width': r([300, 520], [200, 800]),
+  'dimension.hip_width': r([380, 620], [250, 900]),
+  'dimension.inseam': r([600, 880], [150, 1100]),
+  'dimension.leg_opening': r([150, 280], [80, 500]),
+  'dimension.skirt_length': r([400, 1100], [200, 1500]),
+  'dimension.waistband_height': r([25, 60], [10, 150]),
+  'dimension.collar_stand_height': r([20, 40], [8, 80]),
+} as const;
+
 /**
  * `design-structure@1.0.0` (I20): the platform constraint set for every garment type. Versions are
  * permanent — a behaviour change means a new version, so old runs stay repeatable (CST-004).
@@ -61,7 +72,15 @@ export const DESIGN_STRUCTURE_V1: ConstraintSet = Object.freeze({
     approximatePlacement,
     unconfirmedCritical,
   ]),
-  ranges: Object.freeze({ shirt: SHIRT, tshirt: TSHIRT }),
+  ranges: Object.freeze({
+    shirt: SHIRT,
+    tshirt: TSHIRT,
+    jacket: SHIRT,
+    hoodie: TSHIRT,
+    dress: { ...SHIRT, ...LOWER, 'dimension.body_length': r([800, 1400], [400, 1900]) },
+    skirt: LOWER,
+    trousers: LOWER,
+  }),
 });
 
 /** Every constraint set the platform knows, newest last per key. */

@@ -314,6 +314,9 @@ model Organization {
   artifactRevisions ArtifactRevision[]
   designOperations  DesignOperation[]
   validationRuns    ValidationRun[]
+  designAnalyses    DesignAnalysis[]
+  techPacks         TechPack[]
+  aiUsageRecords    AiUsageRecord[]
   validationFindings ValidationFinding[]
 
   @@map("organizations")
@@ -516,6 +519,7 @@ model Project {
   deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   designs          Design[]
+  analyses         DesignAnalysis[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, status, updatedAt])
@@ -602,6 +606,7 @@ model Design {
   revisions              DesignRevision[]
   operations             DesignOperation[]
   validationRuns         ValidationRun[]
+  techPacks              TechPack[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, projectId, updatedAt])
@@ -666,6 +671,7 @@ model DesignRevision {
   organization           Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   design                 Design        @relation(fields: [designId], references: [id], onDelete: Restrict)
   workingCopies          WorkingCopy[] @relation("WorkingCopyBase")
+  techPacks              TechPack[]
 
   @@unique([designId, revisionNumber])
   @@unique([organizationId, displayId])
@@ -878,4 +884,97 @@ model ValidationFinding {
   @@unique([runId, findingId])
   @@index([organizationId])
   @@map("validation_findings")
+}
+
+/// AI design analyzer run (Component 1, ADR-056): uploaded inputs → structured garment analysis,
+/// library matches and component crops; the user then creates a design from it.
+model DesignAnalysis {
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  projectId      String       @map("project_id") @db.Uuid
+  displayId      String       @map("display_id")
+  /// queued | running | succeeded | failed
+  status         String
+  /// Human progress text while running ("Checking the component library").
+  stage          String?
+  /// [{ assetId, role, fileName }]
+  inputs         Json
+  notes          String?
+  garmentHint    String?      @map("garment_hint")
+  audience       String?
+  /// gemini | openai | fake (chosen when created)
+  provider       String
+  jobId          String?      @map("job_id") @db.Uuid
+  /// AnalysisResult (decomposition, details, matches…)
+  result         Json?
+  /// component key → crop asset id
+  crops          Json         @default("{}")
+  error          Json?
+  /// Design created from this analysis.
+  designId       String?      @map("design_id") @db.Uuid
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime?    @map("completed_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, projectId, createdAt])
+  @@index([projectId])
+  @@map("design_analyses")
+}
+
+/// Generated tech pack (Component 3, ADR-056): always for one immutable design revision.
+model TechPack {
+  id             String         @id @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  designId       String         @map("design_id") @db.Uuid
+  revisionId     String         @map("revision_id") @db.Uuid
+  displayId      String         @map("display_id")
+  /// queued | running | succeeded | failed
+  status         String
+  stage          String?
+  provider       String
+  /// { modelImages: boolean, … }
+  options        Json           @default("{}")
+  jobId          String?        @map("job_id") @db.Uuid
+  /// TechPackDocument
+  document       Json?
+  pdfAssetId     String?        @map("pdf_asset_id") @db.Uuid
+  error          Json?
+  createdBy      String?        @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(6)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design         Design         @relation(fields: [designId], references: [id], onDelete: Restrict)
+  revision       DesignRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, designId, createdAt])
+  @@index([designId])
+  @@index([revisionId])
+  @@map("tech_packs")
+}
+
+/// One AI provider call (ADR-056): simple usage log and daily preflight until metering (I24).
+model AiUsageRecord {
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  jobId          String?      @map("job_id") @db.Uuid
+  provider       String
+  model          String
+  task           String
+  inputTokens    Int?         @map("input_tokens")
+  outputTokens   Int?         @map("output_tokens")
+  images         Int          @default(0)
+  latencyMs      Int          @default(0) @map("latency_ms")
+  /// succeeded | failed | outcome_unknown
+  outcome        String
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@map("ai_usage_records")
 }

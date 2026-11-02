@@ -13,4 +13,11 @@ export interface GarmentCategoryDef {
 export const GARMENT_CATEGORIES: readonly GarmentCategoryDef[] = Object.freeze([
   { key: 'woven_shirt', label: 'Woven shirt', garmentType: 'shirt', fabricBase: 'woven' },
   { key: 'knit_tshirt', label: 'Knit T-shirt', garmentType: 'tshirt', fabricBase: 'knit' },
+  // Demo track (ADR-056): further families recognised by the AI analyzer. They have no parametric
+  // drawing yet; the editor shows their reference image with AI-identified parts and patterns.
+  { key: 'dress', label: 'Dress', garmentType: 'dress', fabricBase: 'woven' },
+  { key: 'skirt', label: 'Skirt', garmentType: 'skirt', fabricBase: 'woven' },
+  { key: 'trousers', label: 'Trousers', garmentType: 'trousers', fabricBase: 'woven' },
+  { key: 'jacket', label: 'Jacket', garmentType: 'jacket', fabricBase: 'woven' },
+  { key: 'hoodie', label: 'Hoodie / sweatshirt', garmentType: 'hoodie', fabricBase: 'knit' },
 ]);

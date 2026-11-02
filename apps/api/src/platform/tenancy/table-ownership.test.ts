@@ -37,6 +37,10 @@ const OWNERS: Record<string, string | string[]> = {
   constraintSet: 'modules/validation',
   validationRun: 'modules/validation',
   validationFinding: 'modules/validation',
+  // ADR-056: the worker (apps/worker) also writes these three while running AI jobs.
+  designAnalysis: 'modules/analysis',
+  techPack: 'modules/techpacks',
+  aiUsageRecord: 'modules/ai',
 };
 
 /** Dev-only scripts that look rows up read-only; all their writes go through module services. */

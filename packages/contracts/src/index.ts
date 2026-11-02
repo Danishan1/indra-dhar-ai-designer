@@ -20,3 +20,4 @@ export * from './value-status.js';
 export * from './artifacts/index.js';
 export * from './operations/index.js';
 export * from './validation/index.js';
+export * from './studio/index.js';
