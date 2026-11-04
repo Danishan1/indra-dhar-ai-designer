@@ -46,10 +46,14 @@ import {
   reconstructionSvg,
   DEFAULT_PRESENTATION,
   type Presentation,
+  readSketch,
+  patternDescription,
+  patternSection,
 } from '@ai-designer/design-ai';
 import {
   canonicalJson,
   type GarmentDesignState,
+  type PatternAudience,
   type PropertyValue,
   readAnyVersion,
   sha256Hex,
@@ -429,6 +433,38 @@ export function designAnalysisHandler(deps: AiStudioDeps): JobHandler {
         }),
         stage,
       });
+      if (row.mode === 'sketch') {
+        // ADR-058: the AI reads the sketch; patterns are drafted by the engine when the user confirms.
+        const audience = ['women', 'men', 'girls', 'boys'].includes(row.audience ?? '')
+          ? (row.audience as PatternAudience)
+          : null;
+        const sketch = await readSketch(
+          {
+            images: images.map((i) => i.image),
+            garmentHint: row.garmentHint,
+            audience,
+            size: row.size,
+            notes: row.notes,
+          },
+          { provider, progress: stage },
+        );
+        await prisma.designAnalysis.update({
+          where: { id: row.id },
+          data: {
+            status: 'succeeded',
+            stage: null,
+            result: JSON.parse(
+              JSON.stringify({
+                ...sketch,
+                imageSizes: loaded.map((l) => (l ? { width: l.width, height: l.height } : null)),
+                processing: { chains: provider.chains, history: provider.history },
+              }),
+            ) as object,
+            completedAt: new Date(),
+          },
+        });
+        return { family: sketch.spec.family, size: sketch.spec.size };
+      }
       const result = await analyzeDesign(
         { images, notes: row.notes, garmentHint: row.garmentHint, audience: row.audience },
         { provider, library, progress: stage },
@@ -660,7 +696,8 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
           kind: 'reconstruction',
           svg: v.svg,
         }));
-      const flats = technicalFlats(state);
+      const patternFirst = !!state.patternSpec;
+      const flats = patternFirst ? [] : technicalFlats(state);
       // Original uploads: references for the document and the image model.
       const references: TechPackImage[] = [];
       let original: AiImageInput | null = null;
@@ -705,7 +742,12 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
           await provider.generateStructured({
             task: 'techpack_text',
             system: ANALYST_SYSTEM,
-            prompt: techPackTextPrompt({ state, summary: designSummary(state, artifacts) }),
+            prompt: techPackTextPrompt({
+              state,
+              summary: patternFirst
+                ? { garment: patternDescription(state), pattern: patternSection(state) }
+                : designSummary(state, artifacts),
+            }),
             images: imageRefs,
             schema: techPackTextSchema,
             shapeHint: TECHPACK_TEXT_SHAPE,
@@ -715,7 +757,8 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
         ctx.logger.warn({ err, techPackId }, 'tech pack text failed; using generic steps');
       }
 
-      const description = designDescriptionForImages(state, artifacts);
+      // Pattern-first designs: the garment sewn from the patterns (the sketch only shows the look).
+      const description = patternDescription(state) ?? designDescriptionForImages(state, artifacts);
       const category = state.garmentCategory ?? '';
       const kinds: ImageKind[] = ['front', 'back'];
       if (['jacket', 'dress', 'hoodie', 'trousers'].includes(category)) kinds.push('side');

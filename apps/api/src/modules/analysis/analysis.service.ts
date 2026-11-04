@@ -14,9 +14,15 @@ import {
   type InputRole,
   libraryCategoryOf,
   normalizedAttributes,
+  type SketchAnalysis,
   type SourceImage,
 } from '@ai-designer/design-ai';
-import type { PropertyValue } from '@ai-designer/garment-model';
+import {
+  patternSpecSchema,
+  type PropertyValue,
+  validateDesignState,
+} from '@ai-designer/garment-model';
+import { draftPattern, patternDesignState } from '@ai-designer/pattern-model';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type { z } from 'zod';
 
@@ -140,7 +146,17 @@ export class AnalysisService implements OnModuleInit {
         );
       inputs.push({ assetId: asset.id, role: input.role, fileName: asset.fileName });
     }
-    const provider = await this.ai.preflight(ctx, body.provider, 2, ['garment_reconstruction']);
+    const sketch = body.mode === 'sketch';
+    if (sketch && body.inputs.length > 4)
+      throw new AppError('VALIDATION_FAILED', 'Upload one sketch (and up to 3 more views of it)', {
+        issues: [{ path: 'inputs', message: 'Too many images for a sketch', code: 'too_many' }],
+      });
+    const provider = await this.ai.preflight(
+      ctx,
+      body.provider,
+      sketch ? 1 : 2,
+      sketch ? ['image_analysis'] : ['garment_reconstruction'],
+    );
     const row = await this.prisma.$transaction(async (tx) => {
       const id = newId();
       const created = await tx.designAnalysis.create({
@@ -155,6 +171,8 @@ export class AnalysisService implements OnModuleInit {
           notes: body.notes ?? null,
           garmentHint: body.garmentHint ?? null,
           audience: body.audience ?? null,
+          mode: body.mode,
+          size: body.size ?? null,
           provider,
           createdBy: ctx.userId,
         },
@@ -193,6 +211,7 @@ export class AnalysisService implements OnModuleInit {
       throw new AppError('INVALID_STATE_TRANSITION', 'The analysis has not finished', {
         status: row.status,
       });
+    if (row.mode === 'sketch') return this.createPatternDesign(ctx, row, body);
     const result = row.result as unknown as AnalysisResult;
     const inputs = row.inputs as unknown as {
       assetId: string;
@@ -374,6 +393,68 @@ export class AnalysisService implements OnModuleInit {
     return { design, libraryEntriesCreated, fabricsCreated, notes: notes.slice(0, 30) };
   }
 
+  /**
+   * Sketch mode (ADR-058): the reviewed pattern spec → pattern engine → a pattern-first design whose
+   * pieces carry exact dimensions. The sketch stays as the reference image.
+   */
+  private async createPatternDesign(
+    ctx: AuthzContext,
+    row: AnalysisRow,
+    body: z.output<typeof createDesignFromAnalysisRequestSchema>,
+  ) {
+    const result = row.result as unknown as SketchAnalysis;
+    const parsed = patternSpecSchema.safeParse(body.patternSpec ?? result.spec);
+    if (!parsed.success)
+      throw new AppError('VALIDATION_FAILED', 'The pattern options are not valid', {
+        issues: parsed.error.issues.slice(0, 20).map((i) => ({
+          path: `patternSpec.${i.path.join('.')}`,
+          message: i.message,
+          code: i.code,
+        })),
+      });
+    const inputs = row.inputs as unknown as { assetId: string; fileName: string | null }[];
+    const draft = draftPattern(parsed.data);
+    const state = patternDesignState(draft, {
+      createdFrom: 'ai',
+      sources: inputs.map((i, n) => ({
+        assetId: i.assetId,
+        role: 'sketch' as const,
+        label: i.fileName ?? (n === 0 ? 'Sketch' : `View ${n + 1}`),
+      })),
+    });
+    state.metadata = {
+      garmentLabel: result.reading?.label ?? draft.rootName,
+      analysisId: row.id,
+      sketchDetails: result.reading?.details ?? [],
+    };
+    const issues = validateDesignState(state).findings.filter((f) => f.outcome === 'error');
+    if (issues.length)
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `The drafted pattern is not valid: ${issues[0]!.message}`,
+        {
+          issues: issues
+            .slice(0, 20)
+            .map((f) => ({ path: 'pattern', message: f.message, code: f.ruleId })),
+        },
+      );
+    const design = await this.designs.createFromState(ctx, row.projectId, {
+      name: body.name,
+      state,
+      summary: `Patterns drafted from a sketch (${row.displayId}, ${result.provider})`,
+    });
+    await this.prisma.designAnalysis.update({
+      where: { id: row.id },
+      data: { designId: design.id },
+    });
+    return {
+      design,
+      libraryEntriesCreated: 0,
+      fabricsCreated: 0,
+      notes: [...(result.notes ?? [])].slice(0, 30),
+    };
+  }
+
   private async find(ctx: AuthzContext, id: string): Promise<AnalysisRow> {
     const row = await this.prisma.designAnalysis.findFirst({
       where: { id, organizationId: ctx.organizationId },
@@ -394,6 +475,8 @@ export class AnalysisService implements OnModuleInit {
       notes: row.notes,
       garmentHint: row.garmentHint,
       audience: row.audience,
+      mode: row.mode === 'sketch' ? 'sketch' : 'images',
+      size: row.size,
       provider: row.provider as Analysis['provider'],
       result: (row.result as Record<string, unknown> | null) ?? null,
       crops: (row.crops as Record<string, string>) ?? {},

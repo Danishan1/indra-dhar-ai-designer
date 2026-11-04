@@ -3,10 +3,11 @@ import {
   type DesignComponent,
   type GarmentDesignState,
   outlineBounds,
+  type PatternMarking,
   type PatternPiece,
   shapePathD,
 } from '@ai-designer/garment-model';
-import { offsetOutline } from '@ai-designer/pattern-model';
+import { offsetOutline, pieceDimensions } from '@ai-designer/pattern-model';
 
 /**
  * Vector drawings for the tech pack (ADR-057), drawn from the final editable geometry — the source
@@ -110,6 +111,13 @@ export function pieceDetailSvg(piece: PatternPiece): string {
     ...piece.notches.map(
       (n) => `<circle cx="${f(n.x)}" cy="${f(n.y)}" r="${f(sw * 3)}" fill="#111827"/>`,
     ),
+    ...(piece.markings ?? []).map((m) => markingSvg(m, sw)),
+    ...pieceDimensions({ outline: piece.outline, edges: piece.edges ?? [] })
+      .edges.filter((e) => e.length > 25)
+      .map(
+        (e) =>
+          `<text x="${f(e.mid.x)}" y="${f(e.mid.y - sw * 4)}" font-size="${f(fs * 0.62)}" text-anchor="middle" fill="#1e40af" font-family="Helvetica, Arial, sans-serif">${esc(e.label)} ${e.length} mm</text>`,
+      ),
     // width dimension
     `<line x1="${f(b.x)}" y1="${f(dimY)}" x2="${f(b.x + b.width)}" y2="${f(dimY)}" stroke="#111827" stroke-width="${f(sw)}" marker-start="url(#dm)" marker-end="url(#dm)"/>`,
     `<text x="${f(b.x + b.width / 2)}" y="${f(dimY - 6)}" font-size="${f(fs)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">${Math.round(b.width)} mm</text>`,
@@ -122,4 +130,23 @@ export function pieceDetailSvg(piece: PatternPiece): string {
     `<text x="${f(b.x + b.width / 2)}" y="${f(b.y + b.height / 2 + fs * 1.3)}" font-size="${f(fs * 0.75)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#374151">Cut ${piece.cutQuantity}${piece.foldLine ? ' on fold' : ''}${piece.mirrored ? ' (pair)' : ''} · SA ${sa} mm · ${esc(piece.pieceId)}</text>`,
   ];
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0)} ${f(y0)} ${f(W)} ${f(H)}" data-width-mm="${f(W)}" data-height-mm="${f(H)}">${parts.join('')}</svg>`;
+}
+
+function markingSvg(m: PatternMarking, sw: number): string {
+  const pts = m.points.map((p) => `${f(p.x)},${f(p.y)}`).join(' ');
+  const p0 = m.points[0]!;
+  switch (m.kind) {
+    case 'button':
+      return `<circle cx="${f(p0.x)}" cy="${f(p0.y)}" r="${f(sw * 6)}" fill="none" stroke="#111827" stroke-width="${f(sw)}"/>`;
+    case 'buttonhole':
+      return `<line x1="${f(p0.x - sw * 9)}" y1="${f(p0.y)}" x2="${f(p0.x + sw * 9)}" y2="${f(p0.y)}" stroke="#111827" stroke-width="${f(sw * 2)}"/>`;
+    case 'dart':
+      return `<polyline points="${pts}" fill="none" stroke="#dc2626" stroke-width="${f(sw * 1.2)}"/>`;
+    case 'zip':
+      return `<polyline points="${pts}" fill="none" stroke="#0891b2" stroke-width="${f(sw * 3)}"/>`;
+    case 'gather':
+      return `<polyline points="${pts}" fill="none" stroke="#ea580c" stroke-width="${f(sw * 1.4)}" stroke-dasharray="${f(sw * 2)} ${f(sw * 3)}"/>`;
+    default:
+      return `<polyline points="${pts}" fill="none" stroke="#6b7280" stroke-width="${f(sw)}" stroke-dasharray="${f(sw * 5)} ${f(sw * 3)}"/>`;
+  }
 }

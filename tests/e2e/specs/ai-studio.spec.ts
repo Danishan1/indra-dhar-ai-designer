@@ -1,13 +1,13 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { createVerifiedAccount, resetRateLimits } from '../support/accounts.js';
-import { selectInTree } from '../support/editor.js';
 import { createOrganizationInOnboarding, submitSignIn } from '../support/ui.js';
 
 /**
- * The AI studio demo flow (ADR-056) with the offline fake provider (no real AI calls in tests):
- * images → analysis → review → structured design → editor (garment + pattern views) → tech pack.
- * The worker started by the Playwright config runs the analysis and tech pack jobs.
+ * The AI studio flow (ADR-058) with the offline fake provider (no real AI calls in tests):
+ * sketch → AI reading → pattern review → pattern editor (pieces with dimensions, sizes, style,
+ * resize) → commit → tech pack generated from the patterns. The worker started by the Playwright
+ * config runs the analysis and tech pack jobs.
  */
 
 // 96×64 PNG.
@@ -22,25 +22,7 @@ test.beforeEach(async () => {
   await resetRateLimits();
 });
 
-async function analyze(page: Page, projectUrl: string) {
-  await page.goto(projectUrl);
-  await page.getByRole('tab', { name: 'Designs' }).click();
-  await page.getByRole('link', { name: 'New design with AI' }).first().click();
-  await expect(page.getByRole('heading', { level: 1, name: 'New design with AI' })).toBeVisible();
-  const input = page.getByTestId('upload-dropzone').locator('input[type=file]');
-  await input.setInputFiles([
-    { name: 'shirt-sketch.png', mimeType: 'image/png', buffer: PNG },
-    { name: 'blue-fabric.png', mimeType: 'image/png', buffer: PNG },
-  ]);
-  await expect(page.getByTestId('analysis-input')).toHaveCount(2, { timeout: 45_000 });
-  await expect(page.getByLabel('What is blue-fabric.png?')).toContainText('Fabric swatch');
-  await page.getByTestId('analyze-button').click();
-  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible({
-    timeout: 60_000,
-  });
-}
-
-test('AI studio: images → analysis → design → patterns → tech pack (ADR-056)', async ({ page }) => {
+test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)', async ({ page }) => {
   test.setTimeout(240_000);
   const email = await createVerifiedAccount(undefined, 'Ava Studio');
   await page.goto('/sign-in');
@@ -51,103 +33,108 @@ test('AI studio: images → analysis → design → patterns → tech pack (ADR-
   await page.getByRole('dialog', { name: 'New project' }).getByLabel('Name').fill('AI demo');
   await page.getByRole('button', { name: 'Create project' }).click();
   await page.getByRole('tab', { name: 'Designs' }).waitFor();
-  const projectUrl = page.url();
 
-  // 1. Analyzer: components with images, estimates, library matches, fabrics.
-  await analyze(page, projectUrl);
-  const components = page.getByTestId('analysis-component');
-  expect(await components.count()).toBeGreaterThan(8);
-  // The built-in library already has a barrel cuff → reused, AI detail skipped.
-  const cuff = components.filter({ hasText: 'Left cuff' });
-  await expect(cuff.getByTestId('match-badge')).toHaveText(
-    'Exact library match · Barrel cuff, one button',
-  );
-  const stand = components.filter({ hasText: 'Collar stand' });
-  await expect(stand.getByTestId('match-badge')).toHaveText('New component');
-  await expect(cuff).toContainText('cuff width: 65 mm (est.)');
-  await expect(page.getByTestId('analysis-fabric')).toHaveCount(1);
-  await page.getByLabel('Use for Chest pocket').click();
-  await page.getByRole('option', { name: 'Leave it out' }).click();
-  await page.getByLabel('Design name').fill('AI oxford shirt');
-  await page.getByTestId('create-design-button').click();
+  // 1. Start from a sketch; the other starts are announced but not available yet.
+  await page.getByRole('tab', { name: 'Designs' }).click();
+  await page.getByRole('link', { name: 'New design with AI' }).first().click();
+  await expect(page.getByTestId('start-sketch')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('start-photo')).toBeDisabled();
+  await page
+    .getByTestId('upload-dropzone')
+    .locator('input[type=file]')
+    .setInputFiles([{ name: 'party-dress.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(page.getByTestId('analysis-input')).toHaveCount(1, { timeout: 45_000 });
+  await page.getByLabel('For').click();
+  await page.getByRole('option', { name: 'Girls' }).click();
+  await page.getByLabel('Size').click();
+  await page.getByRole('option', { name: '8y' }).click();
+  await page.getByTestId('analyze-button').click();
 
-  // 2. Editor: the editable reconstruction (vector artifacts), original, flat and patterns in sync.
-  const recon = page.getByTestId('reconstruction-view');
-  await expect(recon).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('heading', { level: 1, name: 'AI oxford shirt' })).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: 'Chest pocket', exact: true })).toHaveCount(0);
-  await expect(recon.locator('path[data-component-id]').first()).toBeVisible();
-  // Compare with the original upload.
-  await page.getByTestId('compare-side').click();
-  await expect(page.getByTestId('original-side')).toBeVisible();
-  await page.getByTestId('compare-off').click();
+  // 2. Review: what the AI read, options it set, live pattern preview with dimensions and checks.
+  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId('sketch-reading')).toContainText('Bow at the back waist');
+  const preview = page.getByTestId('pattern-preview');
+  await expect(preview.locator('[data-piece-name="Peter Pan collar"]')).toBeVisible();
+  await expect(
+    preview.locator('[data-piece-name="Bodice front"] [data-testid="piece-width"]'),
+  ).toContainText('cm');
+  await page.getByLabel('Skirt shape').click();
+  await page.getByRole('option', { name: 'Full circle' }).click();
+  await expect(preview.locator('[data-piece-name="Skirt front"]')).toBeVisible();
+  await page.getByLabel('Design name').fill('Party dress');
+  await page.getByTestId('create-patterns-button').click();
 
-  // Select the left cuff: shape + pattern; resizing the shape updates the measurement and pattern.
-  await selectInTree(page, 'Left cuff');
-  await expect(recon.getByTestId('shape-handles')).toBeVisible();
-  const shape = page.getByTestId('shape-section');
-  await expect(shape.getByTestId('shape-source').first()).toContainText(/Traced|template|guess/);
-  await page.getByTestId('view-patterns').click();
-  await page.getByTestId('patterns-selected').click();
-  const card = page.getByTestId('pattern-piece-card').first();
-  await expect(card).toBeVisible();
-  const before = await card.locator('span').nth(1).innerText();
-  const height = shape.getByTestId('shape-height').first();
-  const h0 = Number(await height.inputValue());
-  await height.fill(String(Math.round(h0 * 1.5)));
-  await height.press('Enter');
-  await expect(card.locator('span').nth(1)).not.toHaveText(before);
-  await expect(page.getByTestId('component-properties')).toContainText(/Cuff width/);
-  // Edit the pattern itself: seam allowance.
-  const sa = card.getByRole('spinbutton', { name: 'Seam allowance (mm)' });
-  await sa.fill('15');
-  await sa.press('Enter');
-  await expect(card).toContainText('Needs review');
-  await page.getByTestId('view-flat').click();
-  await page.getByTestId('garment-canvas').waitFor();
+  // 3. Pattern editor: pieces only, sketch on the side.
+  const workspace = page.getByTestId('pattern-workspace');
+  await expect(workspace).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'Party dress' })).toBeVisible();
+  await expect(page.getByTestId('reference-panel').locator('img')).toBeVisible();
+  expect(await page.getByTestId('piece-list-item').count()).toBeGreaterThan(6);
+  const canvas = page.getByTestId('pattern-canvas');
+  const backWidth = canvas.locator('[data-piece-name="Bodice back"] [data-testid="piece-width"]');
+  const w0 = (await backWidth.textContent()) ?? '';
 
-  // Commit so the tech pack documents the edited design.
+  // Change a body measurement: the pattern is redrafted.
+  await page.getByRole('tab', { name: 'Sizes' }).click();
+  const bust = page.getByTestId('body-bust');
+  await bust.fill(String(Number(await bust.inputValue()) + 8));
+  await bust.press('Enter');
+  await expect(backWidth).not.toHaveText(w0);
+
+  // Change a style option: parts are added / removed.
+  await page.getByRole('tab', { name: 'Style' }).click();
+  await page.getByLabel('Collar', { exact: true }).click();
+  await page.getByRole('option', { name: 'None' }).click();
+  await expect(
+    page.getByTestId('piece-list-item').filter({ hasText: 'Peter Pan collar' }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId('piece-list-item').filter({ hasText: 'Front neck facing' }),
+  ).toHaveCount(1);
+
+  // Resize one piece by hand: it is marked edited and kept on redrafts.
+  await page.getByTestId('piece-list-item').filter({ hasText: 'Sleeve band' }).click();
+  await page.getByRole('tab', { name: 'Piece' }).click();
+  const width = page.getByTestId('piece-input-width');
+  await width.fill('30');
+  await width.press('Enter');
+  await expect(
+    page.getByTestId('piece-list-item').filter({ hasText: 'Sleeve band' }),
+  ).toContainText('edited');
+  await expect(page.getByTestId('edited-banner')).toBeVisible();
+  await expect(
+    canvas.locator('[data-piece-name="Sleeve band"] [data-testid="piece-width"]'),
+  ).toHaveText('30.0 cm');
+  await expect(canvas.getByTestId('piece-handles')).toBeVisible();
+  await page.getByRole('tab', { name: 'Fit' }).click();
+  await expect(page.getByTestId('seam-checks')).toBeVisible();
+
+  // Commit so the tech pack documents the edited pattern.
   await page.getByTestId('commit-button').first().click();
   const commitDialog = page.getByRole('dialog', { name: 'Commit a new revision' });
   await commitDialog.getByRole('button', { name: 'Commit revision' }).click();
   await expect(commitDialog).toBeHidden();
   await expect(page.getByTestId('latest-revision-badge')).toHaveText('Latest R002');
 
-  // 3. Tech pack for the latest committed revision (R002, with the edits).
+  // 4. Tech pack generated from the patterns.
   await page.getByTestId('techpack-button').click();
-  await expect(page.getByTestId('presentation-presets')).toBeVisible();
   await page.getByTestId('generate-techpack').click();
   await expect(page.getByRole('heading', { level: 1, name: /^Tech pack/ })).toBeVisible();
-  const doc = page.getByTestId('techpack-document');
-  await expect(doc).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByTestId('techpack-document')).toBeVisible({ timeout: 120_000 });
   const frame = page.frameLocator('[data-testid="techpack-document"]');
-  await expect(frame.getByRole('heading', { name: 'Bill of materials' })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Pattern specification' })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Seam fit checks' })).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Flat patterns' })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: /Pattern piece — Bodice front/ })).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Original reference' })).toBeVisible();
-  await expect(frame.getByText('Garment — front (final geometry)')).toBeVisible();
-  await expect(frame.getByRole('heading', { name: /Pattern piece — Left cuff/ })).toBeVisible();
-  await expect(page.getByTestId('print-browser')).toBeVisible();
-  await expect(
-    frame.getByRole('heading', { name: 'Missing or unconfirmed information' }),
-  ).toBeVisible();
-  await expect(frame.getByRole('heading', { level: 1, name: 'AI oxford shirt' })).toBeVisible();
+  await expect(frame.getByText('Sleeve band', { exact: false }).first()).toBeVisible();
   if (process.env.PDF_CHROMIUM_PATH || process.env.E2E_EXPECT_PDF) {
-    await expect(page.getByTestId('download-pdf')).toBeVisible();
     const [file] = await Promise.all([
       page.waitForEvent('download'),
       page.getByTestId('download-pdf').click(),
     ]);
     expect(file.suggestedFilename()).toMatch(/^TPK-\d+-R002\.pdf$/);
   }
-
-  // 4. Library reuse: analysing the same garment again reuses the saved components (AI skipped).
-  await analyze(page, projectUrl);
-  await expect(
-    page
-      .getByTestId('analysis-component')
-      .filter({ hasText: 'Collar stand' })
-      .getByTestId('match-badge'),
-  ).toContainText('Exact library match');
-  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible();
-  await expect(page.getByText(/reused from the library/)).toContainText(/[1-9]\d* reused/);
 });

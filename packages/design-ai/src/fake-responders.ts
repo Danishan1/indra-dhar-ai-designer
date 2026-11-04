@@ -393,6 +393,84 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
       ],
     };
   },
+  sketch_reading: (req) => {
+    const hint = (/The user says it is: (.*)\.$/m.exec(req.prompt)?.[1] ?? '').toLowerCase();
+    const forWho = (/It is for: (.*)\.$/m.exec(req.prompt)?.[1] ?? '').toLowerCase();
+    const base = {
+      proportions: { lengthToShoulder: null, skirtToBodice: 1.5, sleeveToShoulder: null },
+      uncertain: ['Back view not shown'],
+      confidence: 0.75,
+    };
+    if (/trouser|pant|short/.test(hint))
+      return {
+        ...base,
+        family: 'trousers',
+        label: 'Straight trousers',
+        audience: forWho || 'women',
+        style: {
+          fit: 'regular',
+          leg: 'straight',
+          closure: 'fly_zip',
+          length: 'full',
+          pockets: 'side_seam',
+          waistband: true,
+        },
+        details: [],
+        description: 'Straight-leg trousers with a waistband and side pockets.',
+      };
+    if (/skirt/.test(hint))
+      return {
+        ...base,
+        family: 'skirt',
+        label: 'A-line skirt',
+        audience: forWho || 'women',
+        style: { skirt: 'a_line', length: 'knee', closure: 'side_zip', waistband: true },
+        details: [],
+        description: 'Knee-length A-line skirt with a waistband.',
+      };
+    if (/shirt|top|blouse|tee/.test(hint))
+      return {
+        ...base,
+        family: 'top',
+        label: "Men's shirt",
+        audience: forWho || 'men',
+        style: {
+          topType: 'shirt',
+          collar: 'shirt',
+          closure: 'front_buttons',
+          sleeve: 'long',
+          cuff: 'shirt',
+          yoke: true,
+          darts: false,
+          pockets: 'patch',
+          length: 'hip',
+        },
+        details: [],
+        description: 'Classic long-sleeve shirt with collar, yoke and cuffs.',
+      };
+    return {
+      ...base,
+      family: 'dress',
+      label: "Girls' puff-sleeve party dress",
+      audience: forWho || 'girls',
+      style: {
+        fit: 'regular',
+        neckline: 'round',
+        collar: 'peter_pan',
+        sleeve: 'short',
+        sleeveStyle: 'puff',
+        closure: 'back_zip',
+        waistSeam: true,
+        skirt: 'gathered',
+        length: null,
+        darts: false,
+        pockets: 'none',
+      },
+      details: ['Bow at the back waist'],
+      description:
+        'Party dress with a fitted bodice, Peter Pan collar, puff sleeves and a gathered skirt.',
+    };
+  },
   component_detail: (req) => ({
     details: [...req.prompt.matchAll(/^- ([a-z0-9_]+): /gm)].map((m) => ({
       key: m[1],

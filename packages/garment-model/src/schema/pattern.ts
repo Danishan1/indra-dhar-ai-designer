@@ -26,6 +26,32 @@ export type PatternStatus = z.infer<typeof patternStatusSchema>;
 
 const segmentSchema = z.object({ from: pointSchema, to: pointSchema });
 
+export const patternEdgeSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  from: z.number().int().min(0),
+  to: z.number().int().min(0),
+  intakeMm: z.number().min(0).max(2000).default(0),
+});
+export type PatternEdge = z.infer<typeof patternEdgeSchema>;
+
+export const PatternMarkingKinds = [
+  'dart',
+  'button',
+  'buttonhole',
+  'placement',
+  'gather',
+  'zip',
+  'pleat',
+  'fold',
+  'line',
+] as const;
+export const patternMarkingSchema = z.object({
+  kind: z.enum(PatternMarkingKinds),
+  points: z.array(pointSchema).min(1).max(80),
+  label: z.string().max(80).nullable().default(null),
+});
+export type PatternMarking = z.infer<typeof patternMarkingSchema>;
+
 export const patternPieceSchema = z.object({
   pieceId: z.string().regex(/^pat_[a-z0-9]{8,32}$/),
   componentId: z.string().regex(/^cmp_[a-z0-9]{8,32}$/),
@@ -55,6 +81,14 @@ export const patternPieceSchema = z.object({
     .nullable()
     .default(null),
   notes: z.array(z.string().max(300)).max(20).default([]),
+  /**
+   * Named seam edges as outline index ranges (pattern-first designs, ADR-058): `from` → `to`
+   * walking forward (wrapping). `intakeMm` is taken up when sewing (darts, gathers) so matching
+   * seams compare `length − intake`.
+   */
+  edges: z.array(patternEdgeSchema).max(40).optional(),
+  /** Sewing marks inside the piece: darts, buttons, gathers, zip, pleats, placement lines. */
+  markings: z.array(patternMarkingSchema).max(80).optional(),
 });
 export type PatternPiece = z.infer<typeof patternPieceSchema>;
 export type PatternPieceInput = z.input<typeof patternPieceSchema>;

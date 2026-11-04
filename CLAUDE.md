@@ -30,7 +30,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
 - `docs/architecture/editor.md` + `packages/editor-core/README.md` — **the editor workspace: Zustand store, optimistic changes (`apply`), autosave batches, conflicts, server-side undo/redo.**
 - `packages/garment-render/README.md` — **the 2D technical-flat renderer: coordinates (mm, origin CF neck), property→geometry mapping, placeholders, trims, `sceneToSvg`.**
 - `docs/architecture/validation.md` — **design-structure validation: engine and constraint sets in garment-model, runs/findings API, staleness, editor panel. Never production readiness.**
-- `docs/architecture/ai-studio.md` — **AI studio (ADR-056/057): editable vector reconstruction (component `shapes`), model discovery + capability routing + org keys (`packages/ai`, `packages/secrets`), analyzer + library reuse (`packages/design-ai`), pattern pieces (`packages/pattern-model`), tech packs + PDF, worker jobs.**
+- `docs/architecture/ai-studio.md` — **AI studio (ADR-056/057/058): pattern-first flow (sketch → AI reading → `pattern-model` drafting → pattern editor → tech pack), editable vector reconstruction (component `shapes`), model discovery + capability routing + org keys (`packages/ai`, `packages/secrets`), analyzer + library reuse (`packages/design-ai`), pattern pieces (`packages/pattern-model`), tech packs + PDF, worker jobs.**
 - `docs/architecture/frontend-guidelines.md` — **web conventions (folders, API client, query keys, tokens, shortcuts).** Read before writing UI; for Next.js APIs read `apps/web/node_modules/next/dist/docs/`.
 
 ## Default behaviour when the human says "continue" (or runs /next-iteration)

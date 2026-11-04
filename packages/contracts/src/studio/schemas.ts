@@ -36,8 +36,15 @@ export const createAnalysisRequestSchema = z.object({
     .max(10),
   notes: z.string().trim().max(1000).optional(),
   garmentHint: z.string().trim().max(120).optional(),
-  audience: z.enum(['men', 'women', 'kids', 'unisex']).optional(),
+  audience: z.enum(['men', 'women', 'kids', 'unisex', 'girls', 'boys']).optional(),
   provider: aiProviderNameSchema.optional(),
+  /**
+   * How the design starts (ADR-058): `sketch` = the AI reads a sketch and the pattern engine drafts
+   * editable flat patterns; `images` = the earlier component analysis.
+   */
+  mode: z.enum(['images', 'sketch']).default('images'),
+  /** Size chart entry for sketch mode (e.g. `M`, `6y`); default per audience. */
+  size: z.string().trim().min(1).max(20).optional(),
 });
 export type CreateAnalysisRequest = z.input<typeof createAnalysisRequestSchema>;
 
@@ -56,6 +63,8 @@ export const analysisSchema = z.object({
   notes: z.string().nullable(),
   garmentHint: z.string().nullable(),
   audience: z.string().nullable(),
+  mode: z.enum(['images', 'sketch']),
+  size: z.string().nullable(),
   provider: aiProviderNameSchema,
   /** `AnalysisResult` from `@ai-designer/design-ai` (decomposition, details, matches…). */
   result: z.record(z.string(), z.unknown()).nullable(),
@@ -78,6 +87,8 @@ export const createDesignFromAnalysisRequestSchema = z.object({
   fabricAssignments: z.record(z.string(), z.string().nullable()).default({}),
   /** Save newly identified components to the organization's library. */
   saveToLibrary: z.boolean().default(true),
+  /** Sketch mode: the pattern spec the user reviewed (validated by the API, ADR-058). */
+  patternSpec: z.record(z.string(), z.unknown()).optional(),
 });
 export type CreateDesignFromAnalysisRequest = z.input<typeof createDesignFromAnalysisRequestSchema>;
 

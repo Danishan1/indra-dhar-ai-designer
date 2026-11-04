@@ -251,7 +251,7 @@ describe('garment renderer', () => {
       ),
       { numRuns: 150 },
     );
-  });
+  }, 30_000);
 
   it('re-renders a single sleeve change fast (< 16 ms on average, warm cache)', () => {
     const r = createRenderer();

@@ -8,7 +8,7 @@ import type {
   TechPackSummary,
   WorkingCopy,
 } from '@ai-designer/contracts';
-import { analyzeDesign, fakeResponders } from '@ai-designer/design-ai';
+import { analyzeDesign, fakeResponders, readSketch } from '@ai-designer/design-ai';
 import type { GarmentDesignState } from '@ai-designer/garment-model';
 import { EicarTestScanner, processAsset } from '@ai-designer/media';
 import { createTenant, type TenantFixture } from '@ai-designer/test-utils';
@@ -250,6 +250,78 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
     expect((await other.owner.client.get(`/v1/orgs/${orgId}/techpacks/${summary.id}`)).status).toBe(
       404,
     );
+  });
+
+  it('sketch → AI reading → drafted pattern design with dimensions (ADR-058)', async () => {
+    const sketch = await uploadImage('party-dress.png', '#ffffff', 'sketch');
+    const res = await designer.post(`${org()}/projects/${project.id}/analyses`, {
+      mode: 'sketch',
+      inputs: [{ assetId: sketch, role: 'sketch' }],
+      audience: 'girls',
+      size: '8y',
+      provider: 'fake',
+    });
+    expect(res.status, await res.clone().text()).toBe(201);
+    const a = await json<Analysis>(res);
+    expect(a).toMatchObject({ mode: 'sketch', size: '8y', audience: 'girls' });
+    // Simulate the worker: read the sketch.
+    const reading = await readSketch(
+      {
+        images: [{ mediaType: 'image/png', data: new Uint8Array([1]) }],
+        audience: 'girls',
+        size: '8y',
+      },
+      { provider: new FakeProvider(fakeResponders) },
+    );
+    await prisma.designAnalysis.update({
+      where: { id: a.id },
+      data: {
+        status: 'succeeded',
+        stage: null,
+        result: JSON.parse(JSON.stringify(reading)) as object,
+        completedAt: new Date(),
+      },
+    });
+    const bad = await designer.post(`${org()}/analyses/${a.id}/design`, {
+      name: 'Broken',
+      patternSpec: { family: 'cape', audience: 'girls', size: '8y' },
+    });
+    expect(bad.status).toBe(400);
+    const created = await designer.post(`${org()}/analyses/${a.id}/design`, {
+      name: 'Party dress',
+      patternSpec: {
+        ...reading.spec,
+        style: { ...reading.spec.style, sleeve: 'long', cuff: 'band' },
+      },
+    });
+    expect(created.status, await created.clone().text()).toBe(201);
+    const out = await json<{ design: Design }>(created);
+    const wc = await json<WorkingCopy>(
+      await designer.get(`${org()}/designs/${out.design.id}/working-copy`),
+    );
+    const state = wc.state as unknown as GarmentDesignState;
+    expect(state.patternSpec).toMatchObject({
+      family: 'dress',
+      size: '8y',
+      style: { sleeve: 'long' },
+    });
+    expect(state.sources).toEqual([{ assetId: sketch, role: 'sketch', label: 'party-dress.png' }]);
+    const names = state.patternPieces!.map((p) => p.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'Bodice front',
+        'Bodice back',
+        'Sleeve',
+        'Sleeve band',
+        'Skirt front',
+        'Skirt back',
+      ]),
+    );
+    const front = state.patternPieces!.find((p) => p.name === 'Bodice front')!;
+    expect(front.edges!.map((e) => e.name)).toEqual(
+      expect.arrayContaining(['neck', 'shoulder', 'armhole', 'side', 'waist']),
+    );
+    expect(front.draft).toMatchObject({ method: 'parametric', template: 'bodice_front' });
   });
 
   it('rejects inputs that are not ready images and unconfigured providers', async () => {

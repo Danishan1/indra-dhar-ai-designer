@@ -4,3 +4,9 @@
  */
 export * from './draft.js';
 export * from './svg.js';
+export * from './blocks/sizes.js';
+export * from './blocks/resolve.js';
+export * from './blocks/geom.js';
+export * from './blocks/draft-pattern.js';
+export * from './blocks/checks.js';
+export * from './blocks/state.js';

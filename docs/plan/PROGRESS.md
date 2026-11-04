@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-04 — Pattern-first studio: sketch → patterns → pattern editor → tech pack (owner request) — DONE
+
+- Request: new approach after the owner reverted the measured-reconstruction work. Three components: (1) model reads a sketch (the user chooses how to start; sketch only for now) and we get the flat patterns, (2) editor with only the patterns (editable, dimensioned) and the sketch as a side reference, (3) model turns the patterns into the dress / tech pack. Owner chose: AI reads + system drafts; size chart + editable measurements; dresses, tops/shirts, skirts, trousers/shorts; edits by measurements, piece resize, points/curves and style options.
+- Built (ADR-058): `patternSpec` + piece `edges`/`markings` (garment-model); pattern engine `pattern-model/src/blocks` (size charts, bodice/top, sleeve, collars/facings, skirts, trousers, waistband, pockets, seam checks, draft → state, resize, key-point moves); op `set_pattern_draft`; `sketch_reading` task + `readSketch`/`specFromReading` + fake; analysis `mode`/`size` columns; API sketch mode + pattern design creation; worker sketch job; start page with start modes; sketch review with live preview; pattern editor workspace; tech pack pattern specification, BOM estimate, dimensioned piece pages with markings and seam lengths.
+- Tests: pattern-model 25 (16 garments sew together, measurements drive sizes, redraft keeps ids/hand edits, cap misfit detected, key-point moves), design-operations 25, design-ai 11 (sketch → pattern → tech pack), API integration (sketch analysis → pattern design), e2e AI studio rewritten (sketch → review → editor sizes/style/resize → commit → tech pack + PDF).
+- **Owner actions:** `pnpm install`, **`pnpm db:migrate`** (migration `…_analysis_sketch_mode`), restart `pnpm dev`. Start from _New design with AI → From a sketch_.
+- **Next step:** owner feedback on the drafted patterns; then photo / pattern-piece starts.
+
 ### 2026-11-02 — AI studio v2: editable reconstruction, model registry, tech pack PDF (owner request) — DONE
 
 - Request: reconstruct the garment as editable vector artifacts (not crops), editable flat patterns kept in sync, original vs reconstruction comparison, dynamic model discovery/selection with capability-safe fallback, the Gemini 2.5 errors, and a working tech pack PDF. Owner chose: keys in Settings per organization, vector artifacts canvas, simple model-image presets.

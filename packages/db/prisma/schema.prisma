@@ -904,6 +904,10 @@ model DesignAnalysis {
   notes          String?
   garmentHint    String?      @map("garment_hint")
   audience       String?
+  /// images (component analysis) | sketch (sketch → pattern, ADR-058)
+  mode           String       @default("images")
+  /// Size chart entry for sketch mode (e.g. M, 6y)
+  size           String?
   /// gemini | openai | fake (chosen when created)
   provider       String
   jobId          String?      @map("job_id") @db.Uuid

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { designComponentSchema } from './component.js';
 import { constraintSchema } from './constraint.js';
+import { patternSpecSchema } from './pattern-spec.js';
 import { designSourceSchema, patternPieceSchema } from './pattern.js';
 import { designRelationshipSchema } from './relationship.js';
 
@@ -43,6 +44,8 @@ export const garmentDesignStateSchema = z.looseObject({
   provenance: stateProvenanceSchema,
   /** Flat pattern pieces of the components (ADR-056); absent on designs made before. */
   patternPieces: z.array(patternPieceSchema).optional(),
+  /** Pattern-first designs (ADR-058): the drafting input the pieces are generated from. */
+  patternSpec: patternSpecSchema.optional(),
   /** Images the design was started from (AI analysis, ADR-056). */
   sources: z.array(designSourceSchema).max(30).optional(),
 });

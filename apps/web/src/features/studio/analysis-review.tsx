@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 
 import { studioApi } from './api';
 import { ROLE_OPTIONS } from './new-analysis';
+import { SketchReview } from './sketch-review';
 
 const human = (s: string) => s.replaceAll('_', ' ');
 
@@ -157,6 +158,7 @@ export function AnalysisReviewPage({
       </div>
     );
 
+  if (a.mode === 'sketch') return <SketchReview projectId={projectId} analysis={a} back={back} />;
   return <Review projectId={projectId} analysis={a} back={back} />;
 }
 
@@ -183,6 +185,8 @@ function RetryAnalysis({ projectId, analysis }: { projectId: string; analysis: A
           ...(analysis.audience
             ? { audience: analysis.audience as 'men' | 'women' | 'kids' | 'unisex' }
             : {}),
+          mode: analysis.mode,
+          ...(analysis.size ? { size: analysis.size } : {}),
           provider: provider as 'gemini' | 'openai' | 'fake',
         },
         key.current,

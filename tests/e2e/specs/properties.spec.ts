@@ -154,6 +154,11 @@ test('hierarchy, contextual properties, validation, review and bulk edit (I17)',
     panel(page).getByRole('textbox', { name: 'Sleeve length', exact: true }),
   ).toHaveValue('60');
 
-  // Nothing but design operations was written (no AI call).
-  expect(requests.every((p) => p.endsWith('/operations') || p.includes('/client-logs'))).toBe(true);
+  // Nothing but design operations (and the automatic structure validation) was written: no AI call.
+  expect(
+    requests.every(
+      (p) =>
+        p.endsWith('/operations') || p.endsWith('/validation-runs') || p.includes('/client-logs'),
+    ),
+  ).toBe(true);
 });

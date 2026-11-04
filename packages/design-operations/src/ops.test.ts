@@ -848,3 +848,65 @@ describe('reconstruction shapes (ADR-057)', () => {
     ).toBeUndefined();
   });
 });
+
+describe('pattern drafts (ADR-058)', () => {
+  it('replaces the parts, pieces and spec in one step and undoes exactly', () => {
+    const s = shirt();
+    const root = s.components.find((c) => c.parentComponentId === null)!;
+    const part = {
+      ...find(s, 'cuff', 'left'),
+      componentId: 'cmp_partpartpart1',
+      componentType: 'pocket',
+      side: 'none' as const,
+      properties: {},
+      parentComponentId: root.componentId,
+      tags: ['part:cuffs', 'pattern'],
+    };
+    const pieceIn = {
+      pieceId: 'pat_draftdraft01',
+      componentId: part.componentId,
+      name: 'Cuff',
+      outline: [
+        { x: 0, y: 0 },
+        { x: 250, y: 0 },
+        { x: 250, y: 120 },
+        { x: 0, y: 120 },
+      ],
+      source: 'generated' as const,
+      edges: [{ name: 'top', from: 0, to: 1, intakeMm: 0 }],
+    };
+    const spec = { family: 'top' as const, audience: 'men' as const, size: 'L' };
+    const r = ok(s, {
+      type: 'set_pattern_draft',
+      patternSpec: spec,
+      components: [root, part],
+      patternPieces: [pieceIn],
+      garmentCategory: 'woven_shirt',
+    });
+    expect(r.state.components.map((c) => c.componentId)).toEqual([
+      root.componentId,
+      part.componentId,
+    ]);
+    expect(r.state.patternSpec).toMatchObject({ family: 'top', size: 'L' });
+    expect(r.state.patternPieces?.[0]?.edges?.[0]?.name).toBe('top');
+    const back = applyOperation(r.state, invert(s, r.state) as Operation, ctx());
+    expect(back.ok && back.state.components.length).toBe(s.components.length);
+    expect(back.ok && back.state.patternSpec).toBeUndefined();
+    expect(
+      blocked(s, {
+        type: 'set_pattern_draft',
+        patternSpec: spec,
+        components: [part],
+        patternPieces: [],
+      }),
+    ).toContain('operation.invalid');
+    expect(
+      blocked(s, {
+        type: 'set_pattern_draft',
+        patternSpec: spec,
+        components: [root],
+        patternPieces: [pieceIn],
+      }),
+    ).toContain('operation.invalid');
+  });
+});

@@ -11,6 +11,7 @@ import {
   unitSchema,
   componentShapeSchema,
   patternPieceSchema,
+  patternSpecSchema,
 } from '@ai-designer/garment-model';
 import { z } from 'zod';
 
@@ -89,6 +90,25 @@ export const replacePatternPiecesSchema = z.object({
   type: z.literal('replace_pattern_pieces'),
   componentId: id,
   pieces: z.array(patternPieceSchema).max(20),
+});
+
+/**
+ * Pattern-first designs (ADR-058): the drafting spec and its result in one step — a measurement or
+ * style change redrafts the pieces and may add/remove parts (sleeves, collar, waistband…).
+ */
+export const setPatternDraftSchema = z.object({
+  type: z.literal('set_pattern_draft'),
+  patternSpec: patternSpecSchema,
+  components: z.array(designComponentSchema).min(1).max(80),
+  patternPieces: z.array(patternPieceSchema).max(120),
+  garmentType: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{0,63}$/)
+    .optional(),
+  garmentCategory: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{0,63}$/)
+    .optional(),
 });
 
 /** Replaces the editable reconstruction shapes of a component (ADR-057). */
@@ -205,6 +225,7 @@ const singleClientOperations = [
   setComponentLockSchema,
   renameComponentSchema,
   replacePatternPiecesSchema,
+  setPatternDraftSchema,
   setComponentShapesSchema,
   attachArtifactSchema,
   replaceArtifactSchema,

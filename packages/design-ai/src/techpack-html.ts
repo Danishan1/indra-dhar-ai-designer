@@ -79,19 +79,31 @@ export function techPackHtml(
       `<section><h2>On mannequin and model</h2><div class="grid2">${styled.map((v) => figure(v, imageSrc)).join('')}</div></section>`,
     );
 
-  sections.push(
-    `<section><h2>Components</h2><div class="components">${doc.components
-      .map(
-        (
-          c,
-        ) => `<div class="comp">${c.image ? figure(c.image, imageSrc, 'small') : ''}<div><h3>${esc(c.name)} <small>${esc(c.type)}${c.side !== 'none' ? ` · ${esc(c.side)}` : ''}</small></h3>
+  if (doc.pattern) {
+    const pt = doc.pattern;
+    sections.push(
+      `<section><h2>Pattern specification</h2><p>${esc(pt.family)} · ${esc(pt.audience)} · size ${esc(pt.size)} · seam allowance ${pt.seamAllowanceMm} mm · hem allowance ${pt.hemAllowanceMm} mm</p>
+      <table class="full"><tbody>${pt.style.map((x) => `<tr><td>${esc(x.label)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>
+      <h3>Body measurements</h3><table class="full"><thead><tr><th>Measurement</th><th>Value</th><th>Source</th></tr></thead><tbody>${pt.body.map((b) => `<tr><td>${esc(b.label)}</td><td>${(b.valueMm / 10).toFixed(1)} cm</td><td>${esc(b.source)}</td></tr>`).join('')}</tbody></table>
+      <h3>Finished garment</h3><table class="full"><tbody>${pt.finished.map((f) => `<tr><td>${esc(f.label)}</td><td>${(f.valueMm / 10).toFixed(1)} cm</td></tr>`).join('')}</tbody></table>
+      <h3>Seam fit checks</h3><table class="full"><thead><tr><th>Seams</th><th>Lengths (mm)</th><th>Difference</th><th>Result</th></tr></thead><tbody>${pt.checks.map((c) => `<tr><td>${esc(c.label)}</td><td>${c.a} ↔ ${c.b}</td><td>${c.difference > 0 ? '+' : ''}${c.difference} mm</td><td>${c.status === 'ok' ? 'fits' : c.status === 'warning' ? 'check' : 'does not fit'}</td></tr>`).join('')}</tbody></table></section>`,
+    );
+  }
+
+  if (!doc.pattern)
+    sections.push(
+      `<section><h2>Components</h2><div class="components">${doc.components
+        .map(
+          (
+            c,
+          ) => `<div class="comp">${c.image ? figure(c.image, imageSrc, 'small') : ''}<div><h3>${esc(c.name)} <small>${esc(c.type)}${c.side !== 'none' ? ` · ${esc(c.side)}` : ''}</small></h3>
       ${c.fabric ? `<p>Fabric: ${esc(c.fabric)}</p>` : ''}
       <table>${c.attributes.map((a) => `<tr><td>${esc(a.label)}</td><td>${esc(a.value)}</td><td>${badge(a.status)}</td></tr>`).join('')}
       ${c.measurements.map((m) => `<tr><td>${esc(m.label)}</td><td>${m.valueMm === null ? '—' : `${m.valueMm} mm`}</td><td>${badge(m.status)}</td></tr>`).join('')}</table>
       <p class="muted">${c.patternPieces} pattern piece(s)</p></div></div>`,
-      )
-      .join('')}</div></section>`,
-  );
+        )
+        .join('')}</div></section>`,
+    );
 
   sections.push(
     `<section><h2>Bill of materials</h2><table class="full"><thead><tr><th>Item</th><th>Type</th><th>Placement</th><th>Quantity</th><th>Status</th><th>Notes</th></tr></thead><tbody>${doc.bom

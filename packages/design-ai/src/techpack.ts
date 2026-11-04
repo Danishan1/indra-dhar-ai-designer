@@ -10,6 +10,7 @@ import { offsetOutline, patternSheetSvg } from '@ai-designer/pattern-model';
 
 import type { TechPackText } from './analysis-schema.js';
 import { ATTRIBUTE_PROPERTY } from './library-match.js';
+import { type PatternSection, patternSection } from './techpack-pattern.js';
 import { componentShapeSvg, pieceDetailSvg } from './techpack-vector.js';
 
 /**
@@ -115,6 +116,8 @@ export interface TechPackDocument {
   quality: string[];
   care: string[];
   missing: { area: string; item: string }[];
+  /** Pattern-first designs (ADR-058): drafting spec, measurements, fit checks. */
+  pattern?: PatternSection | null;
 }
 
 export interface ArtifactName {
@@ -283,6 +286,38 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
         });
     }
 
+  // Pattern-first designs: measurements come from the patterns, not component properties.
+  const pattern = patternSection(state);
+  if (pattern) {
+    measurements.length = 0;
+    for (const b of pattern.body)
+      measurements.push({
+        component: 'Body',
+        point: b.label,
+        valueMm: b.valueMm,
+        status: b.source === 'edited' ? 'confirmed' : 'proposed',
+        source: b.source === 'edited' ? 'Entered' : `Size chart ${pattern.size}`,
+      });
+    for (const f of pattern.finished)
+      measurements.push({
+        component: 'Garment',
+        point: f.label,
+        valueMm: f.valueMm,
+        status: 'proposed',
+        source: 'Measured on the pattern',
+      });
+    for (let i = missing.length - 1; i >= 0; i--)
+      if (/size|length|width|height|depth|allowance/i.test(missing[i]!.item)) missing.splice(i, 1);
+    for (const c of pattern.checks.filter((x) => x.status !== 'ok'))
+      missing.push({ area: 'Pattern fit', item: `${c.label}: off by ${c.difference} mm` });
+    if (pattern.editedPieces.length)
+      missing.push({
+        area: 'Pattern',
+        item: `Edited by hand, check before cutting: ${pattern.editedPieces.join(', ')}`,
+      });
+    missing.push({ area: 'Pattern', item: 'Make and fit a sample (toile) before production' });
+  }
+
   // Bill of materials.
   const bom: TechPackDocument['bom'] = [];
   const fabricUse = new Map<
@@ -339,7 +374,55 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
     });
     if (!f.composition) missing.push({ area: f.name, item: 'Fabric composition and weight' });
   }
-  if (!fabricUse.size) {
+  if (!fabricUse.size && pattern) {
+    // Pattern-first: estimate the yardage from the pieces themselves.
+    const total = pieces
+      .filter((p) => (p.fabricRole ?? 'main') === 'main')
+      .reduce(
+        (s, p) =>
+          s +
+          area(offsetOutline(p.outline, p.seamAllowanceMm ?? 0)) *
+            p.cutQuantity *
+            (p.foldLine ? 2 : 1),
+        0,
+      );
+    const metres = Math.max(0.1, (total * 1.25) / 1_500_000);
+    bom.push({
+      item: 'Main fabric',
+      type: 'fabric',
+      placement: 'All main pieces',
+      quantity: `≈ ${metres.toFixed(2)} m at 150 cm width`,
+      status: 'estimate',
+      notes: 'Choose the fabric; estimate from the pattern area + 25 % for layout',
+    });
+    const zips = pieces.flatMap((p) => p.markings ?? []).filter((m) => m.kind === 'zip');
+    if (zips.length)
+      bom.push({
+        item: 'Zip',
+        type: 'trim',
+        placement: zips.map((z) => z.label ?? 'zip').join(', '),
+        quantity: '1',
+        status: 'estimate',
+        notes: 'Length from the zip marking on the pattern',
+      });
+    const btns = pieces.reduce(
+      (n, p) =>
+        n +
+        (p.markings ?? []).filter((m) => m.kind === 'button').length *
+          (p.mirrored || p.cutQuantity > 1 ? 1 : 1),
+      0,
+    );
+    if (btns)
+      bom.push({
+        item: 'Buttons',
+        type: 'trim',
+        placement: 'As marked on the pattern',
+        quantity: `${btns} pcs`,
+        status: 'estimate',
+        notes: 'Size, material and colour not specified',
+      });
+    missing.push({ area: 'Materials', item: 'Fabric not chosen' });
+  } else if (!fabricUse.size) {
     bom.push({
       item: 'Main fabric',
       type: 'fabric',
@@ -443,6 +526,7 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
 
   return {
     version: 1,
+    pattern,
     header: {
       ...input.header,
       garmentLabel,

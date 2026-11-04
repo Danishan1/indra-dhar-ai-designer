@@ -482,6 +482,48 @@ class Applier {
           s.patternPieces = s.patternPieces.filter((p) => !removed.has(p.componentId));
         return;
       }
+      case 'set_pattern_draft': {
+        const root = s.components.find((c) => c.parentComponentId === null);
+        const nextRoot = op.components.find((c) => c.parentComponentId === null);
+        if (!root || !nextRoot || root.componentId !== nextRoot.componentId)
+          throw new Blocked([
+            finding('operation.invalid', 'The garment body cannot be replaced by a redraft', null),
+          ]);
+        const ids = new Set<string>();
+        for (const c of op.components) {
+          if (ids.has(c.componentId))
+            throw new Blocked([
+              finding(
+                'id.duplicate',
+                `Component id ${c.componentId} is used twice`,
+                comp(c.componentId),
+              ),
+            ]);
+          ids.add(c.componentId);
+        }
+        const pieceIds = new Set<string>();
+        for (const p of op.patternPieces) {
+          if (pieceIds.has(p.pieceId) || !ids.has(p.componentId))
+            throw new Blocked([
+              finding(
+                'operation.invalid',
+                `Pattern piece ${p.name} does not belong to a part of this design`,
+                null,
+              ),
+            ]);
+          pieceIds.add(p.pieceId);
+        }
+        // Relationships to removed parts go with them.
+        const alive = (ref: EntityRef) =>
+          ref.entityType !== 'design_component' || ids.has(ref.entityId);
+        s.relationships = s.relationships.filter((r) => alive(r.source) && alive(r.target));
+        s.components = op.components;
+        s.patternPieces = op.patternPieces;
+        s.patternSpec = op.patternSpec;
+        if (op.garmentType) s.garmentType = op.garmentType;
+        if (op.garmentCategory) s.garmentCategory = op.garmentCategory;
+        return;
+      }
       case 'set_component_shapes': {
         const c = this.component(op.componentId);
         if (op.shapes.length) c.shapes = op.shapes;

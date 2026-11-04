@@ -61,6 +61,7 @@ export const OPERATION_TYPES: readonly OperationTypeDef[] = [
   d('rename_component', 'Rename a component'),
   d('replace_pattern_pieces', 'Replace the pattern pieces of a component'),
   d('set_component_shapes', 'Change the shape of a component'),
+  d('set_pattern_draft', 'Redraft the pattern'),
   d('attach_artifact', 'Attach an artifact', [
     'rule_based_composition',
     'deterministic_model_update',

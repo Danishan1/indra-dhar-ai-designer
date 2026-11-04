@@ -11,6 +11,26 @@ images ──► design.analysis (worker) ──► review (web) ──► desig
                                                                                      └► document + PDF
 ```
 
+## Pattern-first studio (ADR-058) — the current core flow
+
+Sketch → **Component 1** (AI reads) → pattern engine → **Component 2** (pattern editor) →
+**Component 3** (tech pack from the patterns).
+
+| Step      | What                                                                                                                                           | Where                                                                              |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Start     | user chooses _From a sketch_ (photo / pattern pieces: coming soon), uploads 1–4 views, optional garment, audience, size                        | `web/features/studio/new-analysis.tsx`; analysis `mode: 'sketch'`                  |
+| Read      | one vision call: family, audience, style options from fixed lists, proportions, details not drafted                                            | `design-ai/src/sketch.ts` (`readSketch`, `specFromReading`), task `sketch_reading` |
+| Review    | options marked _sketch_, live pattern preview with dimensions and fit checks, then _Create patterns_                                           | `web/features/studio/sketch-review.tsx`                                            |
+| Draft     | `draftPattern(spec)` → parts + pieces (edges, markings, grain, fold, notches)                                                                  | `pattern-model/src/blocks/*`                                                       |
+| State     | `patternSpec` + `patternPieces`; parts as components (`part:<key>` tags)                                                                       | `patternDesignState`, `draftToState`                                               |
+| Edit      | measurements / style → `set_pattern_draft`; width/height, key points, SA, cut → `replace_pattern_pieces`                                       | `web/features/editor/patterns/pattern-workspace.tsx`, `web/features/patterns/*`    |
+| Check     | seams that are sewn together, recomputed from the current pieces                                                                               | `seamChecks`                                                                       |
+| Tech pack | pattern specification, body/finished measurements, fit checks, BOM from piece areas, piece pages; images from the pattern description + sketch | `design-ai/src/techpack-pattern.ts`, worker `techPackHandler`                      |
+
+Size charts are approximations to start from — every measurement is editable. Pieces edited by
+hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
+the seam allowance is drawn outside.
+
 ## Reconstruct, don't crop (ADR-057)
 
 The analyzer rebuilds the garment as **editable vector artifacts**. Each component has `shapes`

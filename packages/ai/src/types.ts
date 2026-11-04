@@ -12,6 +12,7 @@ export type AiProviderName = 'gemini' | 'openai' | 'fake';
 export type AiTask =
   | 'garment_decomposition'
   | 'component_detail'
+  | 'sketch_reading'
   | 'pattern_interpretation'
   | 'fabric_analysis'
   | 'techpack_text'

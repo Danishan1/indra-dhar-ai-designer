@@ -39,10 +39,16 @@ import { editorApi } from './api';
 import { SceneProvider } from './canvas/scene-context';
 import { ConflictDialog } from './components/conflict-dialog';
 import { SaveStatusChip } from './components/save-status';
-import { Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
+import { PanelTitle, Placeholder, ToolButton, WorkspaceLayout } from './editor-workspace';
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
 import { LeftPanelContent, LeftPanelTabs } from './library/left-panel';
+import {
+  PatternPieceList,
+  PatternSidePanel,
+  PatternUiProvider,
+  PatternViewport,
+} from './patterns/pattern-workspace';
 import { CommitButton } from './revisions/commit-dialog';
 import { RevisionInspector } from './revisions/revision-inspector';
 import { useRevisionSnapshot } from './revisions/use-revisions';
@@ -129,6 +135,28 @@ function Editor() {
   useEditorShortcuts();
   useUnsavedGuard();
   const inspect = useEditor((s) => s.inspect);
+  const patternFirst = useEditor((s) => !!s.display.patternSpec);
+  if (patternFirst)
+    return (
+      <PatternUiProvider>
+        <WorkspaceLayout
+          header={<EditorHeader />}
+          tools={<EditorTools />}
+          hierarchy={<PatternPieceList />}
+          hierarchyHeader={<PanelTitle>Pattern pieces</PanelTitle>}
+          viewport={<PatternViewport />}
+          properties={<PatternSidePanel />}
+          propertiesHeader={<PanelTitle>Pattern</PanelTitle>}
+          takeover={inspect ? <RevisionInspector inspect={inspect} /> : undefined}
+          operations={<HistoryList />}
+          validation={<ValidationPanel />}
+          validationBadge={<ValidationTabCount />}
+          jobs={<Placeholder>Generation jobs (I21).</Placeholder>}
+          statusBar={<StatusBar />}
+        />
+        <ConflictDialog />
+      </PatternUiProvider>
+    );
   return (
     <>
       <WorkspaceLayout

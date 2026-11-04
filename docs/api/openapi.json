@@ -5828,6 +5828,19 @@
                         "null"
                       ]
                     },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "images",
+                        "sketch"
+                      ]
+                    },
+                    "size": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "provider": {
                       "type": "string",
                       "enum": [
@@ -5927,6 +5940,8 @@
                     "notes",
                     "garmentHint",
                     "audience",
+                    "mode",
+                    "size",
                     "provider",
                     "result",
                     "crops",
@@ -6083,6 +6098,13 @@
                   "saveToLibrary": {
                     "default": true,
                     "type": "boolean"
+                  },
+                  "patternSpec": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
@@ -24278,7 +24300,9 @@
                       "men",
                       "women",
                       "kids",
-                      "unisex"
+                      "unisex",
+                      "girls",
+                      "boys"
                     ]
                   },
                   "provider": {
@@ -24288,6 +24312,19 @@
                       "openai",
                       "fake"
                     ]
+                  },
+                  "mode": {
+                    "default": "images",
+                    "type": "string",
+                    "enum": [
+                      "images",
+                      "sketch"
+                    ]
+                  },
+                  "size": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20
                   }
                 },
                 "required": [
@@ -24381,6 +24418,19 @@
                       ]
                     },
                     "audience": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "images",
+                        "sketch"
+                      ]
+                    },
+                    "size": {
                       "type": [
                         "string",
                         "null"
@@ -24485,6 +24535,8 @@
                     "notes",
                     "garmentHint",
                     "audience",
+                    "mode",
+                    "size",
                     "provider",
                     "result",
                     "crops",
