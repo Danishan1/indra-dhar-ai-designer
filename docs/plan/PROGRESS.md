@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-08 — Pattern CAD editor (owner request) — DONE
+
+- Request: the pattern editor should work like CAD (AutoCAD/Photoshop-style sizing) — accurate, editable pieces; lengthening, widening and reshaping. Owner chose all tool groups (rulers/grid/snap/1:1, exact point & curve editing, lengthen/widen, measure/move/rotate/mirror) and true-size output.
+- Built (ADR-059): piece `path` (Bézier) + `canvas`; Schneider fitting of drafted outlines; path ops (move/insert/delete nodes, handles, corner/smooth, curve/straight, slash-and-spread lengthen/widen, exact seam length, rotate/mirror/scale); DXF R12 + tiled 1:1 print; CAD canvas (rulers, grid, zoom, calibrated 1:1, snapping, select/point/measure/lengthen/widen/pan tools, box select, nudge, live spread preview); inspector (exact width/height, point X/Y, transforms, seam lengths, numeric lengthen/widen); shortcut crash fix (`keyOf` with missing `event.code`).
+- Tests: pattern-model 31 (+fitting keeps seam lengths, lengthen/widen/shorten, exact seam length, node ops, rotate/mirror, DXF, tiled print); e2e AI studio extended (rulers, 1:1, lengthen 5 cm, exact seam length, point X, resize + rotate, DXF download).
+- **Owner actions:** none beyond restarting `pnpm dev` (no migration). For true size: toolbar → Calibrate once per screen.
+- **Next step:** owner feedback on the editor; then Components 1 and 3 changes.
+
 ### 2026-11-04 — Pattern-first studio: sketch → patterns → pattern editor → tech pack (owner request) — DONE
 
 - Request: new approach after the owner reverted the measured-reconstruction work. Three components: (1) model reads a sketch (the user chooses how to start; sketch only for now) and we get the flat patterns, (2) editor with only the patterns (editable, dimensioned) and the sketch as a side reference, (3) model turns the patterns into the dress / tech pack. Owner chose: AI reads + system drafts; size chart + editable measurements; dresses, tops/shirts, skirts, trousers/shorts; edits by measurements, piece resize, points/curves and style options.

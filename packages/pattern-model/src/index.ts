@@ -10,3 +10,15 @@ export * from './blocks/geom.js';
 export * from './blocks/draft-pattern.js';
 export * from './blocks/checks.js';
 export * from './blocks/state.js';
+export {
+  arcLength,
+  bez,
+  bezD,
+  type Cubic,
+  flattenCubic,
+  nearestT,
+  split as splitCubic,
+} from './cad/bezier.js';
+export * from './cad/fit.js';
+export * from './cad/path.js';
+export * from './cad/export.js';

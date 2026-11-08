@@ -15,6 +15,8 @@ import {
   SCHEMA_VERSION,
 } from '@ai-designer/garment-model';
 
+import { attachPath, scalePiece } from '../cad/path.js';
+
 import type { PatternDraft } from './draft-pattern.js';
 import { edgeLength, type P } from './geom.js';
 
@@ -99,7 +101,7 @@ export function draftToState(
         continue;
       }
       pieces.push(
-        patternPieceSchema.parse({
+        withFittedPath({
           pieceId: old?.pieceId ?? createPatternPieceId(rb),
           componentId,
           name: d.name,
@@ -146,6 +148,11 @@ function makeComponent(
   });
 }
 
+/** Parses a drafted piece and gives it its editable Bézier path (fitted from the outline). */
+function withFittedPath(input: unknown): PatternPiece {
+  return attachPath(patternPieceSchema.parse(input));
+}
+
 /** A complete new pattern-first design state. */
 export function patternDesignState(
   draft: PatternDraft,
@@ -176,11 +183,6 @@ export function patternDesignState(
 
 // ── manual edits ─────────────────────────────────────────────────────────────
 
-const scalePt = (p: P, ox: number, oy: number, sx: number, sy: number): P => ({
-  x: Math.round((ox + (p.x - ox) * sx) * 10) / 10,
-  y: Math.round((oy + (p.y - oy) * sy) * 10) / 10,
-});
-
 /** Resizes a piece to a width and/or height (mm) from its top-left; marks it edited by hand. */
 export function resizePiece(
   piece: PatternPiece,
@@ -188,27 +190,11 @@ export function resizePiece(
 ): PatternPiece {
   const xs = piece.outline.map((p) => p.x);
   const ys = piece.outline.map((p) => p.y);
-  const ox = Math.min(...xs);
-  const oy = Math.min(...ys);
-  const w = Math.max(1, Math.max(...xs) - ox);
-  const h = Math.max(1, Math.max(...ys) - oy);
+  const w = Math.max(1, Math.max(...xs) - Math.min(...xs));
+  const h = Math.max(1, Math.max(...ys) - Math.min(...ys));
   const sx = size.width && size.width > 0 ? size.width / w : 1;
   const sy = size.height && size.height > 0 ? size.height / h : 1;
-  const f = (p: P) => scalePt(p, ox, oy, sx, sy);
-  return {
-    ...piece,
-    outline: piece.outline.map(f),
-    notches: piece.notches.map(f),
-    grainline: piece.grainline
-      ? { from: f(piece.grainline.from), to: f(piece.grainline.to) }
-      : null,
-    foldLine: piece.foldLine ? { from: f(piece.foldLine.from), to: f(piece.foldLine.to) } : null,
-    ...(piece.markings
-      ? { markings: piece.markings.map((m) => ({ ...m, points: m.points.map(f) })) }
-      : {}),
-    source: 'user',
-    status: 'needs_review',
-  };
+  return scalePiece(piece, sx, sy);
 }
 
 export const EDGE_LABELS: Record<string, string> = {
@@ -339,5 +325,7 @@ export function moveKeyPoint(
       y: Math.round((outline[i]!.y + dy * w) * 10) / 10,
     };
   }
-  return { ...piece, outline, source: 'user', status: 'needs_review' };
+  const { path: _drop, ...rest } = piece;
+  void _drop;
+  return { ...rest, outline, source: 'user', status: 'needs_review' };
 }

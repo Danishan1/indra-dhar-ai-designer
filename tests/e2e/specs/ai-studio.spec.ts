@@ -72,8 +72,18 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(page.getByRole('heading', { level: 1, name: 'Party dress' })).toBeVisible();
   await expect(page.getByTestId('reference-panel').locator('img')).toBeVisible();
   expect(await page.getByTestId('piece-list-item').count()).toBeGreaterThan(6);
+  // CAD view: real-scale rulers, true-size zoom.
   const canvas = page.getByTestId('pattern-canvas');
-  const backWidth = canvas.locator('[data-piece-name="Bodice back"] [data-testid="piece-width"]');
+  await expect(page.getByTestId('ruler-top')).toBeVisible();
+  await expect(page.getByTestId('ruler-left')).toBeVisible();
+  await page.getByTestId('zoom-actual').click();
+  await expect(page.getByTestId('pattern-cad')).toHaveAttribute('data-zoom', '100');
+  await page.getByTestId('zoom-fit').click();
+  const item = (name: string) => page.getByTestId('piece-list-item').filter({ hasText: name });
+  const dim = (name: string, which: 'width' | 'height') =>
+    canvas.locator(`[data-piece-name="${name}"] [data-testid="piece-${which}"]`);
+  await item('Bodice back').click();
+  const backWidth = dim('Bodice back', 'width');
   const w0 = (await backWidth.textContent()) ?? '';
 
   // Change a body measurement: the pattern is redrafted.
@@ -87,27 +97,52 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await page.getByRole('tab', { name: 'Style' }).click();
   await page.getByLabel('Collar', { exact: true }).click();
   await page.getByRole('option', { name: 'None' }).click();
-  await expect(
-    page.getByTestId('piece-list-item').filter({ hasText: 'Peter Pan collar' }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByTestId('piece-list-item').filter({ hasText: 'Front neck facing' }),
-  ).toHaveCount(1);
+  await expect(item('Peter Pan collar')).toHaveCount(0);
+  await expect(item('Front neck facing')).toHaveCount(1);
 
-  // Resize one piece by hand: it is marked edited and kept on redrafts.
-  await page.getByTestId('piece-list-item').filter({ hasText: 'Sleeve band' }).click();
+  // Lengthen the skirt front by 5 cm across a line (slash and spread).
+  await item('Skirt front').click();
   await page.getByRole('tab', { name: 'Piece' }).click();
+  const h0 = parseFloat((await dim('Skirt front', 'height').textContent()) ?? '0');
+  await page.getByTestId('spread-input').fill('5');
+  await page.getByTestId('spread-numeric-apply').click();
+  await expect(dim('Skirt front', 'height')).toHaveText(`${(h0 + 5).toFixed(1)} cm`);
+  await expect(item('Skirt front')).toContainText('edited');
+  await expect(page.getByTestId('edited-banner')).toBeVisible();
+
+  // Set a seam to an exact length.
+  const side = page.getByTestId('edge-side');
+  const s0 = parseFloat(await side.inputValue());
+  await side.fill((s0 + 1).toFixed(1));
+  await side.press('Enter');
+  await expect(side).toHaveValue((s0 + 1).toFixed(1));
+
+  // Direct point editing: select a point, type its exact X.
+  await page.getByTestId('tool-point').click();
+  await canvas.getByTestId('path-node').first().click();
+  const nx = page.getByTestId('node-x');
+  await expect(nx).toBeVisible();
+  await nx.fill('-2');
+  await nx.press('Enter');
+  await expect(nx).toHaveValue('-2.0');
+
+  // Resize and rotate a piece.
+  await page.getByTestId('tool-select').click();
+  await item('Sleeve band').click();
   const width = page.getByTestId('piece-input-width');
   await width.fill('30');
   await width.press('Enter');
-  await expect(
-    page.getByTestId('piece-list-item').filter({ hasText: 'Sleeve band' }),
-  ).toContainText('edited');
-  await expect(page.getByTestId('edited-banner')).toBeVisible();
-  await expect(
-    canvas.locator('[data-piece-name="Sleeve band"] [data-testid="piece-width"]'),
-  ).toHaveText('30.0 cm');
-  await expect(canvas.getByTestId('piece-handles')).toBeVisible();
+  await expect(dim('Sleeve band', 'width')).toHaveText('30.0 cm');
+  await page.getByTestId('rotate-right').click();
+  await expect(dim('Sleeve band', 'height')).toHaveText('30.0 cm');
+  await expect(canvas.getByTestId('node-layer')).toBeVisible();
+
+  // True-size outputs.
+  const [dxf] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('export-dxf').click(),
+  ]);
+  expect(dxf.suggestedFilename()).toMatch(/\.dxf$/);
   await page.getByRole('tab', { name: 'Fit' }).click();
   await expect(page.getByTestId('seam-checks')).toBeVisible();
 

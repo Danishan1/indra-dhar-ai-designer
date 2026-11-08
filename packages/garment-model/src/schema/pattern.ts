@@ -52,6 +52,22 @@ export const patternMarkingSchema = z.object({
 });
 export type PatternMarking = z.infer<typeof patternMarkingSchema>;
 
+/**
+ * Editable vector outline (ADR-059): closed cubic Bézier path, handles in absolute piece
+ * coordinates; segment i runs from node i (`out`) to node i+1 (`in`); no handles = straight line.
+ * `seg` names the seam edge the outgoing segment belongs to. When present, `outline` and `edges`
+ * are derived from it (flattened) so every consumer keeps working on polylines.
+ */
+export const pathNodeSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  in: pointSchema.nullable().default(null),
+  out: pointSchema.nullable().default(null),
+  smooth: z.boolean().default(false),
+  seg: z.string().max(40).default(''),
+});
+export type PathNode = z.infer<typeof pathNodeSchema>;
+
 export const patternPieceSchema = z.object({
   pieceId: z.string().regex(/^pat_[a-z0-9]{8,32}$/),
   componentId: z.string().regex(/^cmp_[a-z0-9]{8,32}$/),
@@ -89,6 +105,10 @@ export const patternPieceSchema = z.object({
   edges: z.array(patternEdgeSchema).max(40).optional(),
   /** Sewing marks inside the piece: darts, buttons, gathers, zip, pleats, placement lines. */
   markings: z.array(patternMarkingSchema).max(80).optional(),
+  /** Editable Bézier outline (see `pathNodeSchema`). */
+  path: z.array(pathNodeSchema).min(3).max(400).optional(),
+  /** Where the piece sits on the editor canvas (mm); layout only, not geometry. */
+  canvas: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
 });
 export type PatternPiece = z.infer<typeof patternPieceSchema>;
 export type PatternPieceInput = z.input<typeof patternPieceSchema>;

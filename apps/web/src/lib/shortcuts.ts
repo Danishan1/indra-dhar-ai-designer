@@ -64,9 +64,11 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 
 function keyOf(event: KeyboardEvent): string {
   // Alt changes `event.key` on macOS (alt+1 → '¡'); fall back to the physical digit/letter.
-  if (event.code.startsWith('Digit')) return event.code.slice(5);
-  if (event.code.startsWith('Key') && event.altKey) return event.code.slice(3).toLowerCase();
-  return event.key.toLowerCase();
+  // Autofill and some IME events arrive without `code`/`key`.
+  const code = event.code ?? '';
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Key') && event.altKey) return code.slice(3).toLowerCase();
+  return (event.key ?? '').toLowerCase();
 }
 
 export function matchesCombo(

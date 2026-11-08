@@ -27,6 +27,19 @@ Sketch → **Component 1** (AI reads) → pattern engine → **Component 2** (pa
 | Check     | seams that are sewn together, recomputed from the current pieces                                                                               | `seamChecks`                                                                       |
 | Tech pack | pattern specification, body/finished measurements, fit checks, BOM from piece areas, piece pages; images from the pattern description + sketch | `design-ai/src/techpack-pattern.ts`, worker `techPackHandler`                      |
 
+### Pattern CAD editor (ADR-059)
+
+| Piece                                                                                                                                      | Where                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Bézier path model, fitting, flattening, node ops, lengthen/widen (`spreadPiece`), exact seam length (`setEdgeLength`), rotate/mirror/scale | `pattern-model/src/cad/path.ts`, `fit.ts`, `bezier.ts` |
+| DXF + tiled 1:1 print                                                                                                                      | `pattern-model/src/cad/export.ts`                      |
+| Canvas: rulers, grid, zoom/1:1, snapping, tools, overlays                                                                                  | `web/features/patterns/cad/pattern-cad.tsx`            |
+| Toolbar, calibration, inspector (transform, points, seam lengths, numeric lengthen/widen)                                                  | `web/features/editor/patterns/pattern-workspace.tsx`   |
+
+Keys (canvas focused): V select · A points · M measure · L lengthen · W widen · H / Space pan ·
+0 fit · 1 true size · +/− zoom · arrows nudge (Shift ×10, Alt ×0.1) · Delete points · Enter apply
+spread · Esc cancel. Undo/redo stay global (Ctrl+Z / Ctrl+Shift+Z).
+
 Size charts are approximations to start from — every measurement is editable. Pieces edited by
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
 the seam allowance is drawn outside.
