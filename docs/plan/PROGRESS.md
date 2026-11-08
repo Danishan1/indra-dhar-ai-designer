@@ -135,6 +135,11 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-08 — "How it works" guide for the owner — DONE
+
+- Request: a docs folder explaining how the product works today — the journey, each component, the services they use and how each works — so the owner can propose strategy against the existing model.
+- Built: `docs/how-it-works/` (README + 8 pages: journey, sketch reading, pattern engine, pattern editor, tech pack, platform services, data structures, limits and levers), linked from CLAUDE.md. No code changes.
+
 ### 2026-11-08 — Component 1: accurate patterns from the sketch (owner request) — DONE
 
 - Request: the sketch reading was inaccurate (sample 01 in `samples/sketches/`: a boy's shirt + shorts became a shirt dress without belt loops, zip or waistband). Owner's strategy: decide man/woman, adult/child, upper/lower/both, then a garment-specific checklist. Owner chose: two passes; extend the engine so every checklist item drafts pieces; cover the 4 families + jumpsuits/co-ords, jackets/outerwear, kids-specific.
