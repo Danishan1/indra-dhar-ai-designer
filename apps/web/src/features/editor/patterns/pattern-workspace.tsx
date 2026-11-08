@@ -16,6 +16,8 @@ import {
   rotatePiece,
   seamChecks,
   setEdgeLength,
+  edgeAllowance,
+  edgeOnFold,
   setNodePosition,
   setSegmentCurved,
   setSmooth,
@@ -42,6 +44,7 @@ import {
   PrinterIcon,
   RotateCcwIcon,
   RotateCwIcon,
+  RulerDimensionLineIcon,
   RulerIcon,
   ScissorsIcon,
   SquareDashedIcon,
@@ -111,6 +114,7 @@ export function PatternUiProvider({ children }: { children: ReactNode }) {
     snapPoints: true,
     showGrid: true,
     showAllowance: true,
+    showDimensions: true,
     pxPerMm: typeof window === 'undefined' ? DEFAULT_PX_PER_MM : readCalibration(),
   }));
   const setSelected = (id: string | null) => {
@@ -242,7 +246,7 @@ export function PatternViewport() {
   const cad = useRef<CadApi | null>(null);
   const pieces = useMemo(() => state.patternPieces ?? [], [state.patternPieces]);
   const sources = (state.sources ?? []).filter((s) => s.role === 'sketch' || s.role === 'reference');
-  const toggle = (k: 'snapGrid' | 'snapPoints' | 'showGrid' | 'showAllowance') => setSettings({ ...settings, [k]: !settings[k] });
+  const toggle = (k: 'snapGrid' | 'snapPoints' | 'showGrid' | 'showAllowance' | 'showDimensions') => setSettings({ ...settings, [k]: !settings[k] });
   const exportDxf = () => {
     const blob = new Blob([piecesToDxf(pieces)], { type: 'application/dxf' });
     const url = URL.createObjectURL(blob);
@@ -290,6 +294,7 @@ export function PatternViewport() {
               ['snapGrid', 'Snap to grid', Grid2x2CheckIcon],
               ['showGrid', 'Show grid', Grid3x3Icon],
               ['showAllowance', 'Show seam allowance', SquareDashedIcon],
+              ['showDimensions', 'Show dimensions on all pieces', RulerDimensionLineIcon],
             ] as const
           ).map(([k, label, Icon]) => (
             <Button key={k} size="icon-sm" variant="ghost" title={label} aria-label={label} aria-pressed={settings[k]} className={cn(settings[k] && 'bg-accent text-accent-foreground')} onClick={() => toggle(k)} data-testid={`toggle-${k}`}>
@@ -572,6 +577,14 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
       <section>
         <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Seam lengths ({unit}) — type to set exactly</h3>
         <table className="w-full" data-testid="piece-edges">
+          <thead>
+            <tr className="text-[10px] text-muted-foreground">
+              <th className="text-left font-normal">Seam</th>
+              <th className="text-left font-normal">Length</th>
+              <th className="text-right font-normal">Intake</th>
+              <th className="text-right font-normal">SA mm</th>
+            </tr>
+          </thead>
           <tbody>
             {[...new Set(path.map((n) => n.seg).filter(Boolean))].map((name) => {
               const L = pathEdgeLength(path, name);
@@ -583,12 +596,37 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
                     <LengthField mm={L} unit={unit} disabled={disabled} compact testId={`edge-${name}`} onCommit={(mm) => edit(setEdgeLength(piece, name, mm, 'end'), `Set ${EDGE_LABELS[name] ?? name} of ${piece.name} to ${fmt(mm, unit)} ${unit}`)} />
                   </td>
                   <td className="py-0.5 pl-2 text-right text-muted-foreground tabular-nums">{intake ? `−${fmt(intake, unit)}` : ''}</td>
+                  <td className="w-14 py-0.5 pl-2 text-right">
+                    {edgeOnFold(piece, name) ? (
+                      <span className="text-[11px] text-violet-600" title="Cut on the fold: no seam allowance">fold</span>
+                    ) : (
+                      <Input
+                        className="h-6 px-1 text-right text-[12px] tabular-nums"
+                        type="number"
+                        min={0}
+                        max={100}
+                        aria-label={`Seam allowance of the ${EDGE_LABELS[name] ?? name}`}
+                        disabled={disabled}
+                        data-testid={`edge-sa-${name}`}
+                        defaultValue={edgeAllowance(piece, name)}
+                        key={`esa-${piece.pieceId}-${name}-${edgeAllowance(piece, name)}`}
+                        onBlur={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isFinite(v) || v < 0 || v > 100 || v === edgeAllowance(piece, name)) return;
+                          const rest = { ...(piece.allowances ?? {}) };
+                          if (v === (piece.seamAllowanceMm ?? 0)) delete rest[name];
+                          else rest[name] = v;
+                          edit({ ...piece, allowances: rest }, `Seam allowance of the ${EDGE_LABELS[name] ?? name} of ${piece.name}: ${v} mm`);
+                        }}
+                      />
+                    )}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        <p className="mt-1 text-muted-foreground">Setting a length moves the seam&apos;s end point along the seam.</p>
+        <p className="mt-1 text-muted-foreground">Setting a length moves the seam&apos;s end point along the seam. Each seam can have its own allowance (e.g. a deeper hem); fold edges never get one.</p>
       </section>
 
       {piece.notes.length ? (

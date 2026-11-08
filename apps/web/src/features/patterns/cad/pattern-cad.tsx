@@ -1,6 +1,6 @@
 'use client';
 
-import type { PathNode, PatternPiece } from '@ai-designer/garment-model';
+import type { PatternPiece } from '@ai-designer/garment-model';
 import {
   type CutLine,
   deleteNodes,
@@ -9,11 +9,8 @@ import {
   moveHandle,
   moveNodes,
   nearestOnPath,
-  offsetOutline,
-  pathEdgeLength,
+  layoutCanvas,
   pieceBounds,
-  pieceDimensions,
-  segCubic,
   spreadPiece,
   withPath,
 } from '@ai-designer/pattern-model';
@@ -33,6 +30,8 @@ import { cn } from '@/lib/utils';
 
 import { fmt, type Unit } from '../options';
 
+import { PieceVector } from './piece-vector';
+
 /**
  * CAD canvas for flat patterns (ADR-059): real-scale rulers and grid, zoom to true size (1:1,
  * calibrated), snapping to grid and points, and tools — select/move, direct point & curve editing,
@@ -47,6 +46,8 @@ export interface CadSettings {
   snapPoints: boolean;
   showGrid: boolean;
   showAllowance: boolean;
+  /** Seam names and lengths on every piece (otherwise only the selected one). */
+  showDimensions: boolean;
   /** Screen pixels per millimetre at 100 % (calibration). */
   pxPerMm: number;
 }
@@ -61,41 +62,8 @@ const STEPS = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
 type Pt = { x: number; y: number };
 
 function autoLayout(pieces: readonly PatternPiece[]): Map<string, Pt> {
-  const out = new Map<string, Pt>();
-  let x = 0;
-  let y = 0;
-  let row = 0;
-  for (const p of pieces) {
-    const b = pieceBounds({ outline: offsetOutline(p.outline, p.seamAllowanceMm ?? 0) });
-    if (p.canvas) {
-      out.set(p.pieceId, p.canvas);
-      continue;
-    }
-    if (x > 0 && x + b.width > 2400) {
-      x = 0;
-      y += row + 160;
-      row = 0;
-    }
-    out.set(p.pieceId, { x: x - b.x, y: y - b.y });
-    x += b.width + 120;
-    row = Math.max(row, b.height);
-  }
-  return out;
+  return layoutCanvas(pieces);
 }
-
-function pathD(path: readonly PathNode[]): string {
-  const n = path.length;
-  if (!n) return '';
-  let d = `M${path[0]!.x} ${path[0]!.y}`;
-  for (let i = 0; i < n; i++) {
-    const c = segCubic(path, i);
-    const b = path[(i + 1) % n]!;
-    d += c ? `C${c[1].x} ${c[1].y} ${c[2].x} ${c[2].y} ${b.x} ${b.y}` : `L${b.x} ${b.y}`;
-  }
-  return `${d}Z`;
-}
-
-const poly = (pts: readonly Pt[]) => pts.map((p) => `${p.x},${p.y}`).join(' ');
 
 type Gesture =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
@@ -672,7 +640,7 @@ export function PatternCad({
                 k={1 / v.z}
                 unit={unit}
                 showAllowance={settings.showAllowance}
-                detailed={isSel}
+                detailed={isSel || settings.showDimensions}
                 fs={fs}
               />
             </g>
@@ -870,208 +838,6 @@ export function PatternCad({
       ) : null}
       {overlay}
     </div>
-  );
-}
-
-function PieceVector({
-  piece,
-  selected,
-  k,
-  unit,
-  showAllowance,
-  detailed,
-  fs,
-}: {
-  piece: PatternPiece;
-  selected: boolean;
-  k: number;
-  unit: Unit;
-  showAllowance: boolean;
-  detailed: boolean;
-  fs: number;
-}) {
-  const path = piece.path?.length ? piece.path : null;
-  const b = pieceBounds(piece);
-  const sa = piece.seamAllowanceMm ?? 0;
-  const dims = detailed
-    ? pieceDimensions({ outline: piece.outline, edges: piece.edges ?? [] })
-    : null;
-  const label = Math.min(fs * 1.25, Math.max(b.width, b.height) / 8);
-  return (
-    <>
-      {showAllowance && sa > 0 ? (
-        <polygon
-          points={poly(offsetOutline(piece.outline, sa))}
-          fill="none"
-          stroke="#94a3b8"
-          strokeWidth={1}
-          strokeDasharray="5 4"
-          vectorEffect="non-scaling-stroke"
-          pointerEvents="none"
-        />
-      ) : null}
-      {path ? (
-        <path
-          d={pathD(path)}
-          fill={selected ? '#dbeafe' : piece.source === 'user' ? '#fef3c7' : '#f8fafc'}
-          stroke={selected ? '#1d4ed8' : '#0f172a'}
-          strokeWidth={selected ? 2 : 1.4}
-          vectorEffect="non-scaling-stroke"
-          className="cursor-pointer"
-        />
-      ) : (
-        <polygon
-          points={poly(piece.outline)}
-          fill={selected ? '#dbeafe' : '#f8fafc'}
-          stroke="#0f172a"
-          strokeWidth={1.4}
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
-      {piece.foldLine ? (
-        <line
-          x1={piece.foldLine.from.x}
-          y1={piece.foldLine.from.y}
-          x2={piece.foldLine.to.x}
-          y2={piece.foldLine.to.y}
-          stroke="#7c3aed"
-          strokeWidth={2}
-          strokeDasharray="10 5"
-          vectorEffect="non-scaling-stroke"
-          pointerEvents="none"
-        />
-      ) : null}
-      {piece.grainline ? (
-        <line
-          x1={piece.grainline.from.x}
-          y1={piece.grainline.from.y}
-          x2={piece.grainline.to.x}
-          y2={piece.grainline.to.y}
-          stroke="#475569"
-          strokeWidth={1.3}
-          vectorEffect="non-scaling-stroke"
-          pointerEvents="none"
-        />
-      ) : null}
-      {piece.notches.map((n, i) => (
-        <circle key={i} cx={n.x} cy={n.y} r={2.5 * k} fill="#0f172a" pointerEvents="none" />
-      ))}
-      {(piece.markings ?? []).map((m, i) =>
-        m.kind === 'button' ? (
-          <circle
-            key={i}
-            cx={m.points[0]!.x}
-            cy={m.points[0]!.y}
-            r={5}
-            fill="none"
-            stroke="#0f172a"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-            pointerEvents="none"
-          />
-        ) : (
-          <polyline
-            key={i}
-            points={poly(m.points)}
-            fill="none"
-            stroke={
-              m.kind === 'dart'
-                ? '#dc2626'
-                : m.kind === 'zip'
-                  ? '#0891b2'
-                  : m.kind === 'gather'
-                    ? '#ea580c'
-                    : '#64748b'
-            }
-            strokeWidth={m.kind === 'zip' ? 3 : 1.2}
-            strokeDasharray={
-              m.kind === 'gather' || m.kind === 'line' || m.kind === 'fold' ? '4 3' : undefined
-            }
-            vectorEffect="non-scaling-stroke"
-            pointerEvents="none"
-          />
-        ),
-      )}
-      <text
-        x={b.cx}
-        y={b.cy}
-        fontSize={label}
-        textAnchor="middle"
-        fontWeight={600}
-        fill="#0f172a"
-        pointerEvents="none"
-      >
-        {piece.name}
-      </text>
-      <text
-        x={b.cx}
-        y={b.cy + label * 1.2}
-        fontSize={label * 0.7}
-        textAnchor="middle"
-        fill="#475569"
-        pointerEvents="none"
-      >
-        Cut {piece.cutQuantity}
-        {piece.foldLine ? ' on fold' : piece.mirrored ? ' (pair)' : ''}
-      </text>
-      {dims ? (
-        <g pointerEvents="none" data-testid="piece-dimensions">
-          <line
-            x1={b.x}
-            y1={b.y + b.height + sa + 18 * k}
-            x2={b.x + b.width}
-            y2={b.y + b.height + sa + 18 * k}
-            stroke="#475569"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-          <text
-            x={b.cx}
-            y={b.y + b.height + sa + 32 * k}
-            fontSize={fs}
-            textAnchor="middle"
-            fill="#0f172a"
-            data-testid="piece-width"
-          >
-            {fmt(dims.width, unit)} {unit}
-          </text>
-          <line
-            x1={b.x - sa - 18 * k}
-            y1={b.y}
-            x2={b.x - sa - 18 * k}
-            y2={b.y + b.height}
-            stroke="#475569"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-          <text
-            x={b.x - sa - 24 * k}
-            y={b.cy}
-            fontSize={fs}
-            textAnchor="middle"
-            fill="#0f172a"
-            transform={`rotate(-90 ${b.x - sa - 24 * k} ${b.cy})`}
-            data-testid="piece-height"
-          >
-            {fmt(dims.height, unit)} {unit}
-          </text>
-          {dims.edges
-            .filter((e) => e.length > 20)
-            .map((e) => (
-              <text
-                key={`${e.name}-${e.mid.x}`}
-                x={e.mid.x + (e.mid.x < b.cx ? -5 * k : 5 * k)}
-                y={e.mid.y}
-                fontSize={fs * 0.9}
-                textAnchor={e.mid.x < b.cx ? 'end' : 'start'}
-                fill="#1e40af"
-              >
-                {e.label} {fmt(path ? pathEdgeLength(path, e.name) : e.length, unit)}
-              </text>
-            ))}
-        </g>
-      ) : null}
-    </>
   );
 }
 

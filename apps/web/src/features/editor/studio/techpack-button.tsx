@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileTextIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -20,8 +20,10 @@ import { SimpleSelect } from '@/components/ui/select';
 import { newIdempotencyKey } from '@/features/designs/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { studioApi } from '@/features/studio/api';
+import { toApiError } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/query/keys';
 
+import { useRevisionsApi } from '../revisions/use-revisions';
 import { selectHasUnsavedWork } from '../store';
 import { useEditor, useEditorStore } from '../store-context';
 
@@ -29,22 +31,25 @@ const rev = (n: number | undefined) => (n ? `R${String(n).padStart(3, '0')}` : '
 
 /**
  * "Generate tech pack" (Component 3, ADR-056): documents the latest committed revision — never the
- * draft, and the generator never changes the design. Uncommitted changes are pointed out first.
+ * draft, and the generator never changes the design. With uncommitted changes the user can commit
+ * them as a new revision in the same step (ADR-060: patterns finished → tech pack), or generate
+ * for the previous revision.
  */
 export function TechPackButton() {
   const { can } = useOrganization();
   const [open, setOpen] = useState(false);
+  const patternFirst = useEditor((s) => !!s.display.patternSpec);
   if (!can('design.generate')) return null;
   return (
     <>
       <Button
         size="sm"
-        variant="outline"
+        variant={patternFirst ? 'default' : 'outline'}
         className="h-7 gap-1 px-2 text-xs"
         onClick={() => setOpen(true)}
         data-testid="techpack-button"
       >
-        <FileTextIcon aria-hidden /> Tech pack
+        <FileTextIcon aria-hidden /> {patternFirst ? 'Create tech pack' : 'Tech pack'}
       </Button>
       {open ? <TechPackDialog onClose={() => setOpen(false)} /> : null}
     </>
@@ -58,6 +63,12 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
   const designId = useEditor((s) => s.meta.design.id);
   const head = useEditor((s) => s.meta.headRevision);
   const uncommitted = useEditor((s) => s.server.hasUncommittedChanges || selectHasUnsavedWork(s));
+  const canEdit = useEditor((s) => s.meta.capabilities.canEdit);
+  const revisions = useRevisionsApi();
+  const queryClient = useQueryClient();
+  const [commitFirst, setCommitFirst] = useState(true);
+  const [commitKey] = useState(() => globalThis.crypto.randomUUID());
+  const willCommit = uncommitted && canEdit && commitFirst;
   const [modelImages, setModelImages] = useState(true);
   const [presentation, setPresentation] = useState({
     model: 'female' as 'female' | 'male' | 'child' | 'none',
@@ -82,6 +93,24 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
   const generate = useMutation({
     mutationFn: async () => {
       await store.getState().flush();
+      if (willCommit && store.getState().server.hasUncommittedChanges) {
+        try {
+          await revisions.commit(
+            {
+              expectedVersion: store.getState().server.version,
+              summary: 'Patterns finalized for the tech pack',
+              allowNoChanges: false,
+            },
+            commitKey,
+          );
+        } catch (e) {
+          if (toApiError(e).code !== 'NO_CHANGES') throw e;
+        }
+        await store.getState().reloadFromServer();
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.org(active.id).revisions(designId),
+        });
+      }
       return studioApi.createTechPack(
         active.id,
         designId,
@@ -102,19 +131,34 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>Generate tech pack</DialogTitle>
           <DialogDescription>
-            Documents revision {rev(head?.revisionNumber)} exactly as committed: views, components,
-            flat patterns, bill of materials, measurements and construction. Anything missing is
-            listed — never invented.
+            Documents revision{' '}
+            {rev(willCommit ? (head?.revisionNumber ?? 0) + 1 : head?.revisionNumber)} exactly as
+            committed: views, components, flat patterns, bill of materials, measurements and
+            construction. Anything missing is listed — never invented.
           </DialogDescription>
         </DialogHeader>
         {uncommitted ? (
-          <p
-            className="rounded-md border border-status-needs-review/50 p-2 text-[13px]"
+          <div
+            className="flex flex-col gap-2 rounded-md border border-status-needs-review/50 p-2 text-[13px]"
             data-testid="techpack-uncommitted"
           >
-            You have changes that are not committed. Commit them first if the tech pack should
-            include them.
-          </p>
+            <p>Your latest changes are not in a revision yet.</p>
+            {canEdit ? (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={commitFirst}
+                  onChange={(e) => setCommitFirst(e.target.checked)}
+                  data-testid="techpack-commit-first"
+                />
+                Commit them as revision {rev((head?.revisionNumber ?? 0) + 1)} and document that
+              </label>
+            ) : (
+              <p className="text-muted-foreground">
+                The tech pack will document {rev(head?.revisionNumber)} without them.
+              </p>
+            )}
+          </div>
         ) : null}
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
@@ -215,10 +259,14 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
           </Button>
           <Button
             onClick={() => generate.mutate()}
-            disabled={!head || !chosen || generate.isPending}
+            disabled={(!head && !willCommit) || !chosen || generate.isPending}
             data-testid="generate-techpack"
           >
-            {generate.isPending ? 'Starting…' : `Generate for ${rev(head?.revisionNumber)}`}
+            {generate.isPending
+              ? 'Starting…'
+              : willCommit
+                ? `Commit ${rev((head?.revisionNumber ?? 0) + 1)} and generate`
+                : `Generate for ${rev(head?.revisionNumber)}`}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-08 — All three components aligned: sketch → patterns → tech pack (owner request) — DONE
+
+- Request: fix the whole model (sketch start only) so the AI's patterns, the upgraded CAD editor and the tech pack line up, with dimensions visible properly in the editor, and a finished working flow.
+- Built (ADR-060): sketch prompt cues + `unsureOptions` ("check" badges); per-seam `allowances` with hem allowance and zero on folds; shared `cutOutline` everywhere (canvas, sheets, DXF, print, tech pack); initial canvas layout by part; new piece drawing (cut line, PLACE ON FOLD, grain arrows, notch ticks, seam labels along each seam, dimension toggle); review page uses the read-only CAD view; SA per seam in the seam table; step indicator and "Create tech pack" that commits the working copy first; tech pack cutting layout per fabric with yardage, sewing order from the parts, allowance notes. Removed the old `patterns/pattern-canvas.tsx` (replaced by `cad/pattern-preview.tsx`).
+- Tests: pattern-model 37 (+allowances/fold, cuff-joined sleeve hem, layout without overlap, marker inside the fabric and non-overlapping, sewing order); design-ai (+unsure options, marker/BOM/sewing order/allowance notes in the tech pack); e2e AI studio (+check badge, cut line/fold/seam labels on review, steps, per-seam SA, commit-and-generate, cutting layout in the tech pack). verify 65/65, integration api 139 + worker 13, e2e 30/30.
+- **Owner actions:** restart `pnpm dev` (no migration). On the device, delete `apps/web/src/features/patterns/pattern-canvas.tsx` if it is still there.
+- **Next step:** owner review of the full flow; then other starting points (photo, existing pattern).
+
 ### 2026-11-08 — Pattern CAD editor (owner request) — DONE
 
 - Request: the pattern editor should work like CAD (AutoCAD/Photoshop-style sizing) — accurate, editable pieces; lengthening, widening and reshaping. Owner chose all tool groups (rulers/grid/snap/1:1, exact point & curve editing, lengthen/widen, measure/move/rotate/mirror) and true-size output.

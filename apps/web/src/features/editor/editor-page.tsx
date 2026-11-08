@@ -214,6 +214,7 @@ function EditorHeader() {
         </span>
       </div>
       <Separator orientation="vertical" className="mx-1 h-5" />
+      <WorkflowSteps />
       {/* Working copy vs latest revision vs approved revision (NFR-PRJ-013, FR-EDT-092). */}
       <ul aria-label="Design versions" className="flex items-center gap-1.5">
         <li>
@@ -265,6 +266,42 @@ function EditorHeader() {
         <CommitButton />
       </div>
     </>
+  );
+}
+
+/**
+ * Pattern-first flow (ADR-058/060): sketch → patterns (this editor) → tech pack. Only shown for
+ * pattern-first designs; the tech pack step is the "Create tech pack" button on the right.
+ */
+function WorkflowSteps() {
+  const patternFirst = useEditor((s) => !!s.display.patternSpec);
+  const fromSketch = useEditor((s) => (s.display.sources ?? []).some((x) => x.role === 'sketch'));
+  if (!patternFirst) return null;
+  const steps = [
+    { label: fromSketch ? 'Sketch' : 'Start', state: 'done' as const },
+    { label: 'Patterns', state: 'current' as const },
+    { label: 'Tech pack', state: 'next' as const },
+  ];
+  return (
+    <ol aria-label="Design steps" className="hidden items-center gap-1 text-[11px] xl:flex" data-testid="workflow-steps">
+      {steps.map((st, i) => (
+        <li key={st.label} className="flex items-center gap-1">
+          {i ? <span className="text-muted-foreground" aria-hidden>›</span> : null}
+          <span
+            aria-current={st.state === 'current' ? 'step' : undefined}
+            className={cn(
+              'rounded-full px-2 py-0.5',
+              st.state === 'done' && 'bg-status-confirmed/15 text-status-confirmed',
+              st.state === 'current' && 'bg-primary text-primary-foreground',
+              st.state === 'next' && 'border text-muted-foreground',
+            )}
+          >
+            {st.state === 'done' ? '✓ ' : `${i + 1} `}
+            {st.label}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

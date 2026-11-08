@@ -7,7 +7,14 @@ import {
   type PatternPiece,
   shapePathD,
 } from '@ai-designer/garment-model';
-import { offsetOutline, pieceDimensions } from '@ai-designer/pattern-model';
+import {
+  cutOutline,
+  edgeAllowance,
+  edgeLength,
+  edgeMidFrame,
+  EDGE_LABELS,
+  segmentOnFold,
+} from '@ai-designer/pattern-model';
 
 /**
  * Vector drawings for the tech pack (ADR-057), drawn from the final editable geometry — the source
@@ -85,7 +92,8 @@ export function componentShapeSvg(c: DesignComponent): string | null {
 export function pieceDetailSvg(piece: PatternPiece): string {
   const b = outlineBounds(piece.outline);
   const sa = piece.seamAllowanceMm ?? 0;
-  const pad = sa + 60;
+  const maxSa = Math.max(sa, ...Object.values(piece.allowances ?? {}));
+  const pad = maxSa + 60 + Math.max(10, Math.max(b.width, b.height) / 28) * 1.6;
   const W = b.width + pad * 2;
   const H = b.height + pad * 2 + 40;
   const x0 = b.x - pad;
@@ -94,9 +102,9 @@ export function pieceDetailSvg(piece: PatternPiece): string {
   const fs = Math.max(10, Math.max(b.width, b.height) / 28);
   const poly = (pts: readonly { x: number; y: number }[]) =>
     pts.map((p) => `${f(p.x)},${f(p.y)}`).join(' ');
-  const cut = offsetOutline(piece.outline, sa);
-  const dimY = b.y + b.height + sa + 24;
-  const dimX = b.x - sa - 24;
+  const cut = cutOutline(piece);
+  const dimY = b.y + b.height + maxSa + 24 + fs * 1.6;
+  const dimX = b.x - maxSa - 24 - fs * 1.6;
   const parts = [
     `<rect x="${f(x0)}" y="${f(y0)}" width="${f(W)}" height="${f(H)}" fill="#fff"/>`,
     `<defs><marker id="dm" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#111827"/></marker></defs>`,
@@ -112,12 +120,25 @@ export function pieceDetailSvg(piece: PatternPiece): string {
       (n) => `<circle cx="${f(n.x)}" cy="${f(n.y)}" r="${f(sw * 3)}" fill="#111827"/>`,
     ),
     ...(piece.markings ?? []).map((m) => markingSvg(m, sw)),
-    ...pieceDimensions({ outline: piece.outline, edges: piece.edges ?? [] })
-      .edges.filter((e) => e.length > 25)
-      .map(
+    ...(piece.edges ?? [])
+      .filter(
         (e) =>
-          `<text x="${f(e.mid.x)}" y="${f(e.mid.y - sw * 4)}" font-size="${f(fs * 0.62)}" text-anchor="middle" fill="#1e40af" font-family="Helvetica, Arial, sans-serif">${esc(e.label)} ${e.length} mm</text>`,
-      ),
+          e.from < piece.outline.length &&
+          e.to < piece.outline.length &&
+          edgeLength(piece.outline, e) > 25,
+      )
+      .map((e) => {
+        const fr = edgeMidFrame(piece.outline, e);
+        const fold = segmentOnFold(piece, fr.segment);
+        const allow = fold ? 0 : edgeAllowance(piece, e.name);
+        const d = allow + fs * 0.75;
+        const x = fr.p.x + fr.normal.x * d;
+        const y = fr.p.y + fr.normal.y * d;
+        const ang = fr.angle > 90 ? fr.angle - 180 : fr.angle < -90 ? fr.angle + 180 : fr.angle;
+        const extra = fold ? ' · FOLD' : allow !== sa ? ` · SA ${allow}` : '';
+        const label = EDGE_LABELS[e.name] ?? e.name.replaceAll('_', ' ');
+        return `<text x="${f(x)}" y="${f(y)}" font-size="${f(fs * 0.62)}" text-anchor="middle" dominant-baseline="middle" fill="${fold ? '#6d28d9' : '#1e40af'}" font-family="Helvetica, Arial, sans-serif" transform="rotate(${f(ang)} ${f(x)} ${f(y)})">${esc(label)} ${Math.round(edgeLength(piece.outline, e))} mm${extra}</text>`;
+      }),
     // width dimension
     `<line x1="${f(b.x)}" y1="${f(dimY)}" x2="${f(b.x + b.width)}" y2="${f(dimY)}" stroke="#111827" stroke-width="${f(sw)}" marker-start="url(#dm)" marker-end="url(#dm)"/>`,
     `<text x="${f(b.x + b.width / 2)}" y="${f(dimY - 6)}" font-size="${f(fs)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">${Math.round(b.width)} mm</text>`,

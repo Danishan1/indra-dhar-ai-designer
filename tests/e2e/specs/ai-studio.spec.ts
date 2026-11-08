@@ -55,11 +55,23 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
     timeout: 60_000,
   });
   await expect(page.getByTestId('sketch-reading')).toContainText('Bow at the back waist');
+  // Guesses are marked for checking (ADR-060).
+  await expect(page.getByTestId('unsure-closure')).toBeVisible();
   const preview = page.getByTestId('pattern-preview');
   await expect(preview.locator('[data-piece-name="Peter Pan collar"]')).toBeVisible();
   await expect(
     preview.locator('[data-piece-name="Bodice front"] [data-testid="piece-width"]'),
   ).toContainText('cm');
+  // Same drawing as the editor: cutting lines, fold marks, seams dimensioned.
+  await expect(
+    preview.locator('[data-piece-name="Bodice front"] [data-testid="cut-line"]'),
+  ).toHaveCount(1);
+  await expect(
+    preview.locator('[data-piece-name="Bodice front"] [data-testid="fold-mark"]'),
+  ).toHaveCount(1);
+  await expect(
+    preview.locator('[data-piece-name="Bodice front"] [data-testid="edge-label-shoulder"]'),
+  ).toContainText('shoulder');
   await page.getByLabel('Skirt shape').click();
   await page.getByRole('option', { name: 'Full circle' }).click();
   await expect(preview.locator('[data-piece-name="Skirt front"]')).toBeVisible();
@@ -71,6 +83,7 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(workspace).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('heading', { level: 1, name: 'Party dress' })).toBeVisible();
   await expect(page.getByTestId('reference-panel').locator('img')).toBeVisible();
+  await expect(page.getByTestId('workflow-steps')).toContainText('Patterns');
   expect(await page.getByTestId('piece-list-item').count()).toBeGreaterThan(6);
   // CAD view: real-scale rulers, true-size zoom.
   const canvas = page.getByTestId('pattern-canvas');
@@ -117,6 +130,16 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await side.press('Enter');
   await expect(side).toHaveValue((s0 + 1).toFixed(1));
 
+  // Per-seam allowance: a deeper hem; the fold edge has none.
+  const hemSa = page.getByTestId('edge-sa-hem');
+  await expect(hemSa).toHaveValue('30');
+  await hemSa.fill('40');
+  await hemSa.press('Tab');
+  await expect(
+    canvas.locator('[data-piece-name="Skirt front"] [data-testid="edge-label-hem"]'),
+  ).toContainText('SA 4');
+  await expect(page.getByTestId('piece-edges')).toContainText('fold');
+
   // Direct point editing: select a point, type its exact X.
   await page.getByTestId('tool-point').click();
   await canvas.getByTestId('path-node').first().click();
@@ -146,15 +169,11 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await page.getByRole('tab', { name: 'Fit' }).click();
   await expect(page.getByTestId('seam-checks')).toBeVisible();
 
-  // Commit so the tech pack documents the edited pattern.
-  await page.getByTestId('commit-button').first().click();
-  const commitDialog = page.getByRole('dialog', { name: 'Commit a new revision' });
-  await commitDialog.getByRole('button', { name: 'Commit revision' }).click();
-  await expect(commitDialog).toBeHidden();
-  await expect(page.getByTestId('latest-revision-badge')).toHaveText('Latest R002');
-
-  // 4. Tech pack generated from the patterns.
+  // 4. Tech pack: the edits are committed as R002 in the same step.
   await page.getByTestId('techpack-button').click();
+  await expect(page.getByTestId('techpack-uncommitted')).toBeVisible();
+  await expect(page.getByTestId('techpack-commit-first')).toBeChecked();
+  await expect(page.getByTestId('generate-techpack')).toHaveText('Commit R002 and generate');
   await page.getByTestId('generate-techpack').click();
   await expect(page.getByRole('heading', { level: 1, name: /^Tech pack/ })).toBeVisible();
   await expect(page.getByTestId('techpack-document')).toBeVisible({ timeout: 120_000 });
@@ -165,6 +184,8 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(frame.getByRole('heading', { name: /Pattern piece — Bodice front/ })).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Original reference' })).toBeVisible();
   await expect(frame.getByText('Sleeve band', { exact: false }).first()).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Cutting layout — main' })).toBeVisible();
+  await expect(frame.getByText('hem 40 mm').first()).toBeVisible();
   if (process.env.PDF_CHROMIUM_PATH || process.env.E2E_EXPECT_PDF) {
     const [file] = await Promise.all([
       page.waitForEvent('download'),

@@ -398,6 +398,7 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
     const forWho = (/It is for: (.*)\.$/m.exec(req.prompt)?.[1] ?? '').toLowerCase();
     const base = {
       proportions: { lengthToShoulder: null, skirtToBodice: 1.5, sleeveToShoulder: null },
+      unsureOptions: ['closure'],
       uncertain: ['Back view not shown'],
       confidence: 0.75,
     };

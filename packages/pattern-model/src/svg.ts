@@ -1,5 +1,7 @@
 import { outlineBounds, type PatternPiece, type PatternPoint } from '@ai-designer/garment-model';
 
+import { cutOutline } from './cut.js';
+
 /** Pure SVG helpers for pattern pieces (editor pattern view, tech pack). Units: mm. */
 
 const f = (n: number) => (Math.round(n * 10) / 10).toString();
@@ -71,7 +73,7 @@ export function layoutPieces(
   let width = 0;
   const placed: PlacedPiece[] = [];
   for (const piece of pieces) {
-    const cut = offsetOutline(piece.outline, piece.seamAllowanceMm ?? 0);
+    const cut = cutOutline(piece);
     const b = outlineBounds(cut);
     if (x > 0 && x + b.width > maxWidth) {
       x = 0;
@@ -99,7 +101,7 @@ const esc = (s: string) =>
 
 /** One piece as SVG markup (seam line, cutting line, grainline, fold, notches, label). */
 export function pieceMarkup(piece: PatternPiece, opts: { highlight?: boolean } = {}): string {
-  const cut = offsetOutline(piece.outline, piece.seamAllowanceMm ?? 0);
+  const cut = cutOutline(piece);
   const b = outlineBounds(piece.outline);
   const parts = [
     `<path d="${pathD(cut)}" fill="${opts.highlight ? '#fef3c7' : '#ffffff'}" stroke="#111827" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`,

@@ -23,6 +23,7 @@ describe('sketch → pattern (ADR-058)', () => {
       style: { collar: 'peter_pan', sleeveStyle: 'puff', skirt: 'gathered' },
     });
     expect(r.fromSketch).toContain('collar');
+    expect(r.unsure).toEqual(['closure']);
     expect(r.notes.join(' ')).toMatch(/Bow/);
     const draft = draftPattern(r.spec);
     const state = patternDesignState(draft, {
@@ -55,6 +56,15 @@ describe('sketch → pattern (ADR-058)', () => {
     const html = techPackHtml(doc, () => null);
     expect(html).toContain('Pattern specification');
     expect(html).toContain('Seam fit checks');
+    // ADR-060: cutting layout drives the yardage; sewing order comes from the parts.
+    expect(doc.patterns.markers[0]).toMatchObject({ fabricRole: 'main', fabricWidthMm: 1500 });
+    expect(doc.patterns.markers[0]!.lengthMm).toBeGreaterThan(400);
+    expect(doc.bom.find((b) => b.item === 'Main fabric')?.notes).toMatch(/cutting layout/);
+    expect(doc.construction.steps.map((s) => s.title)).toContain('Set in sleeves');
+    expect(doc.patterns.pieces.some((p) => p.allowanceNotes.some((n) => /hem 30 mm/.test(n)))).toBe(
+      true,
+    );
+    expect(html).toContain('Cutting layout — main');
   });
 
   it('is tolerant: unknown values become null, odd combinations are fixed', () => {

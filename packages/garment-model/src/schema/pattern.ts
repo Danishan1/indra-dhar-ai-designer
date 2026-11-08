@@ -107,6 +107,11 @@ export const patternPieceSchema = z.object({
   markings: z.array(patternMarkingSchema).max(80).optional(),
   /** Editable Bézier outline (see `pathNodeSchema`). */
   path: z.array(pathNodeSchema).min(3).max(400).optional(),
+  /**
+   * Seam allowance per named edge (mm), overriding `seamAllowanceMm` (ADR-060) — e.g. a deeper
+   * hem. Edges on the fold line never get allowance, whatever is set here.
+   */
+  allowances: z.record(z.string().trim().min(1).max(40), z.number().min(0).max(100)).optional(),
   /** Where the piece sits on the editor canvas (mm); layout only, not geometry. */
   canvas: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
 });

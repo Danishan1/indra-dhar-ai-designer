@@ -3,10 +3,19 @@ import {
   type DesignComponent,
   type GarmentDesignState,
   outlineBounds,
+  type PatternPiece,
   type PropertyValue,
 } from '@ai-designer/garment-model';
 import { geometryCapability, renderGarment, sceneToSvg } from '@ai-designer/garment-render';
-import { offsetOutline, patternSheetSvg } from '@ai-designer/pattern-model';
+import {
+  buildMarkers,
+  cutOutline,
+  EDGE_LABELS,
+  type Marker,
+  markerSvg,
+  patternSheetSvg,
+  sewingOrder,
+} from '@ai-designer/pattern-model';
 
 import type { TechPackText } from './analysis-schema.js';
 import { ATTRIBUTE_PROPERTY } from './library-match.js';
@@ -98,12 +107,23 @@ export interface TechPackDocument {
       widthMm: number;
       heightMm: number;
       seamAllowanceMm: number | null;
+      /** Edges with their own allowance (hems) and fold edges (0 mm). */
+      allowanceNotes: string[];
       fabricRole: string | null;
       source: string;
       status: string;
       notes: string[];
       pieceId: string;
       /** Dimensioned vector drawing with a 10 cm scale bar. */
+      svg: string;
+    }[];
+    /** Cutting layouts per fabric (ADR-060): grain along the length, planning estimate. */
+    markers: {
+      fabricRole: string;
+      fabricWidthMm: number;
+      lengthMm: number;
+      efficiency: number;
+      pieceCount: number;
       svg: string;
     }[];
   };
@@ -288,6 +308,7 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
 
   // Pattern-first designs: measurements come from the patterns, not component properties.
   const pattern = patternSection(state);
+  const markers: Marker[] = pattern && pieces.length ? buildMarkers(pieces) : [];
   if (pattern) {
     measurements.length = 0;
     for (const b of pattern.body)
@@ -356,10 +377,7 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
     }
     for (const p of pieces)
       if (descendants.has(p.componentId))
-        entry.area +=
-          area(offsetOutline(p.outline, p.seamAllowanceMm ?? 0)) *
-          p.cutQuantity *
-          (p.foldLine ? 2 : 1);
+        entry.area += area(cutOutline(p)) * p.cutQuantity * (p.foldLine ? 2 : 1);
     fabricUse.set(id, entry);
   }
   for (const f of fabricUse.values()) {
@@ -376,25 +394,21 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
   }
   if (!fabricUse.size && pattern) {
     // Pattern-first: estimate the yardage from the pieces themselves.
-    const total = pieces
-      .filter((p) => (p.fabricRole ?? 'main') === 'main')
-      .reduce(
-        (s, p) =>
-          s +
-          area(offsetOutline(p.outline, p.seamAllowanceMm ?? 0)) *
-            p.cutQuantity *
-            (p.foldLine ? 2 : 1),
-        0,
-      );
-    const metres = Math.max(0.1, (total * 1.25) / 1_500_000);
-    bom.push({
-      item: 'Main fabric',
-      type: 'fabric',
-      placement: 'All main pieces',
-      quantity: `≈ ${metres.toFixed(2)} m at 150 cm width`,
-      status: 'estimate',
-      notes: 'Choose the fabric; estimate from the pattern area + 25 % for layout',
-    });
+    // Pattern-first: yardage from the cutting layout (+5 % for shrinkage and ends).
+    for (const m of markers) {
+      const metres = Math.max(0.1, (m.lengthMm * 1.05) / 1000);
+      const main = m.fabricRole === 'main';
+      bom.push({
+        item: main ? 'Main fabric' : `${human(m.fabricRole)} fabric`,
+        type: m.fabricRole === 'interfacing' ? ('interfacing' as const) : ('fabric' as const),
+        placement: `${m.pieceCount} pieces — see cutting layout`,
+        quantity: `≈ ${metres.toFixed(2)} m at ${m.fabricWidthMm / 10} cm width`,
+        status: 'estimate',
+        notes: main
+          ? `Choose the fabric; from the cutting layout (${Math.round(m.efficiency * 100)} % used) + 5 %`
+          : `From the cutting layout (${Math.round(m.efficiency * 100)} % used) + 5 %`,
+      });
+    }
     const zips = pieces.flatMap((p) => p.markings ?? []).filter((m) => m.kind === 'zip');
     if (zips.length)
       bom.push({
@@ -507,6 +521,7 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
       widthMm: Math.round(b.width * (p.foldLine ? 2 : 1)),
       heightMm: Math.round(b.height),
       seamAllowanceMm: p.seamAllowanceMm,
+      allowanceNotes: allowanceNotes(p),
       fabricRole: p.fabricRole,
       source: p.source,
       status: p.status,
@@ -518,7 +533,15 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
   if (!pieces.length) missing.push({ area: 'Patterns', item: 'No pattern pieces in the design' });
 
   const text = input.text;
-  const steps = text?.constructionSteps.length ? text.constructionSteps : defaultSteps(state);
+  const steps = text?.constructionSteps.length
+    ? text.constructionSteps
+    : state.patternSpec
+      ? sewingOrder({
+          patternSpec: state.patternSpec,
+          components: state.components,
+          patternPieces: pieces,
+        }).map((x) => ({ title: x.title, details: x.detail, components: [] }))
+      : defaultSteps(state);
   const missingInfo = Array.isArray(meta['missingInformation'])
     ? (meta['missingInformation'] as unknown[]).filter((x): x is string => typeof x === 'string')
     : [];
@@ -558,6 +581,14 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
           }
         : null,
       pieces: patternRows,
+      markers: markers.map((m) => ({
+        fabricRole: m.fabricRole,
+        fabricWidthMm: m.fabricWidthMm,
+        lengthMm: m.lengthMm,
+        efficiency: m.efficiency,
+        pieceCount: m.pieceCount,
+        svg: markerSvg(m),
+      })),
     },
     construction: {
       aiDrafted: !!text?.constructionSteps.length,
@@ -575,6 +606,16 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
     care: text?.careNotes ?? [],
     missing: dedupe(missing),
   };
+}
+
+/** Allowances that differ from the piece's seam allowance (hems) and fold edges. */
+function allowanceNotes(p: PatternPiece): string[] {
+  const out: string[] = [];
+  for (const [name, mm] of Object.entries(p.allowances ?? {}))
+    if (mm !== p.seamAllowanceMm)
+      out.push(`${EDGE_LABELS[name] ?? name.replaceAll('_', ' ')} ${mm} mm`);
+  if (p.foldLine) out.push('fold edge 0 mm');
+  return out;
 }
 
 function dedupe<T extends { area: string; item: string }>(rows: T[]): T[] {

@@ -129,16 +129,21 @@ export function techPackHtml(
     <table class="full"><thead><tr><th>Piece</th><th>Component</th><th>Cut</th><th>Size (mm)</th><th>Seam allowance</th><th>Source</th><th>Status</th></tr></thead><tbody>${doc.patterns.pieces
       .map(
         (p) =>
-          `<tr><td>${esc(p.name)}</td><td>${esc(p.component)}</td><td>${p.cutQuantity}${p.onFold ? ' on fold' : ''}${p.mirrored ? ' (pair)' : ''}</td><td>${p.widthMm} × ${p.heightMm}</td><td>${p.seamAllowanceMm ?? '—'} mm</td><td>${esc(p.source)}</td><td>${badge(p.status)}</td></tr>`,
+          `<tr><td>${esc(p.name)}</td><td>${esc(p.component)}</td><td>${p.cutQuantity}${p.onFold ? ' on fold' : ''}${p.mirrored ? ' (pair)' : ''}</td><td>${p.widthMm} × ${p.heightMm}</td><td>${p.seamAllowanceMm ?? '—'} mm${p.allowanceNotes?.length ? `<br><span class="muted">${esc(p.allowanceNotes.join(' · '))}</span>` : ''}</td><td>${esc(p.source)}</td><td>${badge(p.status)}</td></tr>`,
       )
       .join('')}</tbody></table></section>`);
 
   for (const p of doc.patterns.pieces.filter((x) => x.svg))
     sections.push(
-      `<section class="piece"><h2>Pattern piece — ${esc(p.name)}</h2><p class="muted">${esc(p.component)} · cut ${p.cutQuantity}${p.onFold ? ' on fold' : ''}${p.mirrored ? ' (pair)' : ''} · seam allowance ${p.seamAllowanceMm ?? '—'} mm · ${esc(p.source)} · ${badge(p.status)} · ${esc(p.pieceId ?? '')}</p><figure class="wide"><div class="svg">${p.svg}</div><figcaption>Solid: seam line · dashed: cutting line (seam allowance) · arrows: grainline · blue dash-dot: fold · dots: notches · bar: 100 mm</figcaption></figure></section>`,
+      `<section class="piece"><h2>Pattern piece — ${esc(p.name)}</h2><p class="muted">${esc(p.component)} · cut ${p.cutQuantity}${p.onFold ? ' on fold' : ''}${p.mirrored ? ' (pair)' : ''} · seam allowance ${p.seamAllowanceMm ?? '—'} mm${p.allowanceNotes?.length ? ` (${esc(p.allowanceNotes.join(', '))})` : ''} · ${esc(p.source)} · ${badge(p.status)} · ${esc(p.pieceId ?? '')}</p><figure class="wide"><div class="svg">${p.svg}</div><figcaption>Solid: seam line · dashed: cutting line (seam allowance) · arrows: grainline · blue dash-dot: fold · dots: notches · bar: 100 mm</figcaption></figure></section>`,
     );
 
-  sections.push(`<section><h2>Construction</h2>${doc.construction.aiDrafted ? '<p class="note">AI-drafted construction notes — review before production.</p>' : '<p class="note">Generic sewing order (no AI draft).</p>'}
+  for (const m of doc.patterns.markers ?? [])
+    sections.push(
+      `<section class="piece" data-section="cutting-layout"><h2>Cutting layout — ${esc(m.fabricRole.replaceAll('_', ' '))}</h2><p class="muted">${m.pieceCount} pieces on ${m.fabricWidthMm / 10} cm fabric, grain along the length · marker length ${(m.lengthMm / 1000).toFixed(2)} m · ${Math.round(m.efficiency * 100)} % used · planning estimate, not a production marker</p><figure class="wide"><div class="svg">${m.svg}</div><figcaption>Fold pieces opened out, pairs mirrored · solid: cutting line · dashed: seam line · bar: 10 cm</figcaption></figure></section>`,
+    );
+
+  sections.push(`<section><h2>Construction</h2>${doc.construction.aiDrafted ? '<p class="note">AI-drafted construction notes — review before production.</p>' : doc.pattern ? '<p class="note">Sewing order derived from the pattern parts (proposed).</p>' : '<p class="note">Generic sewing order (no AI draft).</p>'}
     <ol>${doc.construction.steps.map((s) => `<li><strong>${esc(s.title)}</strong>${s.details ? ` — ${esc(s.details)}` : ''}</li>`).join('')}</ol>
     ${doc.construction.stitching.length ? `<h3>Stitching</h3><table class="full"><thead><tr><th>Seam</th><th>Stitch</th><th>Notes</th></tr></thead><tbody>${doc.construction.stitching.map((s) => `<tr><td>${esc(s.seam)}</td><td>${esc(s.stitch)}</td><td>${esc(s.notes)}</td></tr>`).join('')}</tbody></table>` : ''}
     ${doc.construction.finishing.length ? `<h3>Finishing</h3><ul>${doc.construction.finishing.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}

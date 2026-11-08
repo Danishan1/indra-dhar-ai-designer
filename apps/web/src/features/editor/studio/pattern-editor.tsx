@@ -1,7 +1,7 @@
 'use client';
 
 import { outlineBounds, type PatternPiece } from '@ai-designer/garment-model';
-import { offsetOutline } from '@ai-designer/pattern-model';
+import { cutOutline } from '@ai-designer/pattern-model';
 import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -212,7 +212,7 @@ function PieceCard({
         aria-label={`Pattern piece ${p.name}`}
       >
         <polygon
-          points={poly(offsetOutline(p.outline, sa))}
+          points={poly(cutOutline(p))}
           fill="none"
           stroke="#6b7280"
           strokeWidth={unit}

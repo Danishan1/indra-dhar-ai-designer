@@ -1,6 +1,6 @@
 import type { PatternPiece } from '@ai-designer/garment-model';
 
-import { offsetOutline } from '../svg.js';
+import { cutOutline } from '../cut.js';
 
 import { pieceBounds } from './path.js';
 
@@ -20,7 +20,7 @@ type Piece = Pick<
   | 'cutQuantity'
   | 'mirrored'
 > &
-  Partial<Pick<PatternPiece, 'markings'>>;
+  Partial<Pick<PatternPiece, 'markings' | 'edges' | 'allowances'>>;
 
 interface Placed {
   piece: Piece;
@@ -42,7 +42,7 @@ export function layoutForOutput(
   let row = 0;
   let maxX = 0;
   for (const p of pieces) {
-    const cut = offsetOutline(p.outline, p.seamAllowanceMm ?? 0);
+    const cut = cutOutline(p);
     const b = pieceBounds({ outline: cut });
     if (x > 0 && x + b.width > width) {
       x = 0;
@@ -133,7 +133,7 @@ export function piecesToDxf(pieces: readonly Piece[]): string {
   for (const { piece: p, dx, dy } of placed) {
     poly('SEAM', p.outline, true, dx, dy);
     if ((p.seamAllowanceMm ?? 0) > 0)
-      poly('CUT', offsetOutline(p.outline, p.seamAllowanceMm ?? 0), true, dx, dy);
+      poly('CUT', cutOutline(p), true, dx, dy);
     if (p.grainline) line('GRAIN', p.grainline.from, p.grainline.to, dx, dy);
     if (p.foldLine) line('FOLD', p.foldLine.from, p.foldLine.to, dx, dy);
     for (const nt of p.notches)
@@ -186,8 +186,8 @@ export function tiledPrintHtml(
       const b = pieceBounds(p);
       const sa = p.seamAllowanceMm ?? 0;
       return [
-        sa > 0
-          ? `<polygon points="${pts(offsetOutline(p.outline, sa))}" fill="none" stroke="#000" stroke-width="0.4"/>`
+        sa > 0 || p.allowances
+          ? `<polygon points="${pts(cutOutline(p))}" fill="none" stroke="#000" stroke-width="0.4"/>`
           : '',
         `<polygon points="${pts(p.outline)}" fill="none" stroke="#000" stroke-width="0.25" stroke-dasharray="2 1.2"/>`,
         p.grainline
@@ -207,7 +207,7 @@ export function tiledPrintHtml(
               `<polyline points="${pts(m.points)}" fill="none" stroke="#000" stroke-width="0.3"/>`,
           ),
         `<text x="${b.cx + dx}" y="${b.cy + dy}" font-size="6" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">${esc(p.name)}</text>`,
-        `<text x="${b.cx + dx}" y="${b.cy + dy + 8}" font-size="4" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">Cut ${p.cutQuantity}${p.foldLine ? ' on fold' : ''} · SA ${sa} mm</text>`,
+        `<text x="${b.cx + dx}" y="${b.cy + dy + 8}" font-size="4" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">Cut ${p.cutQuantity}${p.foldLine ? ' on fold' : ''} · SA ${sa} mm${p.allowances?.hem ? ` · hem ${p.allowances.hem} mm` : ''}</text>`,
       ].join('');
     })
     .join('');

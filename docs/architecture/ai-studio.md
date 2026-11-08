@@ -44,6 +44,22 @@ Size charts are approximations to start from — every measurement is editable. 
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
 the seam allowance is drawn outside.
 
+### One flow, one drawing (ADR-060)
+
+| Piece                                                                                                                                                                                                        | Where                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Cutting line with allowance per seam (`allowances`, hem allowance, none on the fold): `cutOutline`, `segmentAllowances`, `edgeAllowance`, `edgeOnFold`, `edgeMidFrame`; initial canvas layout `layoutCanvas` | `pattern-model/src/cut.ts`                                          |
+| Cutting layout per fabric (`buildMarkers`, `markerSvg`)                                                                                                                                                      | `pattern-model/src/marker.ts`                                       |
+| Sewing order from the pattern parts (`sewingOrder`)                                                                                                                                                          | `pattern-model/src/sewing-order.ts`                                 |
+| Piece drawing shared by the review page and the editor (cut line, fold, grain, notches, seam labels)                                                                                                         | `web/features/patterns/cad/piece-vector.tsx`, `pattern-preview.tsx` |
+| Sketch guesses (`unsureOptions` → review "check")                                                                                                                                                            | `design-ai/src/sketch.ts`, `web/features/studio/sketch-review.tsx`  |
+| Commit-and-generate tech pack, step indicator                                                                                                                                                                | `web/features/editor/studio/techpack-button.tsx`, `editor-page.tsx` |
+
+The tech pack of a pattern-first design adds a **Cutting layout** page per fabric (marker length,
+% used — a planning estimate, not a production marker), takes the fabric yardage from it, lists
+per-seam allowances, and uses the deterministic sewing order when the AI drafts no notes (the AI
+gets it as context either way).
+
 ## Reconstruct, don't crop (ADR-057)
 
 The analyzer rebuilds the garment as **editable vector artifacts**. Each component has `shapes`

@@ -16,6 +16,7 @@ import {
 } from '@ai-designer/garment-model';
 
 import { attachPath, scalePiece } from '../cad/path.js';
+import { layoutCanvas } from '../cut.js';
 
 import type { PatternDraft } from './draft-pattern.js';
 import { edgeLength, type P } from './geom.js';
@@ -91,6 +92,10 @@ export function draftToState(
   );
   const pieces: PatternPiece[] = [];
   const kept: string[] = [];
+  // Sleeves finished by a cuff or band are seamed to it: their hem takes the seam allowance.
+  const sleeveFinished = draft.parts.some((p) =>
+    p.pieces.some((d) => d.template === 'cuff' || d.template === 'sleeve_band'),
+  );
   for (const part of draft.parts) {
     const componentId = ids.get(part.key)!;
     for (const d of part.pieces) {
@@ -119,11 +124,44 @@ export function draftToState(
           notes: d.notes.slice(0, 20),
           edges: d.edges,
           markings: d.markings,
+          ...mergeAllowances(
+            hemAllowances(d.template, d.edges, draft.spec.hemAllowanceMm, sleeveFinished),
+            old?.allowances,
+          ),
+          ...(old?.canvas ? { canvas: old.canvas } : {}),
         }),
       );
     }
   }
-  return { components, patternPieces: pieces, kept };
+  const layout = layoutCanvas(pieces);
+  const placed = pieces.map((p) => (p.canvas ? p : { ...p, canvas: layout.get(p.pieceId)! }));
+  return { components, patternPieces: placed, kept };
+}
+
+/** Per-seam allowances set by hand survive a redraft; hems follow the spec's hem allowance. */
+function mergeAllowances(
+  drafted: { allowances?: Record<string, number> },
+  old: Record<string, number> | undefined,
+): { allowances?: Record<string, number> } {
+  const kept = Object.fromEntries(
+    Object.entries(old ?? {}).filter(([k]) => k !== 'hem' && k !== 'hem_ext'),
+  );
+  const all = { ...kept, ...drafted.allowances };
+  return Object.keys(all).length ? { allowances: all } : {};
+}
+
+/** Garment hems get the hem allowance (ADR-060); seams joined to a cuff or band keep the SA. */
+function hemAllowances(
+  template: string,
+  edges: readonly { name: string }[],
+  hemMm: number | undefined,
+  sleeveFinished: boolean,
+): { allowances?: Record<string, number> } {
+  if (hemMm === undefined) return {};
+  if (template === 'sleeve' && sleeveFinished) return {};
+  const names = edges.map((e) => e.name).filter((n) => n === 'hem' || n === 'hem_ext');
+  if (!names.length) return {};
+  return { allowances: Object.fromEntries(names.map((n) => [n, hemMm])) };
 }
 
 function makeComponent(

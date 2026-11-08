@@ -119,6 +119,8 @@ export const sketchReadingSchema = z.object({
     .default({ lengthToShoulder: null, skirtToBodice: null, sleeveToShoulder: null }),
   /** Design details the pattern engine does not draft (ruffles, bows, embroidery…). */
   details: z.array(z.string().max(200)).max(20).catch([]).default([]),
+  /** Style option keys the model chose but is not sure about (shown as "check" on review). */
+  unsureOptions: z.array(z.string().max(40)).max(20).catch([]).default([]),
   /** What the sketch does not show (back view, closure…). */
   uncertain: z.array(z.string().max(200)).max(20).catch([]).default([]),
   description: z.string().max(1500).catch('').default(''),
@@ -129,7 +131,9 @@ export const SKETCH_SYSTEM = [
   'You are a pattern maker reading a fashion sketch for someone who is NOT a professional.',
   'Identify the garment and choose, for each style option, the value from the allowed list that',
   'best matches the drawing. Use null when the sketch does not show it. Never invent measurements;',
-  'only estimate the proportions asked for.',
+  'only estimate the proportions asked for. Read the construction lines, not the shading: seam',
+  'lines, darts, gathers (many small folds), button stands, collars and hems. When a choice is a',
+  'guess, still give the most likely value and list its key in unsureOptions.',
 ].join(' ');
 
 export function sketchPrompt(input: {
@@ -167,7 +171,20 @@ export function sketchPrompt(input: {
     '  lengthToShoulder, skirtToBodice (dresses: skirt length ÷ bodice length), sleeveToShoulder;',
     '- details: design details a basic pattern will not include (ruffles, bows, smocking, prints…);',
     '- uncertain: what you could not tell from the sketch (back view, closure, fabric…);',
+    '- unsureOptions: keys of the style options above that are a guess (e.g. ["closure", "darts"]);',
     '- description: two or three sentences describing the garment.',
+    '',
+    'Visual cues:',
+    '- collar: peter_pan = flat rounded collar lying on the shoulders; shirt = pointed collar on a stand;',
+    '  mandarin = small upright band; none = plain neckline.',
+    '- sleeveStyle: puff = gathered at the cap and/or hem, rounded; flutter = loose flared; straight otherwise.',
+    '- skirt: gathered = many soft folds at the waist; a_line = smooth flare, no folds; circle = deep even',
+    '  waves at the hem; straight/pencil = sides nearly parallel.',
+    '- closure: buttons down the front → front_buttons; a line at centre back or nothing visible on a',
+    '  fitted dress → back_zip (list "closure" as unsure when the back is not shown); trousers → fly_zip.',
+    '- darts: short tapering lines from the waist or side towards the bust/hips.',
+    '- length (dresses/skirts): mini above mid-thigh, knee around the knee, midi mid-calf, maxi ankle.',
+    '- fit: fitted follows the body closely; relaxed/oversized hang away from it.',
   ]
     .filter((l) => l !== '')
     .join('\n');
@@ -177,7 +194,7 @@ export const SKETCH_SHAPE = `{
   "family": "dress", "label": "Girls' puff-sleeve party dress", "audience": "girls", "confidence": 0.8,
   "style": { "fit": "regular", "topType": null, "neckline": "round", "collar": "peter_pan", "sleeve": "short", "sleeveStyle": "puff", "cuff": "band", "closure": "back_zip", "waistSeam": true, "skirt": "gathered", "length": "knee", "darts": false, "pockets": "none", "yoke": null, "leg": null, "waistband": null, "buttons": null },
   "proportions": { "lengthToShoulder": 2.9, "skirtToBodice": 1.6, "sleeveToShoulder": 0.5 },
-  "details": ["Bow at the back waist"], "uncertain": ["Back view not shown — back zip assumed"], "description": "…"
+  "details": ["Bow at the back waist"], "unsureOptions": ["closure"], "uncertain": ["Back view not shown — back zip assumed"], "description": "…"
 }`;
 
 export interface SketchAnalysis {
@@ -187,6 +204,8 @@ export interface SketchAnalysis {
   spec: PatternSpec;
   /** Reading values the spec took over / kept from defaults, for the review page. */
   fromSketch: string[];
+  /** Options read from the sketch that the model was unsure about (check them). */
+  unsure: string[];
   notes: string[];
   provider: string;
   models: { text: string; image: string };
@@ -222,7 +241,7 @@ export async function readSketch(
   });
   await deps.recordUsage?.(res.usage, 'succeeded');
   await deps.progress?.('Preparing the pattern');
-  const { spec, fromSketch, notes } = specFromReading(res.data, {
+  const { spec, fromSketch, unsure, notes } = specFromReading(res.data, {
     audience: input.audience ?? null,
     size: input.size ?? null,
   });
@@ -231,6 +250,7 @@ export async function readSketch(
     reading: res.data,
     spec,
     fromSketch,
+    unsure,
     notes,
     provider: deps.provider.name,
     models: deps.provider.models,
@@ -244,7 +264,7 @@ export async function readSketch(
 export function specFromReading(
   reading: SketchReading,
   input: { audience: PatternAudience | null; size: string | null; family?: PatternFamily | null },
-): { spec: PatternSpec; fromSketch: string[]; notes: string[] } {
+): { spec: PatternSpec; fromSketch: string[]; unsure: string[]; notes: string[] } {
   const notes: string[] = [];
   const family: PatternFamily =
     input.family ?? (reading.family === 'other' ? 'dress' : reading.family);
@@ -312,5 +332,11 @@ export function specFromReading(
     body: {},
     style: style as PatternStyleInput,
   });
-  return { spec, fromSketch, notes };
+  const styleKeys = new Set(Object.keys(spec.style));
+  const unsure = [...new Set(reading.unsureOptions)].filter(
+    (k) => styleKeys.has(k) && fromSketch.includes(k),
+  );
+  if (reading.confidence < 0.5)
+    notes.push('The sketch was hard to read — check the garment type and every option');
+  return { spec, fromSketch, unsure, notes };
 }

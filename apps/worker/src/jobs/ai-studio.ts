@@ -59,6 +59,7 @@ import {
   sha256Hex,
 } from '@ai-designer/garment-model';
 import { type AssetProcessingDeps, processAsset, storeGeneratedAsset } from '@ai-designer/media';
+import { sewingOrder } from '@ai-designer/pattern-model';
 import { createSecretCipher } from '@ai-designer/secrets';
 import type { Logger } from 'pino';
 import sharp from 'sharp';
@@ -745,7 +746,18 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
             prompt: techPackTextPrompt({
               state,
               summary: patternFirst
-                ? { garment: patternDescription(state), pattern: patternSection(state) }
+                ? {
+                    garment: patternDescription(state),
+                    pattern: patternSection(state),
+                    // ADR-060: the deterministic order from the parts, for the AI to refine.
+                    proposedSewingOrder: state.patternSpec
+                      ? sewingOrder({
+                          patternSpec: state.patternSpec,
+                          components: state.components,
+                          patternPieces: state.patternPieces ?? [],
+                        }).map((x) => `${x.step}. ${x.title}: ${x.detail}`)
+                      : [],
+                  }
                 : designSummary(state, artifacts),
             }),
             images: imageRefs,

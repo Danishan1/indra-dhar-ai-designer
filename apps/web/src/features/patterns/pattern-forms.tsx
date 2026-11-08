@@ -103,12 +103,15 @@ export function StyleForm({
   onChange,
   disabled,
   highlight,
+  unsure,
 }: {
   spec: PatternSpec;
   onChange: (next: PatternSpec, label: string) => void;
   disabled?: boolean;
   /** Fields the AI read from the sketch (marked). */
   highlight?: ReadonlySet<string>;
+  /** Fields the AI guessed (marked "check"). */
+  unsure?: ReadonlySet<string>;
 }) {
   const fields = fieldsFor(spec.family, spec.style);
   return (
@@ -138,6 +141,15 @@ export function StyleForm({
                   title="Read from your sketch"
                 >
                   sketch
+                </span>
+              ) : null}
+              {unsure?.has(f.key) ? (
+                <span
+                  className="rounded bg-status-needs-review/15 px-1 text-[10px] text-status-needs-review"
+                  title="The AI was not sure — check this against your design"
+                  data-testid={`unsure-${f.key}`}
+                >
+                  check
                 </span>
               ) : null}
             </Label>

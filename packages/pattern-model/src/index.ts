@@ -4,6 +4,9 @@
  */
 export * from './draft.js';
 export * from './svg.js';
+export * from './cut.js';
+export * from './marker.js';
+export * from './sewing-order.js';
 export * from './blocks/sizes.js';
 export * from './blocks/resolve.js';
 export * from './blocks/geom.js';

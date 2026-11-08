@@ -18,8 +18,8 @@ import { Label } from '@/components/ui/label';
 import { assetContentUrl } from '@/features/assets/api';
 import { newIdempotencyKey } from '@/features/designs/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { PatternPreview } from '@/features/patterns/cad/pattern-preview';
 import { FAMILY_LABEL, type Unit } from '@/features/patterns/options';
-import { PatternCanvas } from '@/features/patterns/pattern-canvas';
 import {
   ChecksList,
   GarmentBasics,
@@ -53,6 +53,7 @@ export function SketchReview({
   const [unit, setUnit] = useState<Unit>('cm');
   const key = useRef(newIdempotencyKey());
   const highlight = useMemo(() => new Set(result.fromSketch ?? []), [result.fromSketch]);
+  const unsure = useMemo(() => new Set(result.unsure ?? []), [result.unsure]);
 
   const preview = useMemo(() => {
     const draft = draftPattern(spec);
@@ -139,13 +140,16 @@ export function SketchReview({
             <h2 className="text-sm font-semibold">Pattern options</h2>
             <p className="text-[12px] text-muted-foreground">
               Options marked <span className="rounded bg-primary/10 px-1 text-primary">sketch</span>{' '}
-              were read from your drawing. Sizes come from a standard size chart — you can change
+              were read from your drawing;{' '}
+              <span className="rounded bg-status-needs-review/15 px-1 text-status-needs-review">check</span>{' '}
+              marks a guess worth confirming. Sizes come from a standard size chart — you can change
               every measurement in the editor.
             </p>
             <GarmentBasics spec={spec} onChange={(s) => setSpec(patternSpecSchema.parse(s))} />
             <StyleForm
               spec={spec}
               highlight={highlight}
+              unsure={unsure}
               onChange={(s) => setSpec(patternSpecSchema.parse(s))}
             />
           </section>
@@ -157,7 +161,7 @@ export function SketchReview({
               <UnitToggle unit={unit} onChange={setUnit} />
             </div>
             <div className="h-[520px] rounded-lg border" data-testid="pattern-preview">
-              <PatternCanvas pieces={preview.pieces} unit={unit} />
+              <PatternPreview pieces={preview.pieces} unit={unit} />
             </div>
             <details
               className="rounded-md border p-2"
