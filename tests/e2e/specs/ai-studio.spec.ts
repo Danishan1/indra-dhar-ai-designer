@@ -194,3 +194,62 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
     expect(file.suggestedFilename()).toMatch(/^TPK-\d+-R002\.pdf$/);
   }
 });
+
+test('AI studio: a shirt + shorts sketch becomes a co-ord set with every bottom detail (ADR-061)', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const email = await createVerifiedAccount(undefined, 'Sam Sets');
+  await page.goto('/sign-in');
+  await submitSignIn(page, email);
+  await createOrganizationInOnboarding(page);
+  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('button', { name: 'New project' }).first().click();
+  await page.getByRole('dialog', { name: 'New project' }).getByLabel('Name').fill('Sets');
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('tab', { name: 'Designs' }).click();
+  await page.getByRole('link', { name: 'New design with AI' }).first().click();
+  await page
+    .getByTestId('upload-dropzone')
+    .locator('input[type=file]')
+    .setInputFiles([{ name: 'boys-set.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(page.getByTestId('analysis-input')).toHaveCount(1, { timeout: 45_000 });
+  await page.getByLabel('Garment', { exact: true }).click();
+  await page.getByRole('option', { name: 'Set: top + bottom (co-ord)' }).click();
+  await page.getByTestId('analyze-button').click();
+
+  // Pass 1 (who, sections, garments) and pass 2 (checklist per garment) on the review page.
+  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId('sketch-classification')).toContainText('child (about 8 years)');
+  await expect(page.getByTestId('sketch-garments')).toContainText('shorts');
+  const shorts = page.getByTestId('garment-shorts');
+  await expect(shorts.getByLabel('Belt loops')).toContainText('6');
+  await expect(shorts.getByLabel('Closure')).toContainText('Fly zip');
+  await expect(shorts.getByLabel('Pockets', { exact: true })).toContainText('Slant');
+  await expect(shorts.getByTestId('unsure-backPockets')).toBeVisible();
+  const preview = page.getByTestId('pattern-preview');
+  await expect(preview.locator('[data-piece-name="Belt loop strip"]')).toBeVisible();
+  await expect(preview.locator('[data-piece-name="Skirt front"]')).toHaveCount(0);
+  await page.getByLabel('Design name').fill('Boys set');
+  await page.getByTestId('create-patterns-button').click();
+
+  // Editor: pieces grouped by garment; the set's style per garment.
+  await expect(page.getByTestId('pattern-workspace')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('piece-list-garment')).toHaveText(['Shirt', 'Shorts']);
+  for (const name of [
+    'Button placket',
+    'Waistband',
+    'Fly facing',
+    'Side front (pocket facing)',
+    'Back patch pocket',
+  ])
+    await expect(page.getByTestId('piece-list-item').filter({ hasText: name })).toHaveCount(1);
+  await page.getByRole('tab', { name: 'Style' }).click();
+  await page.getByTestId('garment-shorts').getByLabel('Belt loops').click();
+  await page.getByRole('option', { name: 'None' }).click();
+  await expect(
+    page.getByTestId('piece-list-item').filter({ hasText: 'Belt loop strip' }),
+  ).toHaveCount(0);
+});

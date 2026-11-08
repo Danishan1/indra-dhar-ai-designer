@@ -1,7 +1,13 @@
-import type { PatternPiece, PatternSpec } from '@ai-designer/garment-model';
+import {
+  garmentSpec,
+  garmentsOf,
+  type PatternPiece,
+  type PatternSpec,
+  patternSpecSchema,
+} from '@ai-designer/garment-model';
 
 import { edgeLength } from './geom.js';
-import { resolve } from './resolve.js';
+import { garmentName, resolve } from './resolve.js';
 import { capEaseRange } from './sleeve.js';
 
 /**
@@ -25,6 +31,37 @@ type PieceLike = Pick<PatternPiece, 'outline' | 'edges' | 'draft' | 'name'>;
 type Term = { template: string | string[]; edge: string; factor?: number; withIntake?: boolean };
 
 export function seamChecks(
+  pieces: readonly PieceLike[],
+  spec: PatternSpec | null | undefined,
+): SeamCheck[] {
+  // Co-ord sets (ADR-061): check every garment on its own pieces (templates `key.` prefixed).
+  if (spec?.garments?.length) {
+    const parsed = patternSpecSchema.parse(spec);
+    return garmentsOf(parsed).flatMap((g) => {
+      const pre = g.key === 'main' ? '' : `${g.key}.`;
+      const own = pieces
+        .filter((p) => {
+          const t = p.draft?.template ?? '';
+          return pre ? t.startsWith(pre) : !t.includes('.');
+        })
+        .map((p) =>
+          pre && p.draft
+            ? { ...p, draft: { ...p.draft, template: p.draft.template.slice(pre.length) } }
+            : p,
+        );
+      const gs = garmentSpec(parsed, g.key);
+      const name = garmentName(gs);
+      return garmentChecks(own, gs).map((c) => ({
+        ...c,
+        id: `${g.key}.${c.id}`,
+        label: `${name}: ${c.label}`,
+      }));
+    });
+  }
+  return garmentChecks(pieces, spec);
+}
+
+function garmentChecks(
   pieces: readonly PieceLike[],
   spec: PatternSpec | null | undefined,
 ): SeamCheck[] {
@@ -147,6 +184,23 @@ export function seamChecks(
     [-6, 6],
     'Bodice and skirt waists must match once darts and gathers are sewn.',
   );
+  if (byTemplate.has('bodice_front') && byTemplate.has('trouser_front')) {
+    check(
+      'waist_legs',
+      'Bodice ↔ legs (waist)',
+      [
+        { template: 'bodice_front', edge: 'waist' },
+        { template: 'bodice_back', edge: 'waist' },
+      ],
+      [
+        { template: 'trouser_front', edge: 'waist' },
+        { template: 'trouser_back', edge: 'waist' },
+        ...(byTemplate.has('side_front') ? [{ template: 'side_front', edge: 'waist' }] : []),
+      ],
+      [-8, 8],
+      'The legs join the bodice at the waist.',
+    );
+  }
   if (!byTemplate.has('bodice_front'))
     check(
       'skirt_side',
@@ -156,8 +210,15 @@ export function seamChecks(
       [-4, 4],
       'Front and back skirt side seams are sewn together.',
     );
-  if (byTemplate.has('waistband')) {
+  if (
+    byTemplate.has('waistband') &&
+    (byTemplate.has('trouser_front') || byTemplate.has('skirt_front'))
+  ) {
     const legs = byTemplate.has('trouser_front');
+    const st = spec?.style;
+    const elastic = st && (st.waistbandType === 'elastic' || st.waistbandType === 'drawstring');
+    const opens =
+      st && ['fly_zip', 'side_zip', 'back_zip', 'front_buttons'].includes(st.closure) && !elastic;
     check(
       'waistband',
       'Waist ↔ waistband',
@@ -165,14 +226,19 @@ export function seamChecks(
         ? [
             { template: 'trouser_front', edge: 'waist', factor: 2 },
             { template: 'trouser_back', edge: 'waist', factor: 2 },
+            ...(byTemplate.has('side_front')
+              ? [{ template: 'side_front', edge: 'waist', factor: 2 }]
+              : []),
           ]
         : [
             { template: 'skirt_front', edge: 'waist', factor: 2 },
             { template: 'skirt_back', edge: 'waist', factor: 2 },
           ],
       [{ template: 'waistband', edge: 'long' }],
-      [25, 50],
-      'The waistband is the finished waist plus the overlap.',
+      !st || opens ? [25, 50] : [-6, 6],
+      opens || !st
+        ? 'The waistband is the finished waist plus the overlap.'
+        : 'The band equals the waist (it pulls on; elastic inside).',
     );
   }
   if (byTemplate.has('collar') || byTemplate.has('collar_stand') || byTemplate.has('collar_band')) {
@@ -205,7 +271,10 @@ export function seamChecks(
     check(
       'outseam',
       'Outseams (front ↔ back)',
-      [{ template: 'trouser_front', edge: 'outseam' }],
+      [
+        { template: 'trouser_front', edge: 'outseam' },
+        ...(byTemplate.has('side_front') ? [{ template: 'side_front', edge: 'outseam' }] : []),
+      ],
       [{ template: 'trouser_back', edge: 'outseam' }],
       [-5, 5],
       'Front and back side seams must match.',

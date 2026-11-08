@@ -44,6 +44,24 @@ Size charts are approximations to start from — every measurement is editable. 
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
 the seam allowance is drawn outside.
 
+### Reading a sketch: classify, then a checklist per garment (ADR-061)
+
+1. **Classify** (`sketch_classify`, `design-ai/src/sketch.ts`): who (male/female, adult/child, age),
+   body sections drawn, and each separate garment with its type (`SKETCH_GARMENT_TYPES`). A shirt
+   above shorts is two garments — a co-ord set — never a dress.
+2. **Checklist** (`sketch_details`): for each garment the questions of its family (`checklist()`),
+   allowed values only, with visual cues; guesses go in `unsure`.
+3. `specFromSketch` → one `patternSpec`: the first garment is `family`/`style`, the others are
+   `garments[]` (same wearer and measurements). Type presets (jeans, chinos, joggers, frock,
+   blazer…) fill what the checklist does not say.
+
+The engine (`pattern-model/src/blocks`): `draft-pattern.ts` (families + set assembly), `bottoms.ts`
+(waistbands, belt loops, back/cargo/patch pockets), `trousers.ts` (slant/scoop cuts, pleats,
+elastic, turn-ups), `jacket.ts` (hood, facings, ribs, kangaroo, linings, plackets), `extras.ts`
+(tiers, pleated skirts, ruffles, wrap, frock yoke). Sets: prefixed part keys/templates and
+`set_garment` components; checks, sewing order and the tech pack run per garment. The review page
+and the editor's Style tab show one section per garment (add/remove garments of a set).
+
 ### One flow, one drawing (ADR-060)
 
 | Piece                                                                                                                                                                                                        | Where                                                               |

@@ -205,3 +205,32 @@ export const MEASUREMENTS_FOR_FAMILY: Record<string, readonly BodyMeasurementKey
     'ankle',
   ],
 };
+// Families added in ADR-061 reuse the lists above.
+const MFF = MEASUREMENTS_FOR_FAMILY as Record<string, readonly BodyMeasurementKey[]>;
+MFF['jacket'] = MFF['top']!;
+MFF['jumpsuit'] = [...new Set([...MFF['top']!, ...MFF['trousers']!])];
+MFF['dungarees'] = [
+  ...new Set([...MFF['trousers']!, 'bust', 'back_length'] as BodyMeasurementKey[]),
+];
+
+/** Measurements a spec uses (every garment of a set). */
+export function measurementsForSpec(spec: {
+  family: string;
+  garments?: readonly { family: string }[];
+}): BodyMeasurementKey[] {
+  const fams = [spec.family, ...(spec.garments ?? []).map((g) => g.family)];
+  return [...new Set(fams.flatMap((f) => [...(MFF[f] ?? [])]))];
+}
+
+/** Kids' chart size for an age in years (nearest size). */
+export function kidsSizeForAge(age: number): string {
+  const sizes = KIDS.sizes.map((s) => [s, parseInt(s, 10)] as const);
+  let best = sizes[0]![0];
+  let bd = Infinity;
+  for (const [s, a] of sizes)
+    if (Math.abs(a - age) < bd) {
+      bd = Math.abs(a - age);
+      best = s;
+    }
+  return best;
+}

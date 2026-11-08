@@ -17,10 +17,13 @@ export function parseLength(text: string, unit: Unit): number | null {
 }
 
 export const FAMILY_LABEL: Record<PatternFamily, string> = {
-  dress: 'Dress',
+  dress: 'Dress / frock',
   top: 'Top / shirt',
   skirt: 'Skirt',
   trousers: 'Trousers / shorts',
+  jumpsuit: 'Jumpsuit / romper',
+  jacket: 'Jacket / hoodie',
+  dungarees: 'Dungarees',
 };
 
 export const AUDIENCE_LABEL: Record<string, string> = {
@@ -34,14 +37,27 @@ type Field = {
   key: keyof PatternStyle;
   label: string;
   options?: Record<string, string>;
-  kind?: 'boolean' | 'number';
+  /** boolean: yes/no · count: 0…max · multi: several of `options`. */
+  kind?: 'boolean' | 'count' | 'multi';
+  min?: number;
+  max?: number;
   families: readonly PatternFamily[];
   /** Hide unless this predicate holds (e.g. cuff only with sleeves). */
   when?: (s: PatternStyle) => boolean;
 };
 
-const ALL: readonly PatternFamily[] = ['dress', 'top', 'skirt', 'trousers'];
-const UPPER: readonly PatternFamily[] = ['dress', 'top'];
+const ALL: readonly PatternFamily[] = [
+  'dress',
+  'top',
+  'skirt',
+  'trousers',
+  'jumpsuit',
+  'jacket',
+  'dungarees',
+];
+const UPPER: readonly PatternFamily[] = ['dress', 'top', 'jacket', 'jumpsuit'];
+const LEGS: readonly PatternFamily[] = ['trousers', 'jumpsuit', 'dungarees'];
+const BOTTOMS: readonly PatternFamily[] = ['trousers', 'skirt', 'jumpsuit', 'dungarees'];
 
 export const STYLE_FIELDS: readonly Field[] = [
   {
@@ -49,6 +65,18 @@ export const STYLE_FIELDS: readonly Field[] = [
     label: 'Type',
     families: ['top'],
     options: { blouse: 'Blouse', shirt: 'Shirt', tshirt: 'T-shirt (knit)' },
+  },
+  {
+    key: 'jacketType',
+    label: 'Type',
+    families: ['jacket'],
+    options: {
+      shirt_jacket: 'Shirt jacket',
+      blazer: 'Blazer',
+      hoodie: 'Hoodie',
+      bomber: 'Bomber',
+      sweatshirt: 'Sweatshirt',
+    },
   },
   {
     key: 'fit',
@@ -68,7 +96,7 @@ export const STYLE_FIELDS: readonly Field[] = [
       square: 'Square',
       boat: 'Boat',
     },
-    when: (s) => s.collar !== 'shirt' && s.collar !== 'mandarin',
+    when: (s) => !['shirt', 'mandarin', 'camp', 'notched'].includes(s.collar) && !s.hood,
   },
   {
     key: 'collar',
@@ -79,8 +107,12 @@ export const STYLE_FIELDS: readonly Field[] = [
       peter_pan: 'Peter Pan',
       shirt: 'Shirt collar + stand',
       mandarin: 'Mandarin',
+      camp: 'Camp (open, no stand)',
+      notched: 'Notched lapel',
     },
+    when: (s) => !s.hood,
   },
+  { key: 'hood', label: 'Hood', families: ['jacket', 'top'], kind: 'boolean' },
   {
     key: 'sleeve',
     label: 'Sleeve',
@@ -114,7 +146,39 @@ export const STYLE_FIELDS: readonly Field[] = [
     options: { none: 'None', band: 'Band', shirt: 'Shirt cuff' },
     when: (s) => s.sleeve !== 'none' && s.sleeve !== 'cap',
   },
-  { key: 'waistSeam', label: 'Waist seam', families: ['dress'], kind: 'boolean' },
+  {
+    key: 'placket',
+    label: 'Button placket',
+    families: UPPER,
+    options: {
+      grown_on: 'Grown-on facing',
+      separate: 'Separate placket',
+      hidden: 'Hidden placket',
+    },
+    when: (s) => s.closure === 'front_buttons' && s.collar !== 'notched',
+  },
+  {
+    key: 'buttons',
+    label: 'Buttons',
+    families: UPPER,
+    kind: 'count',
+    min: 0,
+    max: 12,
+    when: (s) => s.closure === 'front_buttons',
+  },
+  {
+    key: 'hemShape',
+    label: 'Hem',
+    families: ['top', 'jacket'],
+    options: { auto: 'Automatic', straight: 'Straight', curved: 'Curved (shirt-tail)' },
+  },
+  {
+    key: 'waistSeam',
+    label: 'Waist seam',
+    families: ['dress'],
+    kind: 'boolean',
+    when: (s) => !s.yoke,
+  },
   {
     key: 'skirt',
     label: 'Skirt shape',
@@ -127,12 +191,23 @@ export const STYLE_FIELDS: readonly Field[] = [
       gathered: 'Gathered',
       half_circle: 'Half circle',
       circle: 'Full circle',
+      tiered: 'Tiered',
+      pleated: 'Knife pleated',
     },
+  },
+  {
+    key: 'tiers',
+    label: 'Tiers',
+    families: ['dress', 'skirt'],
+    kind: 'count',
+    min: 2,
+    max: 5,
+    when: (s) => s.skirt === 'tiered',
   },
   {
     key: 'leg',
     label: 'Leg',
-    families: ['trousers'],
+    families: LEGS,
     options: { straight: 'Straight', slim: 'Slim', wide: 'Wide', tapered: 'Tapered' },
   },
   {
@@ -164,36 +239,132 @@ export const STYLE_FIELDS: readonly Field[] = [
       side_zip: 'Side zip',
       front_buttons: 'Front buttons',
       fly_zip: 'Fly zip',
+      front_zip: 'Front zip',
+      side_buttons: 'Side buttons',
     },
   },
   {
     key: 'pockets',
     label: 'Pockets',
     families: ALL,
-    options: { none: 'None', patch: 'Patch pocket', side_seam: 'Side-seam pockets' },
+    options: {
+      none: 'None',
+      patch: 'Patch pocket',
+      side_seam: 'Side-seam pockets',
+      slant: 'Slant pockets',
+      scoop: 'Scoop (jeans) pockets',
+      kangaroo: 'Kangaroo pocket',
+    },
   },
-  { key: 'darts', label: 'Darts', families: ['dress', 'top', 'skirt'], kind: 'boolean' },
-  { key: 'yoke', label: 'Back yoke', families: ['top'], kind: 'boolean' },
-  { key: 'waistband', label: 'Waistband', families: ['skirt', 'trousers'], kind: 'boolean' },
+  {
+    key: 'pocketCount',
+    label: 'Chest pockets',
+    families: ['top', 'jacket'],
+    kind: 'count',
+    min: 1,
+    max: 2,
+    when: (s) => s.pockets === 'patch',
+  },
+  {
+    key: 'backPockets',
+    label: 'Back pockets',
+    families: LEGS,
+    options: { none: 'None', patch: 'Patch', welt: 'Welt' },
+  },
+  {
+    key: 'backPocketCount',
+    label: 'Back pocket count',
+    families: LEGS,
+    kind: 'count',
+    min: 1,
+    max: 2,
+    when: (s) => s.backPockets !== 'none',
+  },
+  {
+    key: 'cargoPockets',
+    label: 'Cargo pockets',
+    families: ['trousers', 'jumpsuit'],
+    kind: 'boolean',
+  },
+  {
+    key: 'pleats',
+    label: 'Front pleats',
+    families: ['trousers', 'jumpsuit'],
+    options: { none: 'None', single: 'Single', double: 'Double' },
+  },
+  { key: 'turnUps', label: 'Turn-ups', families: ['trousers'], kind: 'boolean' },
+  {
+    key: 'darts',
+    label: 'Darts',
+    families: ['dress', 'top', 'skirt', 'jumpsuit'],
+    kind: 'boolean',
+  },
+  { key: 'yoke', label: 'Yoke', families: ['top', 'dress', 'jacket'], kind: 'boolean' },
+  {
+    key: 'backPleat',
+    label: 'Back pleat',
+    families: ['top'],
+    kind: 'boolean',
+    when: (s) => s.yoke,
+  },
+  {
+    key: 'waistband',
+    label: 'Waistband',
+    families: ['skirt', 'trousers', 'dungarees'],
+    kind: 'boolean',
+  },
+  {
+    key: 'waistbandType',
+    label: 'Waistband type',
+    families: ['skirt', 'trousers', 'dungarees'],
+    options: {
+      fitted: 'Fitted (button)',
+      elastic: 'Elastic',
+      drawstring: 'Drawstring',
+      elastic_back: 'Elastic back',
+    },
+    when: (s) => s.waistband,
+  },
+  { key: 'beltLoops', label: 'Belt loops', families: BOTTOMS, kind: 'count', min: 0, max: 10 },
+  { key: 'lining', label: 'Lining', families: ['jacket', 'skirt', 'dress'], kind: 'boolean' },
+  { key: 'ribbing', label: 'Rib bands', families: ['jacket'], kind: 'boolean' },
+  { key: 'peplum', label: 'Peplum', families: ['top'], kind: 'boolean' },
+  { key: 'wrap', label: 'Wrap front', families: ['dress', 'top', 'skirt'], kind: 'boolean' },
+  {
+    key: 'ruffles',
+    label: 'Ruffles',
+    families: ['dress', 'top', 'skirt'],
+    kind: 'multi',
+    options: { hem: 'Hem', neckline: 'Neckline', sleeve: 'Sleeves' },
+  },
 ];
 
 const LENGTHS: Record<PatternFamily, readonly string[]> = {
   top: ['crop', 'hip', 'tunic'],
   dress: ['mini', 'above_knee', 'knee', 'midi', 'ankle', 'floor'],
   skirt: ['mini', 'above_knee', 'knee', 'midi', 'ankle', 'floor'],
-  trousers: ['shorts', 'knee', 'cropped', 'full'],
+  trousers: ['shorts', 'above_knee', 'knee', 'cropped', 'full'],
+  jumpsuit: ['shorts', 'above_knee', 'knee', 'cropped', 'full'],
+  jacket: [],
+  dungarees: ['shorts', 'above_knee', 'knee', 'cropped', 'full'],
 };
 const CLOSURES: Record<PatternFamily, readonly string[]> = {
   top: ['none', 'back_zip', 'front_buttons'],
   dress: ['none', 'back_zip', 'side_zip', 'front_buttons'],
-  skirt: ['none', 'back_zip', 'side_zip'],
-  trousers: ['none', 'fly_zip', 'side_zip'],
+  skirt: ['none', 'back_zip', 'side_zip', 'front_buttons'],
+  trousers: ['none', 'fly_zip', 'side_zip', 'front_buttons'],
+  jumpsuit: ['none', 'back_zip', 'front_buttons', 'front_zip'],
+  jacket: ['none', 'front_buttons', 'front_zip'],
+  dungarees: ['side_buttons'],
 };
 const POCKETS: Record<PatternFamily, readonly string[]> = {
   top: ['none', 'patch'],
   dress: ['none', 'patch', 'side_seam'],
-  skirt: ['none', 'side_seam'],
-  trousers: ['none', 'side_seam'],
+  skirt: ['none', 'side_seam', 'patch'],
+  trousers: ['none', 'side_seam', 'slant', 'scoop', 'patch'],
+  jumpsuit: ['none', 'side_seam', 'slant', 'patch'],
+  jacket: ['none', 'patch', 'kangaroo', 'side_seam'],
+  dungarees: ['none', 'patch', 'side_seam'],
 };
 
 /** Fields shown for a family, with the options valid for it. */
@@ -222,6 +393,9 @@ export function styleSummary(family: PatternFamily, style: PatternStyle): string
     .map((f) => {
       const v = style[f.key];
       if (f.kind === 'boolean') return v ? f.label : null;
+      if (f.kind === 'count') return v ? `${f.label}: ${String(v)}` : null;
+      if (f.kind === 'multi')
+        return Array.isArray(v) && v.length ? `${f.label}: ${v.join(', ')}` : null;
       const text = f.options?.[String(v)];
       return text && text !== 'None' ? `${f.label}: ${text}` : null;
     })

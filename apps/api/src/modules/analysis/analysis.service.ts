@@ -154,7 +154,8 @@ export class AnalysisService implements OnModuleInit {
     const provider = await this.ai.preflight(
       ctx,
       body.provider,
-      sketch ? 1 : 2,
+      // Sketches: two reading passes (classify, then the per-garment checklist — ADR-061).
+      2,
       sketch ? ['image_analysis'] : ['garment_reconstruction'],
     );
     const row = await this.prisma.$transaction(async (tx) => {

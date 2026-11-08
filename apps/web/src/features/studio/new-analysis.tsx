@@ -70,7 +70,13 @@ const SKETCH_GARMENTS = [
   { value: 'dress', label: 'Dress' },
   { value: 'top', label: 'Top / shirt / T-shirt' },
   { value: 'skirt', label: 'Skirt' },
-  { value: 'trousers', label: 'Trousers / shorts' },
+  { value: 'trousers', label: 'Trousers' },
+  { value: 'shorts', label: 'Shorts / half pants' },
+  { value: 'shirt and shorts set', label: 'Set: top + bottom (co-ord)' },
+  { value: 'jumpsuit', label: 'Jumpsuit / romper' },
+  { value: 'dungarees', label: 'Dungarees' },
+  { value: 'jacket', label: 'Jacket / blazer' },
+  { value: 'hoodie', label: 'Hoodie / sweatshirt' },
 ];
 const SKETCH_AUDIENCES = [
   { value: 'auto', label: 'Let AI decide' },

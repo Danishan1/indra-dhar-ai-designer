@@ -93,8 +93,12 @@ export function draftToState(
   const pieces: PatternPiece[] = [];
   const kept: string[] = [];
   // Sleeves finished by a cuff or band are seamed to it: their hem takes the seam allowance.
-  const sleeveFinished = draft.parts.some((p) =>
-    p.pieces.some((d) => d.template === 'cuff' || d.template === 'sleeve_band'),
+  const sleeveFinished = new Set(
+    draft.parts.flatMap((p) =>
+      p.pieces
+        .filter((d) => /(^|\.)(cuff|sleeve_band|rib_cuff)$/.test(d.template))
+        .map((d) => garmentPrefix(d.template)),
+    ),
   );
   for (const part of draft.parts) {
     const componentId = ids.get(part.key)!;
@@ -125,7 +129,17 @@ export function draftToState(
           edges: d.edges,
           markings: d.markings,
           ...mergeAllowances(
-            hemAllowances(d.template, d.edges, draft.spec.hemAllowanceMm, sleeveFinished),
+            {
+              allowances: {
+                ...hemAllowances(
+                  d.template,
+                  d.edges,
+                  draft.spec.hemAllowanceMm,
+                  sleeveFinished.has(garmentPrefix(d.template)),
+                ).allowances,
+                ...d.allowances,
+              },
+            },
             old?.allowances,
           ),
           ...(old?.canvas ? { canvas: old.canvas } : {}),
@@ -138,6 +152,10 @@ export function draftToState(
   return { components, patternPieces: placed, kept };
 }
 
+/** Garment of a piece in a set (`shorts.waistband` → `shorts`; main garment → ''). */
+const garmentPrefix = (template: string) =>
+  template.includes('.') ? template.slice(0, template.indexOf('.')) : '';
+
 /** Per-seam allowances set by hand survive a redraft; hems follow the spec's hem allowance. */
 function mergeAllowances(
   drafted: { allowances?: Record<string, number> },
@@ -147,6 +165,7 @@ function mergeAllowances(
     Object.entries(old ?? {}).filter(([k]) => k !== 'hem' && k !== 'hem_ext'),
   );
   const all = { ...kept, ...drafted.allowances };
+  for (const k of Object.keys(all)) if (all[k] === undefined) delete all[k];
   return Object.keys(all).length ? { allowances: all } : {};
 }
 
@@ -158,7 +177,10 @@ function hemAllowances(
   sleeveFinished: boolean,
 ): { allowances?: Record<string, number> } {
   if (hemMm === undefined) return {};
-  if (template === 'sleeve' && sleeveFinished) return {};
+  const base = template.slice(template.lastIndexOf('.') + 1);
+  if (base === 'sleeve' && sleeveFinished) return {};
+  // Bands, facings, ruffles, tiers above the last, pockets: their "hem" is a seam or a fold.
+  if (!/^(front|back|bodice_|skirt_|trouser_|sleeve|frock_|tier_|lining_)/.test(base)) return {};
   const names = edges.map((e) => e.name).filter((n) => n === 'hem' || n === 'hem_ext');
   if (!names.length) return {};
   return { allowances: Object.fromEntries(names.map((n) => [n, hemMm])) };

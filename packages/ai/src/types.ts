@@ -13,6 +13,8 @@ export type AiTask =
   | 'garment_decomposition'
   | 'component_detail'
   | 'sketch_reading'
+  | 'sketch_classify'
+  | 'sketch_details'
   | 'pattern_interpretation'
   | 'fabric_analysis'
   | 'techpack_text'

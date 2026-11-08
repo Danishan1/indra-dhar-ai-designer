@@ -1,0 +1,1 @@
+The very first thing this pattern is, like the reference which we have given is for boy. So it should have the half pant, okay? But it create the skirt, okay? Then it do not give the belt and other components of the belt, okay? It do not give the option for zip. Also it do not have, you know, other relative information.

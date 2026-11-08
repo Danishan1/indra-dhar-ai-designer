@@ -20,4 +20,8 @@ export const GARMENT_CATEGORIES: readonly GarmentCategoryDef[] = Object.freeze([
   { key: 'trousers', label: 'Trousers', garmentType: 'trousers', fabricBase: 'woven' },
   { key: 'jacket', label: 'Jacket', garmentType: 'jacket', fabricBase: 'woven' },
   { key: 'hoodie', label: 'Hoodie / sweatshirt', garmentType: 'hoodie', fabricBase: 'knit' },
+  // Pattern-first families (ADR-061).
+  { key: 'jumpsuit', label: 'Jumpsuit / romper', garmentType: 'jumpsuit', fabricBase: 'woven' },
+  { key: 'dungarees', label: 'Dungarees', garmentType: 'dungarees', fabricBase: 'woven' },
+  { key: 'coord_set', label: 'Co-ord set', garmentType: 'set', fabricBase: 'woven' },
 ]);

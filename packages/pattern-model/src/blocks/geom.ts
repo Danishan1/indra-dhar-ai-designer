@@ -145,6 +145,8 @@ export interface DraftPiece {
   notes: string[];
   /** Drafting inputs worth keeping on the piece (mm). */
   inputs: Record<string, number>;
+  /** Seam allowance per edge where it differs (elastic casings, turn-ups…), mm. */
+  allowances?: Record<string, number>;
 }
 
 export function piece(
@@ -167,6 +169,7 @@ export function piece(
     fabricRole: extra.fabricRole ?? 'main',
     notes: extra.notes ?? [],
     inputs: extra.inputs ?? {},
+    ...(extra.allowances ? { allowances: extra.allowances } : {}),
   };
 }
 
@@ -220,4 +223,120 @@ export function solve(f: (x: number) => number, target: number, lo: number, hi: 
     else b = m;
   }
   return (a + b) / 2;
+}
+
+type Shape = { outline: P[]; edges: PatternEdge[] };
+
+/** Edge name of every outline segment i → i+1 (null when unnamed). */
+export function segmentNames(shape: Shape): (string | null)[] {
+  const n = shape.outline.length;
+  const names: (string | null)[] = Array.from({ length: n }, () => null);
+  for (const e of shape.edges) {
+    let i = e.from;
+    for (let guard = 0; guard < n && i !== e.to; guard++) {
+      names[i] = e.name;
+      i = (i + 1) % n;
+    }
+  }
+  return names;
+}
+
+/**
+ * A shape from points with the edge name of each segment (i → i+1, the last closing back to the
+ * first). Consecutive segments with the same name become one edge. Intake is kept per edge name.
+ */
+export function shapeFromSegments(
+  pts: readonly P[],
+  names: readonly string[],
+  intake: Record<string, number> = {},
+): Shape {
+  const outline = [...pts];
+  const n = outline.length;
+  // Start the edge list where the name changes so an edge never wraps around index 0 twice.
+  let start = 0;
+  for (let i = 0; i < n; i++)
+    if (names[i] !== names[(i - 1 + n) % n]) {
+      start = i;
+      break;
+    }
+  const edges: PatternEdge[] = [];
+  const used = new Set<string>();
+  for (let k = 0; k < n; k++) {
+    const i = (start + k) % n;
+    const name = names[i]!;
+    const last = edges[edges.length - 1];
+    if (last && last.name === name && last.to === i) last.to = (i + 1) % n;
+    else {
+      edges.push({
+        name,
+        from: i,
+        to: (i + 1) % n,
+        intakeMm: used.has(name) ? 0 : (intake[name] ?? 0),
+      });
+      used.add(name);
+    }
+  }
+  return { outline, edges };
+}
+
+/**
+ * Splits a shape with the horizontal line y = `y`: the part above (smaller y) and below, the cut
+ * edge named `cutName` on both. Used for yokes (frocks, jeans) and bib/body splits.
+ */
+export function splitAtY(shape: Shape, y: number, cutName: string): { top: Shape; bottom: Shape } {
+  const names = segmentNames(shape);
+  const intake: Record<string, number> = {};
+  for (const e of shape.edges) intake[e.name] = (intake[e.name] ?? 0) + e.intakeMm;
+  const keep = (above: boolean) => {
+    const pts: P[] = [];
+    const segs: string[] = [];
+    const n = shape.outline.length;
+    const inside = (p: P) => (above ? p.y <= y + 1e-6 : p.y >= y - 1e-6);
+    for (let i = 0; i < n; i++) {
+      const a = shape.outline[i]!;
+      const b = shape.outline[(i + 1) % n]!;
+      const name = names[i] ?? 'edge';
+      const ia = inside(a);
+      const ib = inside(b);
+      if (ia) {
+        pts.push(a);
+        segs.push(name);
+      }
+      if (ia !== ib && Math.abs(b.y - a.y) > 1e-9) {
+        const t = (y - a.y) / (b.y - a.y);
+        const x = P(a.x + (b.x - a.x) * t, y);
+        if (!pts.length || dist(pts[pts.length - 1]!, x) > 0.01) {
+          pts.push(x);
+          // Leaving the kept side starts the cut edge; entering continues the original edge.
+          segs.push(ia ? cutName : name);
+        } else if (ia) segs[segs.length - 1] = cutName;
+      }
+    }
+    // Segments ending on the cut line that run along it belong to the cut.
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i]!;
+      const b = pts[(i + 1) % pts.length]!;
+      if (Math.abs(a.y - y) < 0.01 && Math.abs(b.y - y) < 0.01) segs[i] = cutName;
+    }
+    return shapeFromSegments(pts, segs, intake);
+  };
+  return { top: keep(true), bottom: keep(false) };
+}
+
+/** Moves every point of a shape (and returns a new one). */
+export function translateShape(shape: Shape, dx: number, dy: number): Shape {
+  return { outline: shape.outline.map((p) => P(p.x + dx, p.y + dy)), edges: shape.edges };
+}
+
+/** A rectangle w × h with named edges top, right side, bottom, left side (clockwise on screen). */
+export function rect(
+  w: number,
+  h: number,
+  names: [string, string, string, string] = ['top', 'side', 'bottom', 'side_b'],
+): Shape {
+  return new Outline(P(0, 0))
+    .line(names[0], P(w, 0))
+    .line(names[1], P(w, h))
+    .line(names[2], P(0, h))
+    .close(names[3]);
 }

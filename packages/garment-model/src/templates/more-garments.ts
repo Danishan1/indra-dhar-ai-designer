@@ -131,3 +131,30 @@ export function createHoodie(opts: TemplateOptions = {}): GarmentDesignState {
     hem,
   ]);
 }
+
+/** Pattern-first families (ADR-061): starting points; the pattern engine normally builds these. */
+export function createJumpsuit(opts: TemplateOptions = {}): GarmentDesignState {
+  const body = buildComponent({ type: 'garment_body', name: 'Jumpsuit body' }, opts);
+  const front = buildComponent(
+    { type: 'front_body_panel', name: 'Bodice front', parent: body },
+    opts,
+  );
+  const back = buildComponent({ type: 'back_body_panel', name: 'Bodice back', parent: body }, opts);
+  const legs = pair('leg_panel', 'leg', body, opts);
+  return buildState({ key: 'jumpsuit', garmentType: 'jumpsuit' }, [body, front, back, ...legs]);
+}
+
+export function createDungarees(opts: TemplateOptions = {}): GarmentDesignState {
+  const body = buildComponent({ type: 'garment_body', name: 'Dungarees body' }, opts);
+  const bib = buildComponent({ type: 'bib', name: 'Bib', parent: body }, opts);
+  const straps = buildComponent({ type: 'strap', name: 'Straps', parent: body }, opts);
+  const legs = pair('leg_panel', 'leg', body, opts);
+  return buildState({ key: 'dungarees', garmentType: 'dungarees' }, [body, bib, straps, ...legs]);
+}
+
+export function createCoordSet(opts: TemplateOptions = {}): GarmentDesignState {
+  const body = buildComponent({ type: 'garment_body', name: 'Co-ord set' }, opts);
+  const top = buildComponent({ type: 'set_garment', name: 'Top', parent: body }, opts);
+  const bottom = buildComponent({ type: 'set_garment', name: 'Bottom', parent: body }, opts);
+  return buildState({ key: 'coord_set', garmentType: 'set' }, [body, top, bottom]);
+}

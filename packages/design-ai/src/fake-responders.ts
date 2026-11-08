@@ -393,85 +393,8 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
       ],
     };
   },
-  sketch_reading: (req) => {
-    const hint = (/The user says it is: (.*)\.$/m.exec(req.prompt)?.[1] ?? '').toLowerCase();
-    const forWho = (/It is for: (.*)\.$/m.exec(req.prompt)?.[1] ?? '').toLowerCase();
-    const base = {
-      proportions: { lengthToShoulder: null, skirtToBodice: 1.5, sleeveToShoulder: null },
-      unsureOptions: ['closure'],
-      uncertain: ['Back view not shown'],
-      confidence: 0.75,
-    };
-    if (/trouser|pant|short/.test(hint))
-      return {
-        ...base,
-        family: 'trousers',
-        label: 'Straight trousers',
-        audience: forWho || 'women',
-        style: {
-          fit: 'regular',
-          leg: 'straight',
-          closure: 'fly_zip',
-          length: 'full',
-          pockets: 'side_seam',
-          waistband: true,
-        },
-        details: [],
-        description: 'Straight-leg trousers with a waistband and side pockets.',
-      };
-    if (/skirt/.test(hint))
-      return {
-        ...base,
-        family: 'skirt',
-        label: 'A-line skirt',
-        audience: forWho || 'women',
-        style: { skirt: 'a_line', length: 'knee', closure: 'side_zip', waistband: true },
-        details: [],
-        description: 'Knee-length A-line skirt with a waistband.',
-      };
-    if (/shirt|top|blouse|tee/.test(hint))
-      return {
-        ...base,
-        family: 'top',
-        label: "Men's shirt",
-        audience: forWho || 'men',
-        style: {
-          topType: 'shirt',
-          collar: 'shirt',
-          closure: 'front_buttons',
-          sleeve: 'long',
-          cuff: 'shirt',
-          yoke: true,
-          darts: false,
-          pockets: 'patch',
-          length: 'hip',
-        },
-        details: [],
-        description: 'Classic long-sleeve shirt with collar, yoke and cuffs.',
-      };
-    return {
-      ...base,
-      family: 'dress',
-      label: "Girls' puff-sleeve party dress",
-      audience: forWho || 'girls',
-      style: {
-        fit: 'regular',
-        neckline: 'round',
-        collar: 'peter_pan',
-        sleeve: 'short',
-        sleeveStyle: 'puff',
-        closure: 'back_zip',
-        waistSeam: true,
-        skirt: 'gathered',
-        length: null,
-        darts: false,
-        pockets: 'none',
-      },
-      details: ['Bow at the back waist'],
-      description:
-        'Party dress with a fitted bodice, Peter Pan collar, puff sleeves and a gathered skirt.',
-    };
-  },
+  sketch_classify: (req) => fakeClassify(req.prompt),
+  sketch_details: (req) => fakeDetails(req.prompt),
   component_detail: (req) => ({
     details: [...req.prompt.matchAll(/^- ([a-z0-9_]+): /gm)].map((m) => ({
       key: m[1],
@@ -512,3 +435,171 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
     careNotes: ['Machine wash 30 °C', 'Do not tumble dry'],
   }),
 };
+
+// ── sketch reading fakes (ADR-061) ───────────────────────────────────────────
+
+function fakeClassify(prompt: string) {
+  const hint = (/The user says it is: (.*)\.$/m.exec(prompt)?.[1] ?? '').toLowerCase();
+  const forWho = (/It is for: (.*)\.$/m.exec(prompt)?.[1] ?? '').toLowerCase();
+  const who = (g: string, age: string, years: number | null) => ({
+    gender: /girl|wom/.test(forWho) ? 'female' : /boy|\bm[ae]n\b/.test(forWho) ? 'male' : g,
+    ageGroup: /girl|boy/.test(forWho) ? 'child' : /wom|\bm[ae]n\b/.test(forWho) ? 'adult' : age,
+    ageYears: years,
+  });
+  const base = { views: ['front'], confidence: 0.8, description: 'Fake reading for tests.' };
+  if (/set|co-?ord|shirt and shorts|half pant/.test(hint))
+    return {
+      ...base,
+      ...who('male', 'child', 8),
+      sections: ['upper', 'lower'],
+      garments: [
+        { type: 'shirt', section: 'upper', label: 'Short-sleeve shirt', confidence: 0.9 },
+        { type: 'shorts', section: 'lower', label: 'Shorts with belt loops', confidence: 0.85 },
+      ],
+      label: "Boys' shirt and shorts set",
+    };
+  const single = (
+    type: string,
+    section: string,
+    label: string,
+    g = 'female',
+    age = 'adult',
+    years: number | null = null,
+  ) => ({
+    ...base,
+    ...who(g, age, years),
+    sections: [section],
+    garments: [{ type, section, label, confidence: 0.85 }],
+    label,
+  });
+  if (/hood/.test(hint)) return single('hoodie', 'upper', 'Hoodie', 'unisex');
+  if (/blazer/.test(hint)) return single('blazer', 'upper', 'Blazer', 'male');
+  if (/jumpsuit|romper/.test(hint))
+    return single(/romper/.test(hint) ? 'romper' : 'jumpsuit', 'full', 'Jumpsuit');
+  if (/dungaree|overall/.test(hint))
+    return single('dungarees', 'full', 'Dungarees', 'male', 'child', 6);
+  if (/short/.test(hint)) return single('shorts', 'lower', 'Shorts');
+  if (/trouser|pant|jean/.test(hint))
+    return single(/jean/.test(hint) ? 'jeans' : 'trousers', 'lower', 'Straight trousers');
+  if (/skirt/.test(hint)) return single('skirt', 'lower', 'A-line skirt');
+  if (/shirt|top|blouse|tee/.test(hint)) return single('shirt', 'upper', "Men's shirt", 'male');
+  return single('dress', 'full', "Girls' puff-sleeve party dress", 'female', 'child', 8);
+}
+
+function fakeDetails(prompt: string) {
+  const garments = [...prompt.matchAll(/^Garment (\d+) — ([a-z_]+) \(/gm)].map((m) => ({
+    index: Number(m[1]),
+    type: m[2]!,
+  }));
+  const STYLES: Record<
+    string,
+    {
+      style: Record<string, unknown>;
+      unsure?: string[];
+      details?: string[];
+      proportions?: Record<string, number | null>;
+    }
+  > = {
+    shirt: {
+      style: {
+        topType: 'shirt',
+        collar: 'shirt',
+        closure: 'front_buttons',
+        placket: 'separate',
+        buttons: 6,
+        sleeve: 'short',
+        cuff: 'none',
+        hemShape: 'straight',
+        yoke: true,
+        darts: false,
+        pockets: 'none',
+        fit: 'regular',
+      },
+      unsure: ['yoke'],
+    },
+    shorts: {
+      style: {
+        length: 'above_knee',
+        leg: 'straight',
+        waistband: true,
+        waistbandType: 'fitted',
+        beltLoops: 6,
+        closure: 'fly_zip',
+        pockets: 'slant',
+        backPockets: 'patch',
+        backPocketCount: 2,
+        pleats: 'none',
+        turnUps: false,
+      },
+      unsure: ['backPockets', 'pockets'],
+    },
+    trousers: {
+      style: {
+        fit: 'regular',
+        leg: 'straight',
+        closure: 'fly_zip',
+        length: 'full',
+        pockets: 'side_seam',
+        waistband: true,
+        beltLoops: 5,
+      },
+    },
+    jeans: { style: { fit: 'fitted', leg: 'slim', length: 'full' } },
+    skirt: { style: { skirt: 'a_line', length: 'knee', closure: 'side_zip', waistband: true } },
+    hoodie: { style: { hood: true, ribbing: true, pockets: 'kangaroo', sleeve: 'long' } },
+    blazer: {
+      style: {
+        collar: 'notched',
+        closure: 'front_buttons',
+        buttons: 2,
+        lining: true,
+        sleeve: 'long',
+        pockets: 'patch',
+        pocketCount: 1,
+      },
+    },
+    jumpsuit: {
+      style: {
+        sleeve: 'none',
+        neckline: 'v_neck',
+        closure: 'back_zip',
+        length: 'full',
+        leg: 'wide',
+      },
+    },
+    romper: { style: { sleeve: 'short', closure: 'back_zip', length: 'shorts' } },
+    dungarees: { style: { length: 'full', pockets: 'patch' } },
+    dress: {
+      style: {
+        fit: 'regular',
+        neckline: 'round',
+        collar: 'peter_pan',
+        sleeve: 'short',
+        sleeveStyle: 'puff',
+        cuff: 'band',
+        closure: 'back_zip',
+        waistSeam: true,
+        skirt: 'gathered',
+        length: null,
+        darts: false,
+        pockets: 'none',
+      },
+      unsure: ['closure'],
+      details: ['Bow at the back waist'],
+      proportions: { skirtToBodice: 1.5 },
+    },
+  };
+  return {
+    garments: garments.map((g) => {
+      const s = STYLES[g.type] ?? STYLES['dress']!;
+      return {
+        index: g.index,
+        style: s.style,
+        unsure: s.unsure ?? [],
+        details: s.details ?? [],
+        proportions: s.proportions ?? {},
+      };
+    }),
+    uncertain: ['Back view not shown'],
+  };
+}

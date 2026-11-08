@@ -9,6 +9,38 @@ export function draftNeckFinish(ctx: Ctx, b: BodiceResult): DraftPiece[] {
   const half = b.frontNeck + b.backNeck; // CF → CB along the neckline
   const out: DraftPiece[] = [];
   const backOpen = style.closure === 'back_zip';
+  if (style.hood) return out; // the hood is sewn to the neckline (see draftHood)
+  if (style.collar === 'camp' || style.collar === 'notched') {
+    // One-piece collar without a stand: camp (convertible, to CF) or the top collar of a notched
+    // lapel (from the gorge). Neck edge = the half neckline it sits on.
+    const camp = style.collar === 'camp';
+    const depth = ctx.kids ? (camp ? 60 : 55) : camp ? 80 : 75;
+    const lift = 10;
+    const co = new Outline(P(0, depth));
+    co.quad('neck', P(half * 0.6, depth), P(half, depth - lift), 10);
+    const point = camp
+      ? P(half + (ctx.kids ? 18 : 30), -4)
+      : P(half + (ctx.kids ? 10 : 18), depth * 0.25);
+    co.line('front', point);
+    if (!camp) co.line('front', P(half - (ctx.kids ? 4 : 6), -2));
+    co.quad('outer', P(half * 0.55, -2), P(0, 0), 12);
+    out.push(
+      piece('collar', camp ? 'Camp collar' : 'Top collar', co.close('cb'), {
+        cutQuantity: 2,
+        foldLine: { from: P(0, 0), to: P(0, depth) },
+        grainline: { from: P(half * 0.2, depth * 0.45), to: P(half * 0.8, depth * 0.45) },
+        notches: [P(b.backNeck, depth - lift * (b.backNeck / half) ** 2)],
+        notes: [
+          camp
+            ? 'Cut 2 (upper and under collar) + 1 interfacing; ends at CF'
+            : 'Cut 2 (top collar + under collar) + interfacing; meets the lapel at the gorge',
+        ],
+        inputs: { neckline: half, depth },
+      }),
+    );
+    out.push(backNeckFacing(ctx, b));
+    return out;
+  }
   if (style.collar === 'shirt' || style.collar === 'mandarin') {
     const ext = b.extension;
     const standH = ctx.kids ? 25 : 32;
@@ -121,7 +153,15 @@ export function draftNeckFinish(ctx: Ctx, b: BodiceResult): DraftPiece[] {
     return out;
   }
   // Neck facings (no collar, no front opening — the grown-on facing covers CF).
-  if (style.collar === 'none' && style.closure !== 'front_buttons') {
+  if (style.wrap)
+    ctx.notes.push('Wrap front: finish the neckline and wrap edge with bias binding or a facing');
+  if (
+    style.collar === 'none' &&
+    style.closure !== 'front_buttons' &&
+    !ctx.style.ribbing &&
+    !style.wrap
+  ) {
+    const frontOpen = style.closure === 'front_zip';
     const depth = ctx.kids ? 45 : 55;
     for (const front of [true, false]) {
       const pts = front ? b.frontNeckPts : b.backNeckPts;
@@ -134,7 +174,7 @@ export function draftNeckFinish(ctx: Ctx, b: BodiceResult): DraftPiece[] {
         .map((p) => P(p.x + 30 * (p.x / Math.max(1, hps.x)), p.y + depth));
       o.poly('outer', shifted);
       const shape = o.close(front ? 'cf' : 'cb');
-      const split = !front && backOpen;
+      const split = front ? frontOpen : backOpen;
       out.push(
         piece(
           front ? 'facing_front' : 'facing_back',
@@ -214,5 +254,25 @@ export function draftPocketBag(ctx: Ctx): DraftPiece {
     grainline: { from: P(w * 0.4, 30), to: P(w * 0.4, h * 0.7) },
     markings: [mark('placement', [P(0, 40), P(0, 40 + (ctx.kids ? 110 : 150))], 'pocket opening')],
     notes: ['Cut 4 in pocketing (2 pairs); opening on the side seam'],
+  });
+}
+
+/** Back neck facing (collars without a stand, lined jackets). */
+export function backNeckFacing(ctx: Ctx, b: BodiceResult): DraftPiece {
+  const depth = ctx.kids ? 45 : 60;
+  const pts = b.backNeckPts;
+  const o = new Outline(pts[0]!);
+  o.poly('neck', pts.slice(1));
+  const hps = pts[pts.length - 1]!;
+  o.line('shoulder', P(hps.x + 30, hps.y + 10));
+  o.poly(
+    'outer',
+    [...pts].reverse().map((p) => P(p.x + 30 * (p.x / Math.max(1, hps.x)), p.y + depth)),
+  );
+  return piece('facing_back', 'Back neck facing', o.close('cb'), {
+    cutQuantity: 1,
+    foldLine: { from: pts[0]!, to: P(0, pts[0]!.y + depth) },
+    grainline: { from: P(hps.x * 0.4, pts[0]!.y), to: P(hps.x * 0.4, pts[0]!.y + depth * 0.8) },
+    notes: ['Cut in fabric + interfacing'],
   });
 }

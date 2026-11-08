@@ -46,6 +46,8 @@ export const TASK_OPERATION: Record<AiTask, AiOperation> = {
   garment_decomposition: 'garment_reconstruction',
   component_detail: 'image_analysis',
   sketch_reading: 'image_analysis',
+  sketch_classify: 'image_analysis',
+  sketch_details: 'image_analysis',
   pattern_interpretation: 'pattern_interpretation',
   fabric_analysis: 'image_analysis',
   techpack_text: 'techpack_documentation',

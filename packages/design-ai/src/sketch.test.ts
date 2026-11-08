@@ -4,7 +4,12 @@ import { draftPattern, patternDesignState, seamChecks } from '@ai-designer/patte
 import { describe, expect, it } from 'vitest';
 
 import { fakeResponders } from './fake-responders.js';
-import { readSketch, sketchReadingSchema, specFromReading } from './sketch.js';
+import {
+  readSketch,
+  sketchClassificationSchema,
+  sketchDetailsSchema,
+  specFromSketch,
+} from './sketch.js';
 import { techPackHtml } from './techpack-html.js';
 import { buildTechPack } from './techpack.js';
 
@@ -22,8 +27,8 @@ describe('sketch → pattern (ADR-058)', () => {
       size: '8y',
       style: { collar: 'peter_pan', sleeveStyle: 'puff', skirt: 'gathered' },
     });
-    expect(r.fromSketch).toContain('collar');
-    expect(r.unsure).toEqual(['closure']);
+    expect(r.fromSketch['main']).toContain('collar');
+    expect(r.unsure['main']).toEqual(['closure']);
     expect(r.notes.join(' ')).toMatch(/Bow/);
     const draft = draftPattern(r.spec);
     const state = patternDesignState(draft, {
@@ -67,15 +72,73 @@ describe('sketch → pattern (ADR-058)', () => {
     expect(html).toContain('Cutting layout — main');
   });
 
-  it('is tolerant: unknown values become null, odd combinations are fixed', () => {
-    const reading = sketchReadingSchema.parse({
-      family: 'Shirt',
-      label: 'Shirt',
-      audience: 'Man',
-      style: { collar: 'shirt', closure: 'back zip', sleeve: 'LONG', neckline: 'sweetheart' },
+  it('reads a shirt and shorts as a set with every bottom detail (sample 01)', async () => {
+    const r = await readSketch(
+      { images: [png], garmentHint: 'shirt and shorts set' },
+      { provider: new FakeProvider(fakeResponders) },
+    );
+    expect(r.classification.garments.map((g) => g.type)).toEqual(['shirt', 'shorts']);
+    expect(r.spec).toMatchObject({
+      family: 'top',
+      audience: 'boys',
+      size: '8y',
+      style: { topType: 'shirt', collar: 'shirt', placket: 'separate', sleeve: 'short' },
+      garments: [
+        {
+          key: 'shorts',
+          family: 'trousers',
+          style: {
+            length: 'above_knee',
+            waistband: true,
+            waistbandType: 'fitted',
+            beltLoops: 6,
+            closure: 'fly_zip',
+            pockets: 'slant',
+            backPockets: 'patch',
+          },
+        },
+      ],
     });
-    expect(reading.style.neckline).toBeNull();
-    const { spec, notes } = specFromReading(reading, { audience: null, size: null });
+    expect(r.unsure['shorts']).toContain('backPockets');
+    const state = patternDesignState(draftPattern(r.spec), { createdFrom: 'ai' });
+    const names = state.patternPieces!.map((p) => p.name);
+    for (const n of [
+      'Collar stand',
+      'Button placket',
+      'Waistband',
+      'Belt loop strip',
+      'Fly facing',
+      'Side front (pocket facing)',
+      'Back patch pocket',
+    ])
+      expect(names).toContain(n);
+    expect(names).not.toContain('Skirt front');
+    expect(validateDesignState(state).findings.filter((f) => f.outcome === 'error')).toEqual([]);
+  });
+
+  it('is tolerant: unknown values become null, odd combinations are fixed', () => {
+    const c = sketchClassificationSchema.parse({
+      gender: 'Man',
+      ageGroup: 'grown-up',
+      garments: [{ type: 'Shirt', section: 'top' }],
+      label: 'Shirt',
+    });
+    const d = sketchDetailsSchema.parse({
+      garments: [
+        {
+          index: 0,
+          style: {
+            collar: 'shirt',
+            closure: 'back zip',
+            sleeve: 'LONG',
+            neckline: 'sweetheart',
+            beltLoops: 'many',
+          },
+        },
+      ],
+    });
+    expect(d.garments[0]!.style.neckline).toBeNull();
+    const { spec, notes } = specFromSketch(c, d, { audience: null, size: null });
     expect(spec).toMatchObject({
       family: 'top',
       audience: 'men',
@@ -83,5 +146,26 @@ describe('sketch → pattern (ADR-058)', () => {
       style: { closure: 'front_buttons', sleeve: 'long' },
     });
     expect(notes.join(' ')).toMatch(/front opening/);
+  });
+
+  it('maps garment words and ages: half pants → shorts, a 6-year-old girl → girls 6y', () => {
+    const c = sketchClassificationSchema.parse({
+      gender: 'girl',
+      ageGroup: 'child',
+      ageYears: 6.4,
+      garments: [{ type: 'half pants', section: 'lower', label: 'Half pants' }],
+      label: 'Shorts',
+    });
+    expect(c.garments[0]!.type).toBe('shorts');
+    const { spec } = specFromSketch(c, sketchDetailsSchema.parse({}), {
+      audience: null,
+      size: null,
+    });
+    expect(spec).toMatchObject({
+      family: 'trousers',
+      audience: 'girls',
+      size: '6y',
+      style: { length: 'above_knee' },
+    });
   });
 });

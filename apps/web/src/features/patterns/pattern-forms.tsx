@@ -9,8 +9,8 @@ import {
 import {
   BODY_LABELS,
   defaultStyle,
-  MEASUREMENTS_FOR_FAMILY,
   measurementsFor,
+  measurementsForSpec,
   resolve,
   type SeamCheck,
   sizesFor,
@@ -153,7 +153,48 @@ export function StyleForm({
                 </span>
               ) : null}
             </Label>
-            {f.kind === 'boolean' ? (
+            {f.kind === 'count' ? (
+              <SimpleSelect
+                aria-label={f.label}
+                value={value === null || value === undefined ? 'auto' : String(value)}
+                disabled={disabled}
+                onValueChange={(v) => set(v === 'auto' ? null : Number(v), v)}
+                options={[
+                  ...(f.key === 'buttons' ? [{ value: 'auto', label: 'Automatic' }] : []),
+                  ...Array.from({ length: (f.max ?? 5) - (f.min ?? 0) + 1 }, (_, i) => {
+                    const n = (f.min ?? 0) + i;
+                    return { value: String(n), label: n === 0 ? 'None' : String(n) };
+                  }),
+                ]}
+              />
+            ) : f.kind === 'multi' ? (
+              <div className="flex flex-wrap gap-1" role="group" aria-label={f.label}>
+                {Object.entries(f.options ?? {}).map(([v, label]) => {
+                  const list = Array.isArray(value) ? (value as string[]) : [];
+                  const on = list.includes(v);
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={disabled}
+                      aria-pressed={on}
+                      onClick={() =>
+                        set(
+                          on ? list.filter((x) => x !== v) : [...list, v],
+                          `${label} ${on ? 'off' : 'on'}`,
+                        )
+                      }
+                      className={cn(
+                        'h-7 rounded-md border px-2 text-[12px]',
+                        on ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : f.kind === 'boolean' ? (
               <SimpleSelect
                 aria-label={f.label}
                 value={value ? 'yes' : 'no'}
@@ -256,7 +297,7 @@ export function MeasurementsForm({
 }) {
   const chart = measurementsFor(spec.audience, spec.size);
   const ctx = resolve(spec);
-  const keys = MEASUREMENTS_FOR_FAMILY[spec.family] ?? [];
+  const keys = measurementsForSpec(spec);
   const setBody = (key: BodyMeasurementKey, mm: number | null) => {
     const body = { ...spec.body };
     if (mm === null) delete body[key];

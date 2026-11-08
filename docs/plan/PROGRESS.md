@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-08 — Component 1: accurate patterns from the sketch (owner request) — DONE
+
+- Request: the sketch reading was inaccurate (sample 01 in `samples/sketches/`: a boy's shirt + shorts became a shirt dress without belt loops, zip or waistband). Owner's strategy: decide man/woman, adult/child, upper/lower/both, then a garment-specific checklist. Owner chose: two passes; extend the engine so every checklist item drafts pieces; cover the 4 families + jumpsuits/co-ords, jackets/outerwear, kids-specific.
+- Built (ADR-061): two-pass reading (`sketch_classify` → `sketch_details`) with garment taxonomy, aliases, per-family checklists and cues, per-garment `unsure`, age → kids' size; co-ord sets (`patternSpec.garments`, `set_garment` components, prefixed keys/templates, per-garment checks/sewing order/tech pack); new families jumpsuit/romper, jacket (shirt-jacket, blazer, hoodie, bomber, sweatshirt), dungarees; bottoms details (waistband types, belt loops, slant/scoop pockets with side front + bag, back patch/welt, cargo, pleats, turn-ups); shirt details (separate/hidden placket, sleeve plackets, back pleat, camp collar, chest pockets, hem shape); dress/skirt extras (frock yoke, tiered, pleated, ruffles, wrap + ties, peplum); review shows the classification and one options section per garment; editor Style tab per garment (add/remove set garments), piece list grouped by garment; new start hints (set, shorts, jumpsuit, dungarees, jacket, hoodie).
+- Tests: pattern-model 56 (18-garment matrix: valid, all pieces present, no seam-check errors; set structure), design-ai 13 (sample-01 set reading → all pieces, tolerant parsing, aliases/ages), e2e: set flow (classification, per-garment options, unsure, editor grouping, remove belt loops).
+- **Owner actions:** restart `pnpm dev` (no migration). Try sample 01 again with a real provider; add more samples to `samples/sketches/` with notes for tuning.
+- **Next step:** owner check with real sketches; tune checklists/cues from failures.
+
 ### 2026-11-08 — All three components aligned: sketch → patterns → tech pack (owner request) — DONE
 
 - Request: fix the whole model (sketch start only) so the AI's patterns, the upgraded CAD editor and the tech pack line up, with dimensions visible properly in the editor, and a finished working flow.

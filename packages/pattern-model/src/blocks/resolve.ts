@@ -33,10 +33,21 @@ export function resolve(input: PatternSpec | PatternSpecInput): Ctx {
   const chart = measurementsFor(spec.audience, spec.size);
   const m = { ...chart, ...spec.body } as Record<BodyMeasurementKey, number>;
   const style = spec.style;
-  const knit = spec.family === 'top' && style.topType === 'tshirt';
+  const knit =
+    (spec.family === 'top' && style.topType === 'tshirt') ||
+    (spec.family === 'jacket' &&
+      (style.jacketType === 'hoodie' || style.jacketType === 'sweatshirt'));
   const kids = spec.audience === 'girls' || spec.audience === 'boys';
   const base = EASE[style.fit];
-  const extra = spec.family === 'top' && style.topType === 'shirt' ? 30 : 0;
+  // Shirts sit a little looser; jackets go over other clothes (blazers least, bombers most).
+  const extra =
+    spec.family === 'top' && style.topType === 'shirt'
+      ? 30
+      : spec.family === 'jacket'
+        ? { shirt_jacket: 60, blazer: 50, hoodie: 90, bomber: 110, sweatshirt: 80 }[
+            style.jacketType
+          ]
+        : 0;
   const knitCut = knit ? -30 : 0;
   const scale = kids ? 0.7 : 1;
   const ease = {
@@ -87,8 +98,129 @@ export function defaultStyle(
         leg: 'straight',
         closure: kids ? 'none' : 'fly_zip',
         waistband: true,
+        waistbandType: kids ? 'elastic_back' : 'fitted',
+        beltLoops: kids ? 0 : 5,
         pockets: 'side_seam',
       };
+    case 'jumpsuit':
+      return {
+        length: 'full',
+        leg: 'straight',
+        sleeve: 'none',
+        closure: 'back_zip',
+        darts: audience === 'women',
+        pockets: 'side_seam',
+      };
+    case 'jacket':
+      return {
+        jacketType: 'shirt_jacket',
+        length: 'hip',
+        sleeve: 'long',
+        cuff: 'shirt',
+        collar: 'shirt',
+        closure: 'front_buttons',
+        darts: false,
+        hemShape: 'straight',
+        pockets: 'patch',
+        pocketCount: 2,
+      };
+    case 'dungarees':
+      return {
+        length: kids ? 'full' : 'full',
+        leg: 'straight',
+        closure: 'side_buttons',
+        waistband: false,
+        pockets: 'side_seam',
+        darts: false,
+      };
+  }
+}
+
+/** Jacket defaults by kind (applied when the reading says which jacket it is). */
+export function jacketDefaults(kind: PatternStyle['jacketType']): PatternStyleInput {
+  switch (kind) {
+    case 'blazer':
+      return {
+        jacketType: 'blazer',
+        collar: 'notched',
+        closure: 'front_buttons',
+        lining: true,
+        cuff: 'none',
+        hemShape: 'straight',
+        pockets: 'patch',
+        pocketCount: 2,
+      };
+    case 'hoodie':
+      return {
+        jacketType: 'hoodie',
+        collar: 'none',
+        hood: true,
+        ribbing: true,
+        closure: 'none',
+        cuff: 'none',
+        pockets: 'kangaroo',
+        hemShape: 'straight',
+      };
+    case 'sweatshirt':
+      return {
+        jacketType: 'sweatshirt',
+        collar: 'none',
+        neckline: 'crew',
+        ribbing: true,
+        closure: 'none',
+        cuff: 'none',
+        pockets: 'none',
+        hemShape: 'straight',
+      };
+    case 'bomber':
+      return {
+        jacketType: 'bomber',
+        collar: 'none',
+        neckline: 'crew',
+        ribbing: true,
+        closure: 'front_zip',
+        cuff: 'none',
+        lining: true,
+        pockets: 'slant',
+        hemShape: 'straight',
+      };
+    case 'shirt_jacket':
+    default:
+      return {
+        jacketType: 'shirt_jacket',
+        collar: 'shirt',
+        closure: 'front_buttons',
+        cuff: 'shirt',
+      };
+  }
+}
+
+/** Display name of a drafted garment (`Shorts` for short trousers, `Romper` for a short jumpsuit…). */
+export function garmentName(spec: PatternSpec): string {
+  const s = spec.style;
+  const short = ['shorts', 'mini', 'above_knee', 'knee'].includes(s.length);
+  switch (spec.family) {
+    case 'top':
+      return { blouse: 'Blouse', shirt: 'Shirt', tshirt: 'T-shirt' }[s.topType];
+    case 'trousers':
+      return short ? 'Shorts' : 'Trousers';
+    case 'jumpsuit':
+      return short ? 'Romper' : 'Jumpsuit';
+    case 'jacket':
+      return {
+        shirt_jacket: 'Shirt jacket',
+        blazer: 'Blazer',
+        hoodie: 'Hoodie',
+        bomber: 'Bomber jacket',
+        sweatshirt: 'Sweatshirt',
+      }[s.jacketType];
+    case 'dungarees':
+      return short ? 'Shortalls' : 'Dungarees';
+    case 'skirt':
+      return 'Skirt';
+    case 'dress':
+    default:
+      return spec.audience === 'girls' && s.yoke ? 'Frock' : 'Dress';
   }
 }
 
@@ -100,6 +232,14 @@ export function lengthFor(ctx: Ctx, kind: 'top' | 'skirt' | 'trousers'): number 
   const knee = m.waist_to_knee;
   const floor = m.waist_to_floor;
   if (kind === 'top') {
+    if (ctx.spec.family === 'jacket') {
+      const base = waistY + m.waist_to_hip;
+      return style.jacketType === 'bomber' || style.jacketType === 'sweatshirt'
+        ? base - 10
+        : style.jacketType === 'blazer'
+          ? base + 70
+          : base + 40;
+    }
     switch (style.length) {
       case 'crop':
         return waistY - 30;

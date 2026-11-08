@@ -19,13 +19,9 @@ import { assetContentUrl } from '@/features/assets/api';
 import { newIdempotencyKey } from '@/features/designs/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
 import { PatternPreview } from '@/features/patterns/cad/pattern-preview';
+import { GarmentStyleForms } from '@/features/patterns/garment-forms';
 import { FAMILY_LABEL, type Unit } from '@/features/patterns/options';
-import {
-  ChecksList,
-  GarmentBasics,
-  StyleForm,
-  UnitToggle,
-} from '@/features/patterns/pattern-forms';
+import { ChecksList, GarmentBasics, UnitToggle } from '@/features/patterns/pattern-forms';
 import { queryKeys } from '@/lib/query/keys';
 
 import { studioApi } from './api';
@@ -35,6 +31,17 @@ import { studioApi } from './api';
  * here), and a live preview of the drafted pattern with its dimensions and fit checks. Creating the
  * design opens the pattern editor.
  */
+/** Per-garment highlights; analyses stored before ADR-061 had plain arrays for the one garment. */
+function sketchHighlights(result: { fromSketch?: unknown; unsure?: unknown }) {
+  const norm = (v: unknown): Record<string, string[]> =>
+    Array.isArray(v)
+      ? { main: v as string[] }
+      : v && typeof v === 'object'
+        ? (v as Record<string, string[]>)
+        : {};
+  return { fromSketch: norm(result.fromSketch), unsure: norm(result.unsure) };
+}
+
 export function SketchReview({
   projectId,
   analysis,
@@ -52,8 +59,7 @@ export function SketchReview({
   const [name, setName] = useState(result.reading.label);
   const [unit, setUnit] = useState<Unit>('cm');
   const key = useRef(newIdempotencyKey());
-  const highlight = useMemo(() => new Set(result.fromSketch ?? []), [result.fromSketch]);
-  const unsure = useMemo(() => new Set(result.unsure ?? []), [result.unsure]);
+  const marks = useMemo(() => sketchHighlights(result), [result]);
 
   const preview = useMemo(() => {
     const draft = draftPattern(spec);
@@ -102,8 +108,44 @@ export function SketchReview({
             </figure>
           ))}
           <section className="flex flex-col gap-1.5 text-[13px]" data-testid="sketch-reading">
+            {result.classification ? (
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[12px]"
+                data-testid="sketch-classification"
+              >
+                <dt className="text-muted-foreground">For</dt>
+                <dd>
+                  {result.classification.gender === 'unisex'
+                    ? 'Anyone'
+                    : result.classification.gender === 'male'
+                      ? 'Male'
+                      : 'Female'}{' '}
+                  ·{' '}
+                  {result.classification.ageGroup === 'child'
+                    ? `child${result.classification.ageYears ? ` (about ${Math.round(result.classification.ageYears)} years)` : ''}`
+                    : 'adult'}
+                </dd>
+                <dt className="text-muted-foreground">Covers</dt>
+                <dd>
+                  {(result.classification.sections.length
+                    ? result.classification.sections
+                    : ['—']
+                  ).join(' + ')}
+                </dd>
+                <dt className="text-muted-foreground">Garments</dt>
+                <dd data-testid="sketch-garments">
+                  {(result.garments ?? [])
+                    .map((g) => `${g.label} (${g.type.replaceAll('_', ' ')})`)
+                    .join(', ')}
+                </dd>
+              </dl>
+            ) : null}
             <div className="flex flex-wrap gap-1">
-              <Badge variant="outline">{FAMILY_LABEL[result.spec.family]}</Badge>
+              <Badge variant="outline">
+                {spec.garments.length
+                  ? `Set of ${spec.garments.length + 1}`
+                  : FAMILY_LABEL[result.spec.family]}
+              </Badge>
               {reading.audience ? <Badge variant="outline">{reading.audience}</Badge> : null}
               <span className="text-[12px] text-muted-foreground">
                 confidence {Math.round(reading.confidence * 100)}%
@@ -141,15 +183,17 @@ export function SketchReview({
             <p className="text-[12px] text-muted-foreground">
               Options marked <span className="rounded bg-primary/10 px-1 text-primary">sketch</span>{' '}
               were read from your drawing;{' '}
-              <span className="rounded bg-status-needs-review/15 px-1 text-status-needs-review">check</span>{' '}
+              <span className="rounded bg-status-needs-review/15 px-1 text-status-needs-review">
+                check
+              </span>{' '}
               marks a guess worth confirming. Sizes come from a standard size chart — you can change
               every measurement in the editor.
             </p>
             <GarmentBasics spec={spec} onChange={(s) => setSpec(patternSpecSchema.parse(s))} />
-            <StyleForm
+            <GarmentStyleForms
               spec={spec}
-              highlight={highlight}
-              unsure={unsure}
+              highlight={marks.fromSketch}
+              unsure={marks.unsure}
               onChange={(s) => setSpec(patternSpecSchema.parse(s))}
             />
           </section>

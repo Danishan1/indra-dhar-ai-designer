@@ -3,8 +3,11 @@ import type { GarmentDesignState } from '../schema/design-state.js';
 
 import { createKnitTshirt } from './knit-tshirt.js';
 import {
+  createCoordSet,
   createDress,
+  createDungarees,
   createHoodie,
+  createJumpsuit,
   createJacket,
   createSkirt,
   createTrousers,
@@ -22,6 +25,9 @@ const FACTORIES: Record<string, (opts?: WovenShirtOptions) => GarmentDesignState
   trousers: createTrousers,
   jacket: createJacket,
   hoodie: createHoodie,
+  jumpsuit: createJumpsuit,
+  dungarees: createDungarees,
+  coord_set: createCoordSet,
 };
 
 export const TEMPLATE_KEYS: readonly string[] = Object.keys(FACTORIES);

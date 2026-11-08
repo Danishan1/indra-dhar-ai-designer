@@ -26,7 +26,7 @@ const GENERIC_PROPS = ['appearance.color', 'material.fabric_ref'] as const;
 const t = (d: ComponentTypeDef): ComponentTypeDef => Object.freeze(d);
 
 /** SPEC-003 §8.2. Extend through `extendCatalog` (registry/catalog.ts) — never by editing schemas. */
-export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze([
+const BASE_TYPES: readonly ComponentTypeDef[] = Object.freeze([
   t({
     type: 'garment_body',
     label: 'Garment body',
@@ -131,7 +131,7 @@ export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze([
     type: 'placket',
     label: 'Placket',
     defaultDisplayName: 'Placket',
-    allowedParents: ['garment_body', 'front_body_panel'],
+    allowedParents: ['garment_body', 'front_body_panel', 'sleeve'],
     rootAllowed: false,
     repeatability: 'single',
     allowedProperties: [
@@ -147,7 +147,14 @@ export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze([
     type: 'pocket',
     label: 'Pocket',
     defaultDisplayName: 'Pocket',
-    allowedParents: ['garment_body', 'front_body_panel', 'back_body_panel', 'sleeve'],
+    allowedParents: [
+      'garment_body',
+      'front_body_panel',
+      'back_body_panel',
+      'sleeve',
+      'bib',
+      'leg_panel',
+    ],
     rootAllowed: false,
     repeatability: 'multiple',
     allowedProperties: [
@@ -312,6 +319,56 @@ export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze([
     garmentCategories: ['trousers'],
   }),
   t({
+    type: 'set_garment',
+    label: 'Garment of a set',
+    defaultDisplayName: 'Garment',
+    allowedParents: ['garment_body'],
+    rootAllowed: false,
+    repeatability: 'multiple',
+    allowedProperties: [...GENERIC_PROPS, 'appearance.silhouette'],
+    garmentCategories: '*',
+  }),
+  t({
+    type: 'belt_loop',
+    label: 'Belt loops',
+    defaultDisplayName: 'Belt loops',
+    allowedParents: ['waistband', 'garment_body', 'set_garment'],
+    rootAllowed: false,
+    repeatability: 'single',
+    allowedProperties: [...GENERIC_PROPS],
+    garmentCategories: ['trousers', 'skirt', 'jumpsuit', 'dungarees'],
+  }),
+  t({
+    type: 'bib',
+    label: 'Bib',
+    defaultDisplayName: 'Bib',
+    allowedParents: ['garment_body', 'set_garment'],
+    rootAllowed: false,
+    repeatability: 'multiple',
+    allowedProperties: [...GENERIC_PROPS, 'appearance.pattern'],
+    garmentCategories: ['dungarees'],
+  }),
+  t({
+    type: 'strap',
+    label: 'Straps',
+    defaultDisplayName: 'Straps',
+    allowedParents: ['garment_body', 'set_garment', 'bib'],
+    rootAllowed: false,
+    repeatability: 'multiple',
+    allowedProperties: [...GENERIC_PROPS],
+    garmentCategories: ['dungarees', 'dress'],
+  }),
+  t({
+    type: 'ruffle',
+    label: 'Ruffle',
+    defaultDisplayName: 'Ruffle',
+    allowedParents: '*',
+    rootAllowed: false,
+    repeatability: 'multiple',
+    allowedProperties: [...GENERIC_PROPS],
+    garmentCategories: '*',
+  }),
+  t({
     type: 'custom',
     label: 'Custom component',
     defaultDisplayName: 'Custom component',
@@ -322,3 +379,33 @@ export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze([
     garmentCategories: '*',
   }),
 ]);
+
+/**
+ * Co-ord sets (ADR-061): each garment of a set is a `set_garment` under the one garment body, so
+ * every part that may sit under the garment body may also sit under a set garment.
+ */
+/** Pattern-first categories (ADR-061) whose parts are typical wherever the garment parts are. */
+const LEGGED = ['jumpsuit', 'dungarees'];
+const typical = (d: ComponentTypeDef): ComponentTypeDef['garmentCategories'] => {
+  if (d.garmentCategories === '*') return '*';
+  const extra = ['coord_set'];
+  if (d.garmentCategories.includes('trousers')) extra.push(...LEGGED);
+  if (d.garmentCategories.includes('dress')) extra.push('jumpsuit');
+  return [...new Set([...d.garmentCategories, ...extra])];
+};
+
+export const COMPONENT_TYPES: readonly ComponentTypeDef[] = Object.freeze(
+  BASE_TYPES.map((d) =>
+    t({
+      ...d,
+      allowedParents:
+        d.allowedParents !== '*' &&
+        d.allowedParents.includes('garment_body') &&
+        !d.allowedParents.includes('set_garment') &&
+        d.type !== 'set_garment'
+          ? [...d.allowedParents, 'set_garment']
+          : d.allowedParents,
+      garmentCategories: typical(d),
+    }),
+  ),
+);

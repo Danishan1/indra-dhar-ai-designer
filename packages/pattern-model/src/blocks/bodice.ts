@@ -50,6 +50,10 @@ export interface BodiceResult {
   backNeckPts: P[];
   /** Button extension beyond CF (0 = none). */
   extension: number;
+  /** Notched lapel geometry (gorge → lapel point → break), for the facing and top collar. */
+  lapel: { gorge: P; point: P; breakY: number } | null;
+  /** Front hem / waist y at CF and the facing width a separate facing needs. */
+  frontHemY: number;
   shoulder: number;
   underarmY: number;
 }
@@ -164,10 +168,31 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
     return { pts: [waist, ...curve, hem], hemX: hem.x, hemY: L };
   };
 
-  // Front opening: button extension + grown-on facing.
+  // Front opening: button extension + grown-on facing (a separate placket replaces the facing; a
+  // hidden placket doubles it). Front zips and notched lapels have separate facings.
   const buttons = style.closure === 'front_buttons';
-  const ext = buttons ? (style.topType === 'shirt' && ctx.spec.family === 'top' ? 18 : 15) : 0;
-  const facing = buttons ? (ctx.kids ? 45 : 60) : 0;
+  const zip = style.closure === 'front_zip';
+  const notched = buttons && style.collar === 'notched';
+  const jacket = ctx.spec.family === 'jacket';
+  const ext = buttons
+    ? notched
+      ? ctx.kids
+        ? 18
+        : 22
+      : (style.topType === 'shirt' && ctx.spec.family === 'top') || jacket
+        ? 18
+        : 15
+    : 0;
+  const baseFacing = ctx.kids ? 45 : 60;
+  const facing =
+    !buttons || notched
+      ? 0
+      : style.placket === 'separate'
+        ? 0
+        : style.placket === 'hidden'
+          ? baseFacing * 2
+          : baseFacing;
+  const opened = buttons || zip;
 
   const neckF = neckCurve(neckline, nw, fnd);
   const neckB = cubicPts(P(0, bnd), P(nw * 0.6, bnd), P(nw, bnd * 0.35), P(nw, 0), 10);
@@ -175,9 +200,18 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
 
   // ── front ──
   const fSide = sidePts(true);
-  const fo = buttons ? new Outline(P(-ext - facing, fnd)) : new Outline(P(0, fnd));
-  if (buttons) fo.line('facing', P(-ext, fnd)).line('neck_ext', P(0, fnd));
-  fo.poly('neck', neckF.slice(1))
+  const gorgeAt = Math.max(1, Math.floor(neckF.length * 0.35));
+  const gorge = neckF[gorgeAt]!;
+  const fo = notched
+    ? new Outline(gorge)
+    : buttons
+      ? new Outline(P(-ext - facing, fnd))
+      : new Outline(P(0, fnd));
+  if (buttons && !notched) {
+    if (facing) fo.line('facing', P(-ext, fnd));
+    fo.line('neck_ext', P(0, fnd));
+  }
+  fo.poly('neck', notched ? neckF.slice(gorgeAt + 1) : neckF.slice(1))
     .line('shoulder', spF)
     .poly('armhole', armholeF)
     .poly('side', fSide.pts, bustDart);
@@ -193,14 +227,16 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
     );
   else fo.line(isWaist ? 'waist' : 'hem', P(0, fSide.hemY));
   if (isWaist && dF) fo.intake('waist', dF);
+  const yBreak = yU + (ctx.kids ? 10 : 25);
+  const lapelW = ctx.kids ? 45 : 65;
   if (buttons) {
     const yEnd = isWaist ? fSide.hemY : hemF;
-    fo.line(isWaist ? 'waist_ext' : 'hem_ext', P(-ext, yEnd)).line(
-      'facing',
-      P(-ext - facing, yEnd),
-    );
+    fo.line(isWaist ? 'waist_ext' : 'hem_ext', P(-ext, yEnd));
+    if (facing) fo.line('facing', P(-ext - facing, yEnd));
+    if (notched)
+      fo.line('front_edge', P(-ext, yBreak)).line('lapel', P(-ext - lapelW, gorge.y + 10));
   }
-  const front = fo.close(buttons ? 'front_edge' : 'cf');
+  const front = fo.close(notched ? 'gorge' : buttons ? 'front_edge' : 'cf');
   const frontMarks = [];
   if (bustDart) {
     const top = P(hbF, yU);
@@ -227,7 +263,22 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
         ),
       );
   }
-  if (buttons) {
+  if (zip)
+    frontMarks.push(mark('zip', [P(0, fnd + 5), P(0, (isWaist ? yWF : hemF) - 10)], 'front zip'));
+  if (buttons && notched) {
+    const n = style.buttons ?? (ctx.kids ? 2 : 2);
+    for (let i = 0; i < n; i++)
+      frontMarks.push(
+        mark(
+          'button',
+          [P(0, yBreak + 10 + i * (ctx.kids ? 70 : 100))],
+          i === 0 ? `${n} buttons` : null,
+        ),
+      );
+    frontMarks.push(
+      mark('fold', [P(-ext, yBreak), P(nw * 0.85, 0)], 'roll line (lapel folds back)'),
+    );
+  } else if (buttons) {
     const yStart = fnd + 15;
     const yEnd = isWaist
       ? yWF - 25
@@ -237,9 +288,10 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
       const y = yStart + ((yEnd - yStart) * i) / Math.max(1, count - 1);
       frontMarks.push(mark('button', [P(0, y)], i === 0 ? `${count} buttons` : null));
     }
-    frontMarks.push(
-      mark('fold', [P(-ext, fnd), P(-ext, isWaist ? yWF : hemF)], 'fold back facing'),
-    );
+    if (facing)
+      frontMarks.push(
+        mark('fold', [P(-ext, fnd), P(-ext, isWaist ? yWF : hemF)], 'fold back facing'),
+      );
   }
 
   // ── back ──
@@ -316,6 +368,15 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
       );
     else bo2.line('hem', P(0, bSide.hemY));
     back = bo2.close('cb');
+    if (style.backPleat) {
+      // Box pleat at CB: widen the back body at the fold; the yoke seam takes it in.
+      const pl = ctx.kids ? 20 : 30;
+      back = {
+        outline: back.outline.map((p) => (p.x <= 0.01 ? p : P(p.x + pl, p.y))),
+        edges: back.edges.map((e) => (e.name === 'seam' ? { ...e, intakeMm: e.intakeMm + pl } : e)),
+      };
+      backMarks.push(mark('pleat', [P(0, yokeDepth), P(pl, yokeDepth)], 'box pleat (half)'));
+    }
   }
 
   const frontArmhole = edgeLength(
@@ -333,6 +394,7 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
           yoke.edges.find((e) => e.name === 'armhole')!,
         )
       : 0);
+  // (For a notched lapel the front neck runs from the gorge to the neck point.)
   const frontNeck = edgeLength(
     front.outline,
     front.edges.find((e) => e.name === 'neck')!,
@@ -356,20 +418,29 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
     from: P(abX * 0.5, Math.max(yU, yokeDepth + 30)),
     to: P(abX * 0.5, Math.max(yU + 60, bSide.hemY - 40)),
   };
-  const frontName = ctx.spec.family === 'dress' && isWaist ? 'Bodice front' : 'Front';
-  const backName = ctx.spec.family === 'dress' && isWaist ? 'Bodice back' : 'Back';
+  const bodiceNames =
+    isWaist &&
+    (ctx.spec.family === 'dress' || ctx.spec.family === 'jumpsuit' || ctx.spec.family === 'top');
+  const frontName = bodiceNames ? 'Bodice front' : 'Front';
+  const backName = bodiceNames ? 'Bodice back' : 'Back';
   return {
     front: piece(isWaist ? 'bodice_front' : 'front', frontName, front, {
-      cutQuantity: buttons ? 2 : 1,
-      mirrored: buttons,
-      foldLine: buttons ? null : { from: P(0, fnd), to: P(0, isWaist ? yWF : hemF) },
+      cutQuantity: opened ? 2 : 1,
+      mirrored: opened,
+      foldLine: opened ? null : { from: P(0, fnd), to: P(0, isWaist ? yWF : hemF) },
       grainline: grainF,
       notches: [P(afX, afY)],
       markings: frontMarks,
       inputs: { bust: B, waist: W, armhole: frontArmhole },
-      notes: buttons
-        ? ['Cut 2 (left and right fronts); fold the facing back along the fold line']
-        : [],
+      notes: notched
+        ? [
+            'Cut 2 (left and right fronts); separate front facing; lapel rolls back on the roll line',
+          ]
+        : buttons && facing
+          ? ['Cut 2 (left and right fronts); fold the facing back along the fold line']
+          : opened
+            ? ['Cut 2 (left and right fronts)']
+            : [],
     }),
     back: piece(isWaist ? 'bodice_back' : 'back', backName, back, {
       cutQuantity: backZip ? 2 : 1,
@@ -396,9 +467,11 @@ export function draftBodice(ctx: Ctx, end: BodiceEnd): BodiceResult {
           ) - dB,
         )
       : 0,
-    frontNeckPts: neckF,
+    frontNeckPts: notched ? neckF.slice(gorgeAt) : neckF,
     backNeckPts: neckBack,
     extension: ext,
+    lapel: notched ? { gorge, point: P(-ext - lapelW, gorge.y + 10), breakY: yBreak } : null,
+    frontHemY: isWaist ? yWF : hemF,
     shoulder: dist(P(nw, 0), spF),
     underarmY: yU,
   };

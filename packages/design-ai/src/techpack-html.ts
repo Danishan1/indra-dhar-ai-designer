@@ -82,7 +82,7 @@ export function techPackHtml(
   if (doc.pattern) {
     const pt = doc.pattern;
     sections.push(
-      `<section><h2>Pattern specification</h2><p>${esc(pt.family)} · ${esc(pt.audience)} · size ${esc(pt.size)} · seam allowance ${pt.seamAllowanceMm} mm · hem allowance ${pt.hemAllowanceMm} mm</p>
+      `<section><h2>Pattern specification</h2><p>${pt.garments && pt.garments.length > 1 ? `Co-ord set: ${esc(pt.garments.map((g) => g.name).join(' + '))}` : esc(pt.garments?.[0]?.name ?? pt.family)} · ${esc(pt.audience)} · size ${esc(pt.size)} · seam allowance ${pt.seamAllowanceMm} mm · hem allowance ${pt.hemAllowanceMm} mm</p>
       <table class="full"><tbody>${pt.style.map((x) => `<tr><td>${esc(x.label)}</td><td>${esc(x.value)}</td></tr>`).join('')}</tbody></table>
       <h3>Body measurements</h3><table class="full"><thead><tr><th>Measurement</th><th>Value</th><th>Source</th></tr></thead><tbody>${pt.body.map((b) => `<tr><td>${esc(b.label)}</td><td>${(b.valueMm / 10).toFixed(1)} cm</td><td>${esc(b.source)}</td></tr>`).join('')}</tbody></table>
       <h3>Finished garment</h3><table class="full"><tbody>${pt.finished.map((f) => `<tr><td>${esc(f.label)}</td><td>${(f.valueMm / 10).toFixed(1)} cm</td></tr>`).join('')}</tbody></table>

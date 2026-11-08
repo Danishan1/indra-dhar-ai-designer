@@ -1,6 +1,6 @@
 'use client';
 
-import type { PatternPiece, PatternSpec } from '@ai-designer/garment-model';
+import { type PatternPiece, type PatternSpec, patternSpecSchema } from '@ai-designer/garment-model';
 import {
   deleteNodes,
   draftPattern,
@@ -57,13 +57,18 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { assetContentUrl } from '@/features/assets/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
-import { type CadApi, type CadSettings, type CadTool, PatternCad } from '@/features/patterns/cad/pattern-cad';
+import {
+  type CadApi,
+  type CadSettings,
+  type CadTool,
+  PatternCad,
+} from '@/features/patterns/cad/pattern-cad';
+import { GarmentStyleForms } from '@/features/patterns/garment-forms';
 import { fmt, type Unit } from '@/features/patterns/options';
 import {
   ChecksList,
   GarmentBasics,
   MeasurementsForm,
-  StyleForm,
   UnitToggle,
 } from '@/features/patterns/pattern-forms';
 import { cn } from '@/lib/utils';
@@ -130,7 +135,20 @@ export function PatternUiProvider({ children }: { children: ReactNode }) {
     }
   };
   return (
-    <Ctx.Provider value={{ selected, setSelected, unit, setUnit, nodes, setNodes, tool, setTool, settings, setSettings }}>
+    <Ctx.Provider
+      value={{
+        selected,
+        setSelected,
+        unit,
+        setUnit,
+        nodes,
+        setNodes,
+        tool,
+        setTool,
+        settings,
+        setSettings,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
@@ -185,15 +203,43 @@ export function PatternPieceList() {
   const state = useEditor((s) => s.display);
   const { selected, setSelected } = usePatternUi();
   const pieces = state.patternPieces ?? [];
+  const byId = new Map(state.components.map((c) => [c.componentId, c]));
+  // Co-ord sets: the garment (set_garment) each part belongs to.
+  const garmentOf = (id: string) => {
+    let c = byId.get(id);
+    for (let guard = 0; c && guard < 10; guard++) {
+      if (c.componentType === 'set_garment') return c;
+      c = c.parentComponentId ? byId.get(c.parentComponentId) : undefined;
+    }
+    return null;
+  };
   const groups = state.components
     .filter((c) => c.parentComponentId !== null)
-    .map((c) => ({ c, pieces: pieces.filter((p) => p.componentId === c.componentId) }))
+    .map((c) => ({
+      c,
+      g: garmentOf(c.componentId),
+      pieces: pieces.filter((p) => p.componentId === c.componentId),
+    }))
     .filter((g) => g.pieces.length);
   return (
-    <nav aria-label="Pattern pieces" className="flex min-h-0 flex-1 flex-col overflow-auto p-2 text-[13px]" data-testid="piece-list">
-      {groups.map(({ c, pieces: list }) => (
+    <nav
+      aria-label="Pattern pieces"
+      className="flex min-h-0 flex-1 flex-col overflow-auto p-2 text-[13px]"
+      data-testid="piece-list"
+    >
+      {groups.map(({ c, g, pieces: list }, i) => (
         <div key={c.componentId} className="mb-2">
-          <div className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{c.displayName}</div>
+          {g && groups[i - 1]?.g?.componentId !== g.componentId ? (
+            <div
+              className="mt-1 mb-1 border-b px-1 pb-0.5 text-[12px] font-semibold"
+              data-testid="piece-list-garment"
+            >
+              {g.displayName}
+            </div>
+          ) : null}
+          <div className="px-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            {c.displayName}
+          </div>
           {list.map((p) => (
             <button
               key={p.pieceId}
@@ -210,7 +256,10 @@ export function PatternPieceList() {
               <span className="flex-1 truncate">{p.name}</span>
               <span className="text-[11px] text-muted-foreground">×{p.cutQuantity}</span>
               {p.source === 'user' ? (
-                <span className="rounded bg-status-needs-review/15 px-1 text-[10px] text-status-needs-review" title="Edited by hand — not redrafted">
+                <span
+                  className="rounded bg-status-needs-review/15 px-1 text-[10px] text-status-needs-review"
+                  title="Edited by hand — not redrafted"
+                >
                   edited
                 </span>
               ) : null}
@@ -238,15 +287,29 @@ export function PatternViewport() {
   const designName = useEditor((s) => s.meta.design.name);
   const canEdit = useEditor((s) => s.meta.capabilities.canEdit);
   const ui = usePatternUi();
-  const { selected, setSelected, unit, setUnit, tool, setTool, settings, setSettings, nodes, setNodes } = ui;
+  const {
+    selected,
+    setSelected,
+    unit,
+    setUnit,
+    tool,
+    setTool,
+    settings,
+    setSettings,
+    nodes,
+    setNodes,
+  } = ui;
   const edit = useEditPiece();
   const { active } = useOrganization();
   const [refOpen, setRefOpen] = useState(true);
   const [calOpen, setCalOpen] = useState(false);
   const cad = useRef<CadApi | null>(null);
   const pieces = useMemo(() => state.patternPieces ?? [], [state.patternPieces]);
-  const sources = (state.sources ?? []).filter((s) => s.role === 'sketch' || s.role === 'reference');
-  const toggle = (k: 'snapGrid' | 'snapPoints' | 'showGrid' | 'showAllowance' | 'showDimensions') => setSettings({ ...settings, [k]: !settings[k] });
+  const sources = (state.sources ?? []).filter(
+    (s) => s.role === 'sketch' || s.role === 'reference',
+  );
+  const toggle = (k: 'snapGrid' | 'snapPoints' | 'showGrid' | 'showAllowance' | 'showDimensions') =>
+    setSettings({ ...settings, [k]: !settings[k] });
   const exportDxf = () => {
     const blob = new Blob([piecesToDxf(pieces)], { type: 'application/dxf' });
     const url = URL.createObjectURL(blob);
@@ -262,12 +325,20 @@ export function PatternViewport() {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.open();
-    w.document.write(tiledPrintHtml(pieces, { paper, title: designName }).replace('</body>', '<script>window.onload=()=>setTimeout(()=>window.print(),300)</' + 'script></body>'));
+    w.document.write(
+      tiledPrintHtml(pieces, { paper, title: designName }).replace(
+        '</body>',
+        '<script>window.onload=()=>setTimeout(()=>window.print(),300)</' + 'script></body>',
+      ),
+    );
     w.document.close();
   };
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="pattern-workspace">
-      <div className="flex flex-wrap items-center gap-1 border-b bg-panel/95 px-2 py-1 text-xs" data-testid="cad-toolbar">
+      <div
+        className="flex flex-wrap items-center gap-1 border-b bg-panel/95 px-2 py-1 text-xs"
+        data-testid="cad-toolbar"
+      >
         <div role="toolbar" aria-label="Pattern tools" className="flex rounded-md border p-0.5">
           {TOOLS.map((t) => (
             <Button
@@ -278,7 +349,9 @@ export function PatternViewport() {
               aria-label={t.label}
               aria-pressed={tool === t.tool}
               className={cn(tool === t.tool && 'bg-accent text-accent-foreground')}
-              disabled={!canEdit && (t.tool === 'point' || t.tool === 'lengthen' || t.tool === 'widen')}
+              disabled={
+                !canEdit && (t.tool === 'point' || t.tool === 'lengthen' || t.tool === 'widen')
+              }
               onClick={() => setTool(t.tool)}
               data-testid={`tool-${t.tool}`}
             >
@@ -287,7 +360,11 @@ export function PatternViewport() {
           ))}
         </div>
         <UnitToggle unit={unit} onChange={setUnit} />
-        <div className="flex rounded-md border p-0.5" role="group" aria-label="Snapping and display">
+        <div
+          className="flex rounded-md border p-0.5"
+          role="group"
+          aria-label="Snapping and display"
+        >
           {(
             [
               ['snapPoints', 'Snap to points', MagnetIcon],
@@ -297,37 +374,99 @@ export function PatternViewport() {
               ['showDimensions', 'Show dimensions on all pieces', RulerDimensionLineIcon],
             ] as const
           ).map(([k, label, Icon]) => (
-            <Button key={k} size="icon-sm" variant="ghost" title={label} aria-label={label} aria-pressed={settings[k]} className={cn(settings[k] && 'bg-accent text-accent-foreground')} onClick={() => toggle(k)} data-testid={`toggle-${k}`}>
+            <Button
+              key={k}
+              size="icon-sm"
+              variant="ghost"
+              title={label}
+              aria-label={label}
+              aria-pressed={settings[k]}
+              className={cn(settings[k] && 'bg-accent text-accent-foreground')}
+              onClick={() => toggle(k)}
+              data-testid={`toggle-${k}`}
+            >
               <Icon />
             </Button>
           ))}
         </div>
         <div className="flex rounded-md border p-0.5" role="group" aria-label="Zoom">
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" title="Fit all (0)" onClick={() => cad.current?.zoomTo('fit')} data-testid="zoom-fit">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            title="Fit all (0)"
+            onClick={() => cad.current?.zoomTo('fit')}
+            data-testid="zoom-fit"
+          >
             Fit
           </Button>
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" title="True size (1)" onClick={() => cad.current?.zoomTo('actual')} data-testid="zoom-actual">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            title="True size (1)"
+            onClick={() => cad.current?.zoomTo('actual')}
+            data-testid="zoom-actual"
+          >
             1:1
           </Button>
-          <Button size="icon-sm" variant="ghost" aria-label="Zoom out" onClick={() => cad.current?.zoomTo('out')}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Zoom out"
+            onClick={() => cad.current?.zoomTo('out')}
+          >
             <MinusIcon />
           </Button>
-          <Button size="icon-sm" variant="ghost" aria-label="Zoom in" onClick={() => cad.current?.zoomTo('in')}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Zoom in"
+            onClick={() => cad.current?.zoomTo('in')}
+          >
             <PlusIcon />
           </Button>
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" title="Calibrate true size for this screen" onClick={() => setCalOpen((v) => !v)} data-testid="calibrate">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            title="Calibrate true size for this screen"
+            onClick={() => setCalOpen((v) => !v)}
+            data-testid="calibrate"
+          >
             Calibrate
           </Button>
         </div>
         <div className="ml-auto flex items-center gap-1">
-          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => print('a4')} title="Print at true size on A4 (tiled)" data-testid="print-1to1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            onClick={() => print('a4')}
+            title="Print at true size on A4 (tiled)"
+            data-testid="print-1to1"
+          >
             <PrinterIcon /> Print 1:1
           </Button>
-          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={exportDxf} title="DXF for pattern CAD software and plotters" data-testid="export-dxf">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            onClick={exportDxf}
+            title="DXF for pattern CAD software and plotters"
+            data-testid="export-dxf"
+          >
             <DownloadIcon /> DXF
           </Button>
           {sources.length ? (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setRefOpen((v) => !v)} aria-pressed={refOpen} data-testid="toggle-reference">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => setRefOpen((v) => !v)}
+              aria-pressed={refOpen}
+              data-testid="toggle-reference"
+            >
               {refOpen ? <PanelRightCloseIcon /> : <ImageIcon />} Reference
             </Button>
           ) : null}
@@ -348,16 +487,34 @@ export function PatternViewport() {
             onNodes={setNodes}
             onCommit={(p, label, group) => edit(p, label, group)}
             apiRef={cad}
-            overlay={calOpen ? <Calibration settings={settings} onChange={setSettings} onClose={() => setCalOpen(false)} /> : null}
+            overlay={
+              calOpen ? (
+                <Calibration
+                  settings={settings}
+                  onChange={setSettings}
+                  onClose={() => setCalOpen(false)}
+                />
+              ) : null
+            }
           />
         </div>
         {refOpen && sources.length ? (
-          <aside className="flex w-60 shrink-0 flex-col gap-2 overflow-auto border-l bg-muted/30 p-2" aria-label="Reference" data-testid="reference-panel">
+          <aside
+            className="flex w-60 shrink-0 flex-col gap-2 overflow-auto border-l bg-muted/30 p-2"
+            aria-label="Reference"
+            data-testid="reference-panel"
+          >
             {sources.map((s) => (
               <figure key={s.assetId} className="flex flex-col gap-1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={assetContentUrl(active.id, s.assetId, 'preview_1024')} alt={s.label ?? 'Reference sketch'} className="w-full rounded-md border bg-white object-contain" />
-                <figcaption className="text-[11px] text-muted-foreground">{s.label ?? 'Sketch'}</figcaption>
+                <img
+                  src={assetContentUrl(active.id, s.assetId, 'preview_1024')}
+                  alt={s.label ?? 'Reference sketch'}
+                  className="w-full rounded-md border bg-white object-contain"
+                />
+                <figcaption className="text-[11px] text-muted-foreground">
+                  {s.label ?? 'Sketch'}
+                </figcaption>
               </figure>
             ))}
           </aside>
@@ -368,16 +525,39 @@ export function PatternViewport() {
 }
 
 /** True size: measure the bar with a real ruler and type what you measured. */
-function Calibration({ settings, onChange, onClose }: { settings: CadSettings; onChange: (s: CadSettings) => void; onClose: () => void }) {
+function Calibration({
+  settings,
+  onChange,
+  onClose,
+}: {
+  settings: CadSettings;
+  onChange: (s: CadSettings) => void;
+  onClose: () => void;
+}) {
   const [text, setText] = useState('10');
   const px = settings.pxPerMm * 100;
   return (
-    <div className="absolute top-8 left-8 z-20 flex w-80 flex-col gap-2 rounded-lg border bg-background p-3 text-[12px] shadow-lg" data-testid="calibration">
+    <div
+      className="absolute top-8 left-8 z-20 flex w-80 flex-col gap-2 rounded-lg border bg-background p-3 text-[12px] shadow-lg"
+      data-testid="calibration"
+    >
       <div className="font-medium">Calibrate true size (1:1)</div>
-      <p className="text-muted-foreground">Hold a ruler against the bar below and enter its real length in centimetres.</p>
-      <div className="h-3 bg-foreground" style={{ width: px }} aria-label="10 cm bar at the current calibration" />
+      <p className="text-muted-foreground">
+        Hold a ruler against the bar below and enter its real length in centimetres.
+      </p>
+      <div
+        className="h-3 bg-foreground"
+        style={{ width: px }}
+        aria-label="10 cm bar at the current calibration"
+      />
       <div className="flex items-center gap-2">
-        <Input className="h-7 w-20 text-[12px]" inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} aria-label="Measured length of the bar (cm)" />
+        <Input
+          className="h-7 w-20 text-[12px]"
+          inputMode="decimal"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          aria-label="Measured length of the bar (cm)"
+        />
         cm
         <Button
           size="sm"
@@ -390,7 +570,12 @@ function Calibration({ settings, onChange, onClose }: { settings: CadSettings; o
         >
           Apply
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange({ ...settings, pxPerMm: 96 / 25.4 })}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => onChange({ ...settings, pxPerMm: 96 / 25.4 })}
+        >
           Reset
         </Button>
         <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs" onClick={onClose}>
@@ -421,30 +606,66 @@ export function PatternSidePanel() {
         <TabsTrigger value="measurements">Sizes</TabsTrigger>
         <TabsTrigger value="style">Style</TabsTrigger>
         <TabsTrigger value="checks">
-          Fit{bad ? <span className="ml-1 rounded-full bg-destructive px-1 text-[10px] text-white">{bad}</span> : null}
+          Fit
+          {bad ? (
+            <span className="ml-1 rounded-full bg-destructive px-1 text-[10px] text-white">
+              {bad}
+            </span>
+          ) : null}
         </TabsTrigger>
       </TabsList>
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {edited.length ? (
-          <div className="mb-3 rounded-md border border-status-needs-review/50 p-2 text-[12px]" data-testid="edited-banner">
-            {edited.length} piece{edited.length === 1 ? ' was' : 's were'} edited by hand and {edited.length === 1 ? 'is' : 'are'} kept when you change sizes or style.
-            <Button size="sm" variant="outline" className="mt-1.5 h-7 w-full text-xs" disabled={!canEdit} onClick={() => redraft(spec, 'Redraft all pieces', true)}>
+          <div
+            className="mb-3 rounded-md border border-status-needs-review/50 p-2 text-[12px]"
+            data-testid="edited-banner"
+          >
+            {edited.length} piece{edited.length === 1 ? ' was' : 's were'} edited by hand and{' '}
+            {edited.length === 1 ? 'is' : 'are'} kept when you change sizes or style.
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1.5 h-7 w-full text-xs"
+              disabled={!canEdit}
+              onClick={() => redraft(spec, 'Redraft all pieces', true)}
+            >
               <RotateCcwIcon /> Redraft them from the measurements
             </Button>
           </div>
         ) : null}
         <TabsContent value="piece">
-          {piece ? <PieceForm piece={piece} unit={unit} disabled={!canEdit} /> : <p className="text-[12px] text-muted-foreground">Select a piece on the pattern or in the list.</p>}
+          {piece ? (
+            <PieceForm piece={piece} unit={unit} disabled={!canEdit} />
+          ) : (
+            <p className="text-[12px] text-muted-foreground">
+              Select a piece on the pattern or in the list.
+            </p>
+          )}
         </TabsContent>
         <TabsContent value="measurements" className="flex flex-col gap-3">
-          <GarmentBasics spec={spec} disabled={!canEdit} onChange={(s, label) => redraft(s, label)} />
-          <MeasurementsForm spec={spec} unit={unit} disabled={!canEdit} onChange={(s, label) => redraft(s, label)} />
+          <GarmentBasics
+            spec={spec}
+            disabled={!canEdit}
+            onChange={(s, label) => redraft(s, label)}
+          />
+          <MeasurementsForm
+            spec={spec}
+            unit={unit}
+            disabled={!canEdit}
+            onChange={(s, label) => redraft(s, label)}
+          />
         </TabsContent>
         <TabsContent value="style">
-          <StyleForm spec={spec} disabled={!canEdit} onChange={(s, label) => redraft(s, label)} />
+          <GarmentStyleForms
+            spec={spec}
+            disabled={!canEdit}
+            onChange={(s, label) => redraft(patternSpecSchema.parse(s), label)}
+          />
         </TabsContent>
         <TabsContent value="checks">
-          <p className="mb-2 text-[12px] text-muted-foreground">Seams that are sewn together, measured on the pieces as they are now.</p>
+          <p className="mb-2 text-[12px] text-muted-foreground">
+            Seams that are sewn together, measured on the pieces as they are now.
+          </p>
           <ChecksList checks={checks} unit={unit} />
         </TabsContent>
       </div>
@@ -452,7 +673,15 @@ export function PatternSidePanel() {
   );
 }
 
-function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit; disabled: boolean }) {
+function PieceForm({
+  piece,
+  unit,
+  disabled,
+}: {
+  piece: PatternPiece;
+  unit: Unit;
+  disabled: boolean;
+}) {
   const edit = useEditPiece();
   const state = useEditor((s) => s.display);
   const { nodes, setNodes } = usePatternUi();
@@ -461,10 +690,22 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
   const b = pieceBounds(piece);
   const resetPiece = () => {
     const draft = draftPattern(state.patternSpec!);
-    const fresh = draftToState(state, draft, { redraftEdited: true }).patternPieces.find((p) => p.draft?.template === piece.draft?.template);
-    if (fresh) edit({ ...fresh, pieceId: piece.pieceId, componentId: piece.componentId, ...(piece.canvas ? { canvas: piece.canvas } : {}) }, `Redraft ${piece.name}`);
+    const fresh = draftToState(state, draft, { redraftEdited: true }).patternPieces.find(
+      (p) => p.draft?.template === piece.draft?.template,
+    );
+    if (fresh)
+      edit(
+        {
+          ...fresh,
+          pieceId: piece.pieceId,
+          componentId: piece.componentId,
+          ...(piece.canvas ? { canvas: piece.canvas } : {}),
+        },
+        `Redraft ${piece.name}`,
+      );
   };
-  const set = (patch: Partial<PatternPiece>, label: string) => edit({ ...piece, ...patch, source: 'user', status: 'needs_review' }, label);
+  const set = (patch: Partial<PatternPiece>, label: string) =>
+    edit({ ...piece, ...patch, source: 'user', status: 'needs_review' }, label);
   const single = nodes.length === 1 ? nodes[0]! : null;
   const nd = single !== null ? path[single] : null;
   return (
@@ -472,13 +713,29 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
       <div>
         <div className="text-sm font-semibold">{piece.name}</div>
         <div className="text-muted-foreground">
-          {piece.source === 'user' ? 'Edited by hand' : 'Drafted from the measurements'} · cut {piece.cutQuantity}
-          {piece.foldLine ? ' on the fold' : piece.mirrored ? ' as a mirrored pair' : ''} · {path.length} points
+          {piece.source === 'user' ? 'Edited by hand' : 'Drafted from the measurements'} · cut{' '}
+          {piece.cutQuantity}
+          {piece.foldLine ? ' on the fold' : piece.mirrored ? ' as a mirrored pair' : ''} ·{' '}
+          {path.length} points
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <LengthField label={`Width (${unit})`} mm={dims.width} unit={unit} disabled={disabled} testId="piece-input-width" onCommit={(mm) => edit(resizePiece(piece, { width: mm }), `Width of ${piece.name}`)} />
-        <LengthField label={`Height (${unit})`} mm={dims.height} unit={unit} disabled={disabled} testId="piece-input-height" onCommit={(mm) => edit(resizePiece(piece, { height: mm }), `Height of ${piece.name}`)} />
+        <LengthField
+          label={`Width (${unit})`}
+          mm={dims.width}
+          unit={unit}
+          disabled={disabled}
+          testId="piece-input-width"
+          onCommit={(mm) => edit(resizePiece(piece, { width: mm }), `Width of ${piece.name}`)}
+        />
+        <LengthField
+          label={`Height (${unit})`}
+          mm={dims.height}
+          unit={unit}
+          disabled={disabled}
+          testId="piece-input-height"
+          onCommit={(mm) => edit(resizePiece(piece, { height: mm }), `Height of ${piece.name}`)}
+        />
         <label className="flex flex-col gap-1">
           <span>Seam allowance (mm)</span>
           <Input
@@ -491,7 +748,8 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
             key={`sa-${piece.pieceId}-${piece.seamAllowanceMm}`}
             onBlur={(e) => {
               const v = Number(e.target.value);
-              if (Number.isFinite(v) && v >= 0 && v <= 50 && v !== piece.seamAllowanceMm) set({ seamAllowanceMm: v }, `Seam allowance of ${piece.name}`);
+              if (Number.isFinite(v) && v >= 0 && v <= 50 && v !== piece.seamAllowanceMm)
+                set({ seamAllowanceMm: v }, `Seam allowance of ${piece.name}`);
             }}
           />
         </label>
@@ -507,50 +765,155 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
             key={`cut-${piece.pieceId}-${piece.cutQuantity}`}
             onBlur={(e) => {
               const v = Math.round(Number(e.target.value));
-              if (v >= 1 && v <= 12 && v !== piece.cutQuantity) set({ cutQuantity: v }, `Cut quantity of ${piece.name}`);
+              if (v >= 1 && v <= 12 && v !== piece.cutQuantity)
+                set({ cutQuantity: v }, `Cut quantity of ${piece.name}`);
             }}
           />
         </label>
       </div>
 
       <section className="flex flex-col gap-1.5" data-testid="transform-section">
-        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Transform</h3>
+        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Transform
+        </h3>
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled} onClick={() => edit(rotatePiece(piece, -90), `Rotate ${piece.name}`)} title="Rotate 90° left">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={disabled}
+            onClick={() => edit(rotatePiece(piece, -90), `Rotate ${piece.name}`)}
+            title="Rotate 90° left"
+          >
             <RotateCcwIcon /> 90°
           </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled} onClick={() => edit(rotatePiece(piece, 90), `Rotate ${piece.name}`)} title="Rotate 90° right" data-testid="rotate-right">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={disabled}
+            onClick={() => edit(rotatePiece(piece, 90), `Rotate ${piece.name}`)}
+            title="Rotate 90° right"
+            data-testid="rotate-right"
+          >
             <RotateCwIcon /> 90°
           </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled} onClick={() => edit(mirrorPiece(piece, 'vertical'), `Mirror ${piece.name}`)} title="Flip horizontally" data-testid="mirror-h">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={disabled}
+            onClick={() => edit(mirrorPiece(piece, 'vertical'), `Mirror ${piece.name}`)}
+            title="Flip horizontally"
+            data-testid="mirror-h"
+          >
             <FlipHorizontal2Icon />
           </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled} onClick={() => edit(mirrorPiece(piece, 'horizontal'), `Mirror ${piece.name}`)} title="Flip vertically">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={disabled}
+            onClick={() => edit(mirrorPiece(piece, 'horizontal'), `Mirror ${piece.name}`)}
+            title="Flip vertically"
+          >
             <FlipVertical2Icon />
           </Button>
         </div>
-        <RotateField disabled={disabled} onRotate={(deg) => edit(rotatePiece(piece, deg), `Rotate ${piece.name} ${deg}°`)} />
+        <RotateField
+          disabled={disabled}
+          onRotate={(deg) => edit(rotatePiece(piece, deg), `Rotate ${piece.name} ${deg}°`)}
+        />
       </section>
 
-      <SpreadSection piece={piece} unit={unit} disabled={disabled} bounds={b} onApply={(p, label) => edit(p, label)} />
+      <SpreadSection
+        piece={piece}
+        unit={unit}
+        disabled={disabled}
+        bounds={b}
+        onApply={(p, label) => edit(p, label)}
+      />
 
       <section className="flex flex-col gap-1.5" data-testid="point-section">
-        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Points</h3>
+        <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Points
+        </h3>
         {nd && single !== null ? (
           <>
             <div className="grid grid-cols-2 gap-2">
-              <LengthField label={`X (${unit})`} mm={nd.x} unit={unit} disabled={disabled} allowNegative testId="node-x" onCommit={(mm) => edit(withPath(piece, setNodePosition(path, single, { x: mm, y: nd.y })), `Move a point of ${piece.name}`)} />
-              <LengthField label={`Y (${unit})`} mm={nd.y} unit={unit} disabled={disabled} allowNegative testId="node-y" onCommit={(mm) => edit(withPath(piece, setNodePosition(path, single, { x: nd.x, y: mm })), `Move a point of ${piece.name}`)} />
+              <LengthField
+                label={`X (${unit})`}
+                mm={nd.x}
+                unit={unit}
+                disabled={disabled}
+                allowNegative
+                testId="node-x"
+                onCommit={(mm) =>
+                  edit(
+                    withPath(piece, setNodePosition(path, single, { x: mm, y: nd.y })),
+                    `Move a point of ${piece.name}`,
+                  )
+                }
+              />
+              <LengthField
+                label={`Y (${unit})`}
+                mm={nd.y}
+                unit={unit}
+                disabled={disabled}
+                allowNegative
+                testId="node-y"
+                onCommit={(mm) =>
+                  edit(
+                    withPath(piece, setNodePosition(path, single, { x: nd.x, y: mm })),
+                    `Move a point of ${piece.name}`,
+                  )
+                }
+              />
             </div>
             <div className="flex flex-wrap gap-1">
-              <Button size="sm" variant="outline" className={cn('h-7 text-xs', !nd.smooth && 'bg-accent')} disabled={disabled} onClick={() => edit(withPath(piece, setSmooth(path, single, false)), 'Corner point')}>
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn('h-7 text-xs', !nd.smooth && 'bg-accent')}
+                disabled={disabled}
+                onClick={() =>
+                  edit(withPath(piece, setSmooth(path, single, false)), 'Corner point')
+                }
+              >
                 Corner
               </Button>
-              <Button size="sm" variant="outline" className={cn('h-7 text-xs', nd.smooth && 'bg-accent')} disabled={disabled} onClick={() => edit(withPath(piece, setSmooth(path, single, true)), 'Smooth point')} data-testid="node-smooth">
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn('h-7 text-xs', nd.smooth && 'bg-accent')}
+                disabled={disabled}
+                onClick={() => edit(withPath(piece, setSmooth(path, single, true)), 'Smooth point')}
+                data-testid="node-smooth"
+              >
                 Smooth
               </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled} onClick={() => edit(withPath(piece, setSegmentCurved(path, single, !(nd.out || path[(single + 1) % path.length]!.in))), 'Curve / straighten a segment')}>
-                {nd.out || path[(single + 1) % path.length]!.in ? 'Straighten next segment' : 'Curve next segment'}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                disabled={disabled}
+                onClick={() =>
+                  edit(
+                    withPath(
+                      piece,
+                      setSegmentCurved(
+                        path,
+                        single,
+                        !(nd.out || path[(single + 1) % path.length]!.in),
+                      ),
+                    ),
+                    'Curve / straighten a segment',
+                  )
+                }
+              >
+                {nd.out || path[(single + 1) % path.length]!.in
+                  ? 'Straighten next segment'
+                  : 'Curve next segment'}
               </Button>
               <Button
                 size="sm"
@@ -558,24 +921,33 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
                 className="h-7 text-xs"
                 disabled={disabled || path.length <= 3}
                 onClick={() => {
-                  edit(withPath(piece, deleteNodes(path, [single])), `Delete a point of ${piece.name}`);
+                  edit(
+                    withPath(piece, deleteNodes(path, [single])),
+                    `Delete a point of ${piece.name}`,
+                  );
                   setNodes([]);
                 }}
               >
                 <Trash2Icon /> Delete
               </Button>
             </div>
-            <p className="text-muted-foreground">Seam: {EDGE_LABELS[nd.seg] ?? (nd.seg || '—')} · coordinates from the piece origin</p>
+            <p className="text-muted-foreground">
+              Seam: {EDGE_LABELS[nd.seg] ?? (nd.seg || '—')} · coordinates from the piece origin
+            </p>
           </>
         ) : (
           <p className="text-muted-foreground">
-            {nodes.length > 1 ? `${nodes.length} points selected — drag them, nudge with the arrow keys (Shift ×10, Alt ×0.1) or press Delete.` : 'Use the point tool (A): click a point, Shift-click or drag a box for several, double-click a seam to add a point, drag the round handles to shape curves.'}
+            {nodes.length > 1
+              ? `${nodes.length} points selected — drag them, nudge with the arrow keys (Shift ×10, Alt ×0.1) or press Delete.`
+              : 'Use the point tool (A): click a point, Shift-click or drag a box for several, double-click a seam to add a point, drag the round handles to shape curves.'}
           </p>
         )}
       </section>
 
       <section>
-        <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Seam lengths ({unit}) — type to set exactly</h3>
+        <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+          Seam lengths ({unit}) — type to set exactly
+        </h3>
         <table className="w-full" data-testid="piece-edges">
           <thead>
             <tr className="text-[10px] text-muted-foreground">
@@ -593,12 +965,31 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
                 <tr key={name} className="border-b last:border-0">
                   <td className="py-0.5">{EDGE_LABELS[name] ?? name.replaceAll('_', ' ')}</td>
                   <td className="w-24 py-0.5">
-                    <LengthField mm={L} unit={unit} disabled={disabled} compact testId={`edge-${name}`} onCommit={(mm) => edit(setEdgeLength(piece, name, mm, 'end'), `Set ${EDGE_LABELS[name] ?? name} of ${piece.name} to ${fmt(mm, unit)} ${unit}`)} />
+                    <LengthField
+                      mm={L}
+                      unit={unit}
+                      disabled={disabled}
+                      compact
+                      testId={`edge-${name}`}
+                      onCommit={(mm) =>
+                        edit(
+                          setEdgeLength(piece, name, mm, 'end'),
+                          `Set ${EDGE_LABELS[name] ?? name} of ${piece.name} to ${fmt(mm, unit)} ${unit}`,
+                        )
+                      }
+                    />
                   </td>
-                  <td className="py-0.5 pl-2 text-right text-muted-foreground tabular-nums">{intake ? `−${fmt(intake, unit)}` : ''}</td>
+                  <td className="py-0.5 pl-2 text-right text-muted-foreground tabular-nums">
+                    {intake ? `−${fmt(intake, unit)}` : ''}
+                  </td>
                   <td className="w-14 py-0.5 pl-2 text-right">
                     {edgeOnFold(piece, name) ? (
-                      <span className="text-[11px] text-violet-600" title="Cut on the fold: no seam allowance">fold</span>
+                      <span
+                        className="text-[11px] text-violet-600"
+                        title="Cut on the fold: no seam allowance"
+                      >
+                        fold
+                      </span>
                     ) : (
                       <Input
                         className="h-6 px-1 text-right text-[12px] tabular-nums"
@@ -612,11 +1003,20 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
                         key={`esa-${piece.pieceId}-${name}-${edgeAllowance(piece, name)}`}
                         onBlur={(e) => {
                           const v = Number(e.target.value);
-                          if (!Number.isFinite(v) || v < 0 || v > 100 || v === edgeAllowance(piece, name)) return;
+                          if (
+                            !Number.isFinite(v) ||
+                            v < 0 ||
+                            v > 100 ||
+                            v === edgeAllowance(piece, name)
+                          )
+                            return;
                           const rest = { ...(piece.allowances ?? {}) };
                           if (v === (piece.seamAllowanceMm ?? 0)) delete rest[name];
                           else rest[name] = v;
-                          edit({ ...piece, allowances: rest }, `Seam allowance of the ${EDGE_LABELS[name] ?? name} of ${piece.name}: ${v} mm`);
+                          edit(
+                            { ...piece, allowances: rest },
+                            `Seam allowance of the ${EDGE_LABELS[name] ?? name} of ${piece.name}: ${v} mm`,
+                          );
                         }}
                       />
                     )}
@@ -626,7 +1026,10 @@ function PieceForm({ piece, unit, disabled }: { piece: PatternPiece; unit: Unit;
             })}
           </tbody>
         </table>
-        <p className="mt-1 text-muted-foreground">Setting a length moves the seam&apos;s end point along the seam. Each seam can have its own allowance (e.g. a deeper hem); fold edges never get one.</p>
+        <p className="mt-1 text-muted-foreground">
+          Setting a length moves the seam&apos;s end point along the seam. Each seam can have its
+          own allowance (e.g. a deeper hem); fold edges never get one.
+        </p>
       </section>
 
       {piece.notes.length ? (
@@ -699,12 +1102,26 @@ function LengthField({
   );
 }
 
-function RotateField({ disabled, onRotate }: { disabled: boolean; onRotate: (deg: number) => void }) {
+function RotateField({
+  disabled,
+  onRotate,
+}: {
+  disabled: boolean;
+  onRotate: (deg: number) => void;
+}) {
   const [deg, setDeg] = useState('');
   return (
     <div className="flex items-center gap-2">
       <span>Rotate by</span>
-      <Input className="h-7 w-20 text-[12px]" inputMode="decimal" value={deg} disabled={disabled} onChange={(e) => setDeg(e.target.value)} aria-label="Rotation in degrees" placeholder="0" />
+      <Input
+        className="h-7 w-20 text-[12px]"
+        inputMode="decimal"
+        value={deg}
+        disabled={disabled}
+        onChange={(e) => setDeg(e.target.value)}
+        aria-label="Rotation in degrees"
+        placeholder="0"
+      />
       °
       <Button
         size="sm"
@@ -751,15 +1168,27 @@ function SpreadSection({
       mode === 'lengthen'
         ? { point: { x: bounds.x, y: bounds.y + bounds.height * pct }, dir: { x: 1, y: 0 } }
         : { point: { x: bounds.x + bounds.width * pct, y: bounds.y }, dir: { x: 0, y: -1 } };
-    onApply(spreadPiece(piece, line, a), `${a > 0 ? (mode === 'lengthen' ? 'Lengthen' : 'Widen') : mode === 'lengthen' ? 'Shorten' : 'Narrow'} ${piece.name} by ${fmt(Math.abs(a), unit)} ${unit}`);
+    onApply(
+      spreadPiece(piece, line, a),
+      `${a > 0 ? (mode === 'lengthen' ? 'Lengthen' : 'Widen') : mode === 'lengthen' ? 'Shorten' : 'Narrow'} ${piece.name} by ${fmt(Math.abs(a), unit)} ${unit}`,
+    );
     setAmount('');
   };
   return (
     <section className="flex flex-col gap-1.5" data-testid="spread-section">
-      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Lengthen / widen</h3>
+      <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        Lengthen / widen
+      </h3>
       <div className="flex rounded-md border p-0.5">
         {(['lengthen', 'widen'] as const).map((m) => (
-          <Button key={m} size="sm" variant="ghost" aria-pressed={mode === m} className={cn('h-6 flex-1 text-xs', mode === m && 'bg-accent')} onClick={() => setMode(m)}>
+          <Button
+            key={m}
+            size="sm"
+            variant="ghost"
+            aria-pressed={mode === m}
+            className={cn('h-6 flex-1 text-xs', mode === m && 'bg-accent')}
+            onClick={() => setMode(m)}
+          >
             {m === 'lengthen' ? 'Length' : 'Width'}
           </Button>
         ))}
@@ -767,7 +1196,13 @@ function SpreadSection({
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span>At (% of the {mode === 'lengthen' ? 'height' : 'width'})</span>
-          <Input className="h-7 text-[12px]" inputMode="decimal" value={at} disabled={disabled} onChange={(e) => setAt(e.target.value)} />
+          <Input
+            className="h-7 text-[12px]"
+            inputMode="decimal"
+            value={at}
+            disabled={disabled}
+            onChange={(e) => setAt(e.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span>
@@ -785,10 +1220,20 @@ function SpreadSection({
           />
         </label>
       </div>
-      <Button size="sm" variant="outline" className="h-7 text-xs" disabled={disabled || !amount} onClick={apply} data-testid="spread-numeric-apply">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs"
+        disabled={disabled || !amount}
+        onClick={apply}
+        data-testid="spread-numeric-apply"
+      >
         Apply
       </Button>
-      <p className="text-muted-foreground">Or use the tools on the canvas: L (length) and W (width) — click where to cut, drag to spread.</p>
+      <p className="text-muted-foreground">
+        Or use the tools on the canvas: L (length) and W (width) — click where to cut, drag to
+        spread.
+      </p>
     </section>
   );
 }
