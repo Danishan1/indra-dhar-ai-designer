@@ -157,22 +157,54 @@ export const techPackParamsSchema = z.object({ orgId: z.uuid(), techPackId: z.uu
 export const LookViews = ['front', 'back', 'left', 'right'] as const;
 export const lookViewSchema = z.enum(LookViews);
 export type LookView = z.infer<typeof lookViewSchema>;
-export const lookStyleSchema = z.enum(['sketch', 'realistic']);
+/**
+ * model = the outfit worn by a real model (front, back, left, right) · sketch = a flat line drawing
+ * of each garment on its own, no model or dummy (front and back only).
+ */
+export const lookStyleSchema = z.enum(['model', 'sketch']);
 export type LookStyle = z.infer<typeof lookStyleSchema>;
+/** Views each style can draw. */
+export const LOOK_STYLE_VIEWS: Record<LookStyle, readonly LookView[]> = {
+  model: LookViews,
+  sketch: ['front', 'back'],
+};
 
-export const createLookRequestSchema = z.object({
-  /** Revision whose patterns are drawn; defaults to the latest committed revision. */
-  revisionId: z.uuid().optional(),
-  provider: aiProviderNameSchema.optional(),
-  /** sketch = fashion illustration (line drawing, light shading) · realistic = product render. */
-  style: lookStyleSchema.default('sketch'),
-  /** Short note shown with the look ("longer sleeves", "final?"). */
-  note: z.string().trim().max(200).optional(),
-});
+export const createLookRequestSchema = z
+  .object({
+    /** Revision whose patterns are drawn; defaults to the latest committed revision. */
+    revisionId: z.uuid().optional(),
+    provider: aiProviderNameSchema.optional(),
+    style: lookStyleSchema.default('model'),
+    /** Short note shown with the look ("longer sleeves", "final?"). */
+    note: z.string().trim().max(200).optional(),
+    /**
+     * Which views to draw — each is an AI image (cost; a line sketch draws each garment of a set
+     * separately), so the user chooses. Duplicates are dropped; the order is front, back, left, right.
+     */
+    views: z
+      .array(lookViewSchema)
+      .min(1, 'Choose at least one view')
+      .max(LookViews.length)
+      .default(['front'])
+      .transform((v) => LookViews.filter((x) => v.includes(x))),
+  })
+  .superRefine((body, ctx) => {
+    const allowed = LOOK_STYLE_VIEWS[body.style];
+    const bad = body.views.filter((v) => !allowed.includes(v));
+    if (bad.length)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['views'],
+        message: `A ${body.style === 'sketch' ? 'line sketch' : 'model'} look draws only ${allowed.join(' and ')} views`,
+      });
+  });
 export type CreateLookRequest = z.input<typeof createLookRequestSchema>;
 
 export const lookViewImageSchema = z.object({
   view: lookViewSchema,
+  /** Line sketches: the garment of the set this drawing shows (`main`, `shorts`…); null on a model. */
+  garment: z.string().nullable().default(null),
+  garmentName: z.string().nullable().default(null),
   assetId: z.uuid().nullable(),
   /** Why the view is missing (provider error), when `assetId` is null. */
   note: z.string().nullable(),

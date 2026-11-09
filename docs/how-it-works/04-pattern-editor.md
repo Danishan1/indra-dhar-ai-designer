@@ -102,10 +102,18 @@ badge. Right of the canvas: the **sketch** as reference (toggle in View).
 
 ## Look preview (ADR-064)
 
-**Preview look** (header button, pattern-first designs) shows how the garment sewn from the
-patterns on screen would look. It is not an editing tool: it asks the image model for four views —
-**front, back, left side, right side** — in a chosen style (_fashion sketch_ or _realistic on a
-dress form_), with an optional note ("longer sleeves").
+**Preview look** (header button, pattern-first designs) shows the garment sewn from the patterns on
+screen. It is not an editing tool. First choose **what it should show**; the views that fit then
+appear:
+
+- **On a model** — the whole outfit worn by a real fashion model (woman, man, girl or boy from the
+  design's audience; never a dummy). Views: front, back, left side, right side.
+- **Line sketch** — a flat technical drawing of the garment on its own: no model, no dummy, no
+  hanger. Views: front and back. A set is drawn **garment by garment** — a shirt + shorts set gives a
+  shirt front, shirt back, shorts front and shorts back, each with only that garment's pieces.
+
+Each drawing is one AI image, so the dialog shows the count before you start ("4 AI images"; for a
+line sketch of a set it is views × garments). Add an optional note ("longer sleeves").
 
 - A look always belongs to a **committed revision**: uncommitted pattern changes are committed first
   (one step). So every look is the record of "these patterns look like this".
@@ -114,9 +122,10 @@ dress form_), with an optional note ("longer sleeves").
   size and cut, which pieces were edited by hand, the garment description from the spec; after the
   front view, the **front image** again so the other views show the same garment; the original
   sketch for mood only.
-- Views appear in the **Looks** tab one by one as they are drawn (4 AI image calls, counted in the
-  daily allowance). A view that fails shows why; the others still run.
-- Every look stays in the list, newest first, with its revision (_patterns R003_), note and date;
+- Views appear in the **Looks** tab one by one as they are drawn (one AI image call per drawing,
+  counted in the daily allowance; the preflight checks exactly that number). A view that fails shows why; the others still run.
+- Every look stays in the list, newest first, with its kind (_on a model_ / _line sketch_), its
+  revision (_patterns R003_), note and date;
   _current patterns_ marks the look of what is on screen. **Use these patterns** restores that
   revision into the working copy — the way back to the fifth-last design; **Compare with now**
   shows the differences. Commit after restoring to keep it.

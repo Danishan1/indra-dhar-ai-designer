@@ -328,23 +328,50 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
     const lookRes = await designer.post(`${org()}/designs/${out.design.id}/looks`, {
       provider: 'fake',
       note: 'first try',
+      views: ['right', 'front', 'front'],
     });
     expect(lookRes.status, await lookRes.clone().text()).toBe(201);
     const look = await json<Look>(lookRes);
     expect(look).toMatchObject({
       status: 'queued',
-      style: 'sketch',
+      style: 'model',
       note: 'first try',
       revisionLabel: 'R001',
       designId: out.design.id,
     });
     expect(look.displayId).toMatch(/^LOK-/);
+    // Only the chosen views (deduplicated, fixed order) — each one is an AI image.
     expect(look.views.map((v) => [v.view, v.assetId])).toEqual([
       ['front', null],
-      ['back', null],
-      ['left', null],
       ['right', null],
     ]);
+    const none = await designer.post(`${org()}/designs/${out.design.id}/looks`, {
+      provider: 'fake',
+      views: [],
+    });
+    expect(none.status).toBe(400);
+    // A line sketch draws only front and back, each garment on its own.
+    const sideSketch = await designer.post(`${org()}/designs/${out.design.id}/looks`, {
+      provider: 'fake',
+      style: 'sketch',
+      views: ['front', 'left'],
+    });
+    expect(sideSketch.status).toBe(400);
+    expect(await prisma.job.count({ where: { kind: 'look.generate' } })).toBe(1);
+    const sketchRes = await designer.post(`${org()}/designs/${out.design.id}/looks`, {
+      provider: 'fake',
+      style: 'sketch',
+      views: ['back', 'front'],
+    });
+    expect(sketchRes.status, await sketchRes.clone().text()).toBe(201);
+    const sketchLook = await json<Look>(sketchRes);
+    expect(sketchLook.style).toBe('sketch');
+    expect(sketchLook.views.map((v) => [v.garment, v.view])).toEqual([
+      ['main', 'front'],
+      ['main', 'back'],
+    ]);
+    expect(sketchLook.views[0]!.garmentName).toBe('Dress');
+    expect(look.views.every((v) => v.garment === null)).toBe(true);
     expect(
       (
         await prisma.job.findFirst({
@@ -352,11 +379,11 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
           orderBy: { createdAt: 'desc' },
         })
       )?.payload,
-    ).toEqual({ lookId: look.id });
+    ).toEqual({ lookId: sketchLook.id });
     const looks = await json<{ items: Look[] }>(
       await viewer.get(`${org()}/designs/${out.design.id}/looks`),
     );
-    expect(looks.items.map((l) => l.id)).toEqual([look.id]);
+    expect(looks.items.map((l) => l.id)).toEqual([sketchLook.id, look.id]);
     expect((await viewer.get(`${org()}/looks/${look.id}`)).status).toBe(200);
     expect((await viewer.post(`${org()}/designs/${out.design.id}/looks`, {})).status).toBe(403);
     expect((await other.owner.client.get(`/v1/orgs/${orgId}/looks/${look.id}`)).status).toBe(404);

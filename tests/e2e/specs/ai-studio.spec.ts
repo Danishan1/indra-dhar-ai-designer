@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 
 import { createVerifiedAccount, resetRateLimits } from '../support/accounts.js';
 import { createOrganizationInOnboarding, submitSignIn } from '../support/ui.js';
@@ -257,6 +257,17 @@ test('AI studio: a shirt + shorts sketch becomes a co-ord set with every bottom 
   await expect(
     page.getByTestId('piece-list-item').filter({ hasText: 'Belt loop strip' }),
   ).toHaveCount(0);
+  // Look preview of a set: a line sketch draws each garment on its own (cost per garment).
+  await page.getByTestId('look-button').click();
+  const dialog = page.getByRole('dialog', { name: 'Preview the look' });
+  await dialog.getByTestId('look-kind-sketch').click();
+  await expect(dialog.getByTestId('look-kind-sketch')).toContainText('shirt, shorts');
+  await expect(dialog.getByTestId('look-cost')).toHaveText('2 AI images');
+  await dialog.getByTestId('look-pick-back').click();
+  await expect(dialog.getByTestId('look-cost')).toHaveText('4 AI images');
+  await dialog.getByTestId('look-kind-model').click();
+  await expect(dialog.getByTestId('look-cost')).toHaveText('2 AI images');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
 });
 
 test('pattern editor tools: categories, scale, spread at lines, size by measurement, seams, notches, rotate, arrange, panels (ADR-062)', async ({
@@ -444,10 +455,11 @@ test('look preview: the garment drawn from the patterns, kept with its revision 
     await page.getByTestId('category-transform').click();
     await page.getByTestId('rail-rotate-right').click();
   };
-  const drawLook = async (note: string) => {
+  const drawLook = async (note: string, pick: (dialog: Locator) => Promise<void>) => {
     await page.getByTestId('look-button').click();
     const dialog = page.getByRole('dialog', { name: 'Preview the look' });
     await expect(dialog.getByTestId('look-uncommitted')).toBeVisible();
+    await pick(dialog);
     await dialog.getByTestId('look-note').fill(note);
     await dialog.getByTestId('look-generate').click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
@@ -457,14 +469,31 @@ test('look preview: the garment drawn from the patterns, kept with its revision 
   await page.locator('#pattern-right-tab-looks').click();
   await expect(page.getByTestId('looks-empty')).toBeVisible();
 
-  // Edit the patterns, preview: the changes are committed first and four views are drawn.
+  // Edit the patterns, preview a line sketch (front + back only; each image costs): the changes
+  // are committed first and exactly those drawings are made.
   await turnBack();
-  await drawLook('first try');
+  await drawLook('first try', async (dialog) => {
+    // Nothing to draw until the kind of look is chosen; its views then appear.
+    await expect(dialog.getByTestId('look-views')).toHaveCount(0);
+    await expect(dialog.getByTestId('look-generate')).toBeDisabled();
+    await dialog.getByTestId('look-kind-sketch').click();
+    await expect(dialog.getByTestId('look-pick-left')).toHaveCount(0);
+    await expect(dialog.getByTestId('look-pick-front')).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByTestId('look-cost')).toHaveText('1 AI image');
+    await dialog.getByTestId('look-pick-front').click();
+    await expect(dialog.getByTestId('look-generate')).toBeDisabled();
+    await dialog.getByTestId('look-pick-back').click();
+    await dialog.getByTestId('look-pick-front').click();
+    await expect(dialog.getByTestId('look-cost')).toHaveText('2 AI images');
+    await expect(dialog.getByTestId('look-generate')).toHaveText('Draw 2 images');
+  });
   await expect(page.locator('#pattern-right-tab-looks')).toHaveAttribute('aria-selected', 'true');
   await expect(cards).toHaveCount(1);
   const first = cards.first();
-  for (const view of ['front', 'back', 'left', 'right'])
+  for (const view of ['front', 'back'])
     await expect(first.getByTestId(`look-view-${view}`)).toBeVisible({ timeout: 90_000 });
+  await expect(first.locator('figcaption')).toHaveText(['Front', 'Back']);
+  await expect(first.getByTestId('look-kind')).toHaveText('line sketch');
   await expect(first).toContainText('patterns R002');
   await expect(first).toContainText('first try');
   await expect(first.getByTestId('look-current')).toBeVisible();
@@ -474,11 +503,18 @@ test('look preview: the garment drawn from the patterns, kept with its revision 
 
   // Another change and another look: newest first; the first look keeps its own patterns.
   await turnBack();
-  await drawLook('second try');
+  // On a model: all four sides.
+  await drawLook('second try', async (dialog) => {
+    await dialog.getByTestId('look-kind-model').click();
+    await dialog.getByTestId('look-pick-all').click();
+    await expect(dialog.getByTestId('look-cost')).toHaveText('4 AI images');
+  });
   await expect(cards).toHaveCount(2);
   await expect(cards.first()).toContainText('second try');
-  await expect(cards.first().getByTestId('look-view-right')).toBeVisible({ timeout: 90_000 });
+  for (const view of ['front', 'back', 'left', 'right'])
+    await expect(cards.first().getByTestId(`look-view-${view}`)).toBeVisible({ timeout: 90_000 });
   await expect(cards.first()).toContainText('patterns R003');
+  await expect(cards.first().getByTestId('look-kind')).toHaveText('on a model');
   const older = cards.nth(1);
   await expect(older.getByTestId('look-current')).toHaveCount(0);
 

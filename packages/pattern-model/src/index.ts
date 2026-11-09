@@ -26,3 +26,4 @@ export {
 export * from './cad/fit.js';
 export * from './cad/path.js';
 export * from './cad/export.js';
+export * from './blocks/garments.js';

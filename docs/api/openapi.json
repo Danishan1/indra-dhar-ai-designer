@@ -16354,8 +16354,8 @@
                           "style": {
                             "type": "string",
                             "enum": [
-                              "sketch",
-                              "realistic"
+                              "model",
+                              "sketch"
                             ]
                           },
                           "note": {
@@ -16376,6 +16376,20 @@
                                     "back",
                                     "left",
                                     "right"
+                                  ]
+                                },
+                                "garment": {
+                                  "default": null,
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "garmentName": {
+                                  "default": null,
+                                  "type": [
+                                    "string",
+                                    "null"
                                   ]
                                 },
                                 "assetId": {
@@ -16399,6 +16413,8 @@
                               },
                               "required": [
                                 "view",
+                                "garment",
+                                "garmentName",
                                 "assetId",
                                 "note"
                               ],
@@ -16610,16 +16626,33 @@
                     ]
                   },
                   "style": {
-                    "default": "sketch",
+                    "default": "model",
                     "type": "string",
                     "enum": [
-                      "sketch",
-                      "realistic"
+                      "model",
+                      "sketch"
                     ]
                   },
                   "note": {
                     "type": "string",
                     "maxLength": 200
+                  },
+                  "views": {
+                    "default": [
+                      "front"
+                    ],
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "front",
+                        "back",
+                        "left",
+                        "right"
+                      ]
+                    }
                   }
                 }
               }
@@ -16684,8 +16717,8 @@
                     "style": {
                       "type": "string",
                       "enum": [
-                        "sketch",
-                        "realistic"
+                        "model",
+                        "sketch"
                       ]
                     },
                     "note": {
@@ -16706,6 +16739,20 @@
                               "back",
                               "left",
                               "right"
+                            ]
+                          },
+                          "garment": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "garmentName": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "assetId": {
@@ -16729,6 +16776,8 @@
                         },
                         "required": [
                           "view",
+                          "garment",
+                          "garmentName",
                           "assetId",
                           "note"
                         ],
@@ -21555,8 +21604,8 @@
                     "style": {
                       "type": "string",
                       "enum": [
-                        "sketch",
-                        "realistic"
+                        "model",
+                        "sketch"
                       ]
                     },
                     "note": {
@@ -21577,6 +21626,20 @@
                               "back",
                               "left",
                               "right"
+                            ]
+                          },
+                          "garment": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "garmentName": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "assetId": {
@@ -21600,6 +21663,8 @@
                         },
                         "required": [
                           "view",
+                          "garment",
+                          "garmentName",
                           "assetId",
                           "note"
                         ],

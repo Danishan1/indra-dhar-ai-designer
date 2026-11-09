@@ -1,6 +1,6 @@
 'use client';
 
-import type { Look, LookView } from '@ai-designer/contracts';
+import type { Look, LookView, LookViewImage } from '@ai-designer/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { GitCompareIcon, Loader2Icon, Undo2Icon } from 'lucide-react';
 import { useState } from 'react';
@@ -31,6 +31,14 @@ const VIEW_LABEL: Record<LookView, string> = {
   right: 'Right',
 };
 
+/** "Front", or "Shorts · Front" for a line sketch of one garment of a set. */
+const caption = (look: Look, v: LookViewImage) =>
+  look.style === 'sketch' && v.garmentName && new Set(look.views.map((x) => x.garment)).size > 1
+    ? `${v.garmentName} · ${VIEW_LABEL[v.view]}`
+    : VIEW_LABEL[v.view];
+const viewTestId = (v: LookViewImage) =>
+  v.garment && v.garment !== 'main' ? `look-view-${v.garment}-${v.view}` : `look-view-${v.view}`;
+
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
     day: 'numeric',
@@ -53,7 +61,7 @@ export function LooksPanel() {
   const restoredFrom = useEditor((s) => s.server.restoredFromRevisionId);
   const compare = useEditor((s) => s.compare);
   const [restoring, setRestoring] = useState<{ id: string; displayId: string } | null>(null);
-  const [zoom, setZoom] = useState<{ look: Look; view: LookView } | null>(null);
+  const [zoom, setZoom] = useState<{ look: Look; index: number } | null>(null);
   const looks = useQuery({
     queryKey: queryKeys.org(active.id).looks(designId),
     queryFn: ({ signal }) => studioApi.looks(active.id, designId, signal),
@@ -69,8 +77,8 @@ export function LooksPanel() {
   if (!items.length)
     return (
       <p className="p-3 text-[12px] text-muted-foreground" data-testid="looks-empty">
-        No looks yet. Use <strong>Preview look</strong> at the top to see how the garment sewn from
-        these patterns looks from the front, back and sides.
+        No looks yet. Use <strong>Preview look</strong> at the top to see the garment sewn from
+        these patterns — worn by a model, or as a line sketch of each garment.
       </p>
     );
 
@@ -91,6 +99,9 @@ export function LooksPanel() {
               <span className="font-medium">{look.displayId}</span>
               <Badge variant="outline" className="h-5 px-1.5 text-[11px]">
                 patterns {look.revisionLabel}
+              </Badge>
+              <Badge variant="outline" className="h-5 px-1.5 text-[11px]" data-testid="look-kind">
+                {look.style === 'sketch' ? 'line sketch' : 'on a model'}
               </Badge>
               {i === 0 ? (
                 <Badge variant="secondary" className="h-5 px-1.5 text-[11px]">
@@ -122,19 +133,19 @@ export function LooksPanel() {
               </p>
             ) : null}
             <div className="grid grid-cols-2 gap-1.5">
-              {look.views.map((v) => (
-                <figure key={v.view} className="flex flex-col gap-0.5">
+              {look.views.map((v, index) => (
+                <figure key={`${v.garment ?? ''}-${v.view}`} className="flex flex-col gap-0.5">
                   {v.assetId ? (
                     <button
                       type="button"
                       className="overflow-hidden rounded border bg-white"
-                      onClick={() => setZoom({ look, view: v.view })}
-                      data-testid={`look-view-${v.view}`}
+                      onClick={() => setZoom({ look, index })}
+                      data-testid={viewTestId(v)}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={assetContentUrl(active.id, v.assetId, 'preview_1024')}
-                        alt={`${VIEW_LABEL[v.view]} view of ${look.displayId}`}
+                        alt={`${caption(look, v)} of ${look.displayId}`}
                         className="aspect-[3/4] w-full object-contain"
                       />
                     </button>
@@ -150,7 +161,7 @@ export function LooksPanel() {
                     </div>
                   )}
                   <figcaption className="text-center text-[11px] text-muted-foreground">
-                    {VIEW_LABEL[v.view]}
+                    {caption(look, v)}
                   </figcaption>
                 </figure>
               ))}
@@ -189,42 +200,44 @@ export function LooksPanel() {
   );
 }
 
-function LookViewer({ look, view, onClose }: { look: Look; view: LookView; onClose: () => void }) {
+function LookViewer({ look, index, onClose }: { look: Look; index: number; onClose: () => void }) {
   const { active } = useOrganization();
-  const [shown, setShown] = useState(view);
-  const drawn = look.views.filter((v) => v.assetId);
-  const current = look.views.find((v) => v.view === shown);
+  const [shown, setShown] = useState(index);
+  const current = look.views[shown];
   return (
     <Dialog open onOpenChange={(o) => (o ? null : onClose())}>
       <DialogContent className="max-w-3xl" data-testid="look-viewer">
         <DialogHeader>
           <DialogTitle>
-            {look.displayId} · {VIEW_LABEL[shown]} view
+            {look.displayId} · {current ? `${caption(look, current)} view` : ''}
           </DialogTitle>
           <DialogDescription>
-            Drawn from the patterns of {look.revisionLabel}
+            {look.style === 'sketch' ? 'Line sketch' : 'On a model'}, drawn from the patterns of{' '}
+            {look.revisionLabel}
             {look.note ? ` — ${look.note}` : ''}. An AI illustration to judge the look, not a
             measured drawing.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex gap-1">
-          {drawn.map((v) => (
-            <Button
-              key={v.view}
-              size="sm"
-              variant={v.view === shown ? 'default' : 'outline'}
-              className="h-7 px-2 text-xs"
-              onClick={() => setShown(v.view)}
-            >
-              {VIEW_LABEL[v.view]}
-            </Button>
-          ))}
+        <div className="flex flex-wrap gap-1">
+          {look.views.map((v, i) =>
+            v.assetId ? (
+              <Button
+                key={`${v.garment ?? ''}-${v.view}`}
+                size="sm"
+                variant={i === shown ? 'default' : 'outline'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setShown(i)}
+              >
+                {caption(look, v)}
+              </Button>
+            ) : null,
+          )}
         </div>
         {current?.assetId ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={assetContentUrl(active.id, current.assetId, 'preview_1024')}
-            alt={`${VIEW_LABEL[shown]} view of ${look.displayId}`}
+            alt={`${caption(look, current)} of ${look.displayId}`}
             className="max-h-[70vh] w-full rounded border bg-white object-contain"
           />
         ) : null}

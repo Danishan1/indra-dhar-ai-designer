@@ -789,8 +789,7 @@ export function specFromSketch(
     };
     const read: string[] = [];
     for (const [k, v] of Object.entries(d?.style ?? {})) {
-      if (v === null || v === undefined || (Array.isArray(v) && !v.length))
-        continue;
+      if (v === null || v === undefined || (Array.isArray(v) && !v.length)) continue;
       style[k] = v;
       read.push(k);
     }

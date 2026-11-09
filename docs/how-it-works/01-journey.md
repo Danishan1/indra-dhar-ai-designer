@@ -124,7 +124,8 @@ Two kinds of change (details on page 4):
 Every change is one **operation**, saved automatically; undo/redo works on operations.
 
 At any point **Preview look** commits the patterns and asks the image model to draw the garment
-from them — front, back, left and right. Every look is kept in the **Looks** tab with its revision,
+from them — worn by a model (front, back, left, right) or as a flat line sketch of each garment
+(front, back); the designer picks the views, each drawing is one AI image. Every look is kept in the **Looks** tab with its revision,
 so the designer can compare variations and go back to the patterns of any earlier look (page 4).
 
 ## Step 7 — Commit and create the tech pack (Component 3)

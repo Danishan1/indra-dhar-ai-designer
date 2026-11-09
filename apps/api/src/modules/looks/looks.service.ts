@@ -3,10 +3,11 @@ import {
   DisplayIdPrefixes,
   JobKinds,
   type Look,
-  LookViews,
+  lookViewImageSchema,
   type LookViewImage,
 } from '@ai-designer/contracts';
 import { newId, nextDisplayId, type Prisma } from '@ai-designer/db';
+import { designGarments } from '@ai-designer/pattern-model';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { z } from 'zod';
 
@@ -30,7 +31,8 @@ const revisionLabel = (n: number) => `R${String(n).padStart(3, '0')}`;
 /**
  * Look previews (ADR-064). A look always shows the patterns of one immutable revision — it is the
  * record of "this is how those patterns look" — so the designer can go back to the patterns of any
- * earlier look by restoring its revision. The worker draws the four views (`look.generate`); the
+ * earlier look by restoring its revision. The worker draws the chosen views (`look.generate`): on a
+ * model, the whole outfit per view; as a line sketch, each garment of a set separately. The
  * design itself is never changed.
  */
 @Injectable()
@@ -50,8 +52,12 @@ export class LooksService implements OnModuleInit {
     this.resolvers.register('look', {
       label: 'Look preview',
       organizationOf: async (id) =>
-        (await this.prisma.designLook.findFirst({ where: { id }, select: { organizationId: true } }))
-          ?.organizationId ?? null,
+        (
+          await this.prisma.designLook.findFirst({
+            where: { id },
+            select: { organizationId: true },
+          })
+        )?.organizationId ?? null,
       governedBy: async (id) => {
         const row = await this.prisma.designLook.findFirst({
           where: { id },
@@ -80,7 +86,10 @@ export class LooksService implements OnModuleInit {
     const design = await this.designs.get(ctx, designId);
     const revisionId = body.revisionId ?? design.headRevisionId;
     if (!revisionId)
-      throw new AppError('INVALID_STATE_TRANSITION', 'Commit the patterns before previewing the look');
+      throw new AppError(
+        'INVALID_STATE_TRANSITION',
+        'Commit the patterns before previewing the look',
+      );
     const { row: revision, state } = await this.revisions.loadVerified(
       this.prisma,
       ctx.organizationId,
@@ -89,7 +98,22 @@ export class LooksService implements OnModuleInit {
     );
     if (!state.patternPieces?.length)
       throw new AppError('INVALID_STATE_TRANSITION', 'This revision has no pattern pieces to draw');
-    const provider = await this.ai.preflight(ctx, body.provider, LookViews.length, [
+    // One drawing per view on a model; per view and garment as a line sketch (shirt and shorts of a
+    // set are drawn separately).
+    const garments =
+      body.style === 'sketch' && state.patternSpec
+        ? designGarments(state.patternSpec)
+        : [{ key: null, name: null }];
+    const entries = garments.flatMap((g) =>
+      body.views.map((view) => ({
+        view,
+        garment: g.key,
+        garmentName: g.name,
+        assetId: null,
+        note: null,
+      })),
+    );
+    const provider = await this.ai.preflight(ctx, body.provider, entries.length, [
       'image_generation',
     ]);
     const id = await this.prisma.$transaction(async (tx) => {
@@ -106,6 +130,8 @@ export class LooksService implements OnModuleInit {
           provider,
           style: body.style,
           note: body.note || null,
+          // The chosen views, not drawn yet; the worker draws exactly these.
+          views: entries,
           createdBy: ctx.userId,
         },
       });
@@ -120,7 +146,13 @@ export class LooksService implements OnModuleInit {
           outcome: 'success',
           resourceType: 'look',
           resourceId: id,
-          metadata: { designId, revisionId: revision.id, provider, style: body.style },
+          metadata: {
+            designId,
+            revisionId: revision.id,
+            provider,
+            style: body.style,
+            views: body.views,
+          },
         },
         tx,
       );
@@ -163,11 +195,11 @@ export class LooksService implements OnModuleInit {
       status: row.status as Look['status'],
       stage: row.stage,
       provider: row.provider as Look['provider'],
-      style: row.style === 'realistic' ? 'realistic' : 'sketch',
+      // Looks made before the two styles: 'realistic' was a dress form → shown as a model look.
+      style: row.style === 'sketch' ? 'sketch' : 'model',
       note: row.note,
-      views: LookViews.map(
-        (view) => stored.find((v) => v.view === view) ?? { view, assetId: null, note: null },
-      ),
+      // Exactly the drawings asked for (garment by garment, then view), as stored.
+      views: stored.map((v) => lookViewImageSchema.parse(v)),
       error: error
         ? { message: error.message ?? 'Generation failed', kind: error.kind ?? null }
         : null,

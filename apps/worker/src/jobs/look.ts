@@ -6,7 +6,12 @@ import {
   lookPrompt,
 } from '@ai-designer/design-ai';
 import { canonicalJson, readAnyVersion, sha256Hex } from '@ai-designer/garment-model';
-import { patternSheetSvg } from '@ai-designer/pattern-model';
+import {
+  type DesignGarment,
+  designGarments,
+  patternSheetSvg,
+  piecesOfGarment,
+} from '@ai-designer/pattern-model';
 import sharp from 'sharp';
 import { z } from 'zod';
 
@@ -20,19 +25,24 @@ import {
 } from './ai-studio.js';
 import type { JobHandler, JobHandlerContext } from './durable-job-processor.js';
 
-const VIEWS: readonly LookView[] = ['front', 'back', 'left', 'right'];
+const ALL_VIEWS: readonly LookView[] = ['front', 'back', 'left', 'right'];
 const payloadSchema = z.object({ lookId: z.uuid() });
 
 interface StoredView {
   view: LookView;
+  /** Line sketches: the garment of the set (`main`, `shorts`…); null for a model look. */
+  garment: string | null;
+  garmentName: string | null;
   assetId: string | null;
   note: string | null;
 }
 
 /**
  * `look.generate` (ADR-064): draws the garment sewn from the pattern pieces of one committed
- * revision from four sides. Inputs to the image model: the pattern sheet (the shapes), the front
- * view once drawn (so the other views show the same garment) and the original sketch (mood only).
+ * revision. The drawings to make are the row's initial `views` (written by the API): on a model,
+ * one per chosen view (whole outfit); as a line sketch, one per garment and view (front/back), each
+ * garment on its own. Inputs to the image model: the pattern sheet (of that garment for a sketch),
+ * the first drawing made (of the same garment, so the others match) and the original sketch (mood).
  * Each view is stored as soon as it is ready so the editor shows progress; a failed view is
  * recorded with its reason and the others still run. The design is never changed.
  */
@@ -43,7 +53,21 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
     const row = await prisma.designLook.findUnique({ where: { id: lookId } });
     if (!row) return { skipped: 'not_found' };
     if (row.status === 'succeeded' || row.status === 'failed') return { skipped: row.status };
-    const views: StoredView[] = [];
+    // The drawings to make (placeholders written by the API); rows without them draw all four.
+    const stored = ((row.views as Partial<StoredView>[] | null) ?? []).filter(
+      (v): v is Partial<StoredView> & { view: LookView } => ALL_VIEWS.includes(v.view as LookView),
+    );
+    const views: StoredView[] = (
+      stored.length
+        ? stored
+        : ALL_VIEWS.map((view): Partial<StoredView> & { view: LookView } => ({ view }))
+    ).map((v) => ({
+      view: v.view,
+      garment: v.garment ?? null,
+      garmentName: v.garmentName ?? null,
+      assetId: null,
+      note: null,
+    }));
     const save = async (data: { stage?: string | null; status?: string }) => {
       await prisma.designLook.update({
         where: { id: row.id },
@@ -75,16 +99,32 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
         stage,
       });
 
-      // The pattern sheet is the source of the shape (names, cut, sizes printed on each piece).
-      const sheetPng = await sharp(Buffer.from(patternSheetSvg(pieces)), { density: 72 })
-        .resize({ width: 1600, height: 1600, fit: 'inside' })
-        .flatten({ background: '#ffffff' })
-        .png()
-        .toBuffer();
-      const sheet: AiImageInput = {
-        mediaType: 'image/png',
-        data: new Uint8Array(sheetPng),
-        label: 'pattern sheet (source of the shape)',
+      // The pattern sheet is the source of the shape (names, cut, sizes printed on each piece);
+      // a line sketch of one garment of a set gets the sheet of that garment only.
+      const garments: DesignGarment[] = state.patternSpec ? designGarments(state.patternSpec) : [];
+      const piecesFor = (key: string | null) => {
+        if (!key || !garments.length) return pieces;
+        const own = piecesOfGarment(pieces, garments, key);
+        return own.length ? own : pieces;
+      };
+      const sheets = new Map<string, AiImageInput>();
+      const sheetFor = async (key: string | null) => {
+        const id = key ?? '*';
+        let sheet = sheets.get(id);
+        if (!sheet) {
+          const png = await sharp(Buffer.from(patternSheetSvg(piecesFor(key))), { density: 72 })
+            .resize({ width: 1600, height: 1600, fit: 'inside' })
+            .flatten({ background: '#ffffff' })
+            .png()
+            .toBuffer();
+          sheet = {
+            mediaType: 'image/png',
+            data: new Uint8Array(png),
+            label: 'pattern sheet (source of the shape)',
+          };
+          sheets.set(id, sheet);
+        }
+        return sheet;
       };
       let sketch: AiImageInput | null = null;
       for (const src of (state.sources ?? []).filter(
@@ -97,21 +137,37 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
         }
       }
 
-      const style: LookStyle = row.style === 'realistic' ? 'realistic' : 'sketch';
-      let front: AiImageInput | null = null;
+      // Legacy 'realistic' looks were a dress form; they are drawn on a model now.
+      const style: LookStyle = row.style === 'sketch' ? 'sketch' : 'model';
+      const references = new Map<string, { view: LookView; image: AiImageInput }>();
       let lastError: ReturnType<typeof errorOf> | null = null;
-      for (const view of VIEWS) {
-        await stage(`Drawing the ${LOOK_VIEW_TITLES[view].toLowerCase()}`);
+      for (const [i, entry] of views.entries()) {
+        const { view } = entry;
+        const key = style === 'sketch' ? entry.garment : null;
+        const reference = references.get(key ?? '*') ?? null;
+        const sheet = await sheetFor(key);
+        const what = entry.garmentName ? `${entry.garmentName.toLowerCase()} — ` : '';
+        await stage(`Drawing the ${what}${LOOK_VIEW_TITLES[view].toLowerCase()}`);
         try {
           const out = await provider.generateImage({
             task: 'image_look_view',
             prompt: lookPrompt(view, {
               state,
               style,
-              hasFrontReference: !!front,
+              reference: reference?.view ?? null,
               hasSketch: !!sketch,
+              garment:
+                style === 'sketch'
+                  ? {
+                      name: entry.garmentName ?? 'Garment',
+                      pieces: piecesFor(key),
+                      ofSet: garments.length > 1,
+                    }
+                  : null,
             }),
-            referenceImages: [sheet, front, sketch].filter((x): x is AiImageInput => !!x),
+            referenceImages: [sheet, reference?.image, sketch].filter(
+              (x): x is AiImageInput => !!x,
+            ),
             aspect: 'portrait',
           });
           // Normalize to PNG (the fake provider returns SVG placeholders).
@@ -120,18 +176,21 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
             organizationId: row.organizationId,
             projectId: design?.projectId ?? null,
             buffer: png,
-            fileName: `${row.displayId}-${view}.png`,
+            fileName: `${row.displayId}-${key && key !== 'main' ? `${key}-` : ''}${view}.png`,
             assetType: 'generated_image',
             provenance: { sourceType: 'ai_job', sourceEntityId: row.id, jobId: ctx.job.id },
             createdBy: row.createdBy,
           });
-          if (view === 'front')
-            front = { mediaType: 'image/png', data: new Uint8Array(png), label: 'front view' };
-          views.push({ view, assetId, note: null });
+          if (!reference)
+            references.set(key ?? '*', {
+              view,
+              image: { mediaType: 'image/png', data: new Uint8Array(png), label: `${view} view` },
+            });
+          views[i] = { ...entry, assetId, note: null };
         } catch (err) {
           lastError = errorOf(err);
-          ctx.logger.warn({ err, lookId, view }, 'look view failed');
-          views.push({ view, assetId: null, note: `Not drawn: ${lastError.message}` });
+          ctx.logger.warn({ err, lookId, view, garment: key }, 'look view failed');
+          views[i] = { ...entry, assetId: null, note: `Not drawn: ${lastError.message}` };
         }
         await save({});
       }

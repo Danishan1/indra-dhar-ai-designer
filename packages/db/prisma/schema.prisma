@@ -982,7 +982,7 @@ model DesignLook {
   status         String
   stage          String?
   provider       String
-  /// sketch | realistic
+  /// model | sketch (legacy: realistic = model)
   style          String         @default("sketch")
   note           String?
   /// [{ view: front|back|left|right, assetId: uuid|null, note: string|null }]
