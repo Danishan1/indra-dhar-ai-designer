@@ -135,6 +135,12 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-09 — Plan: garment flats from the patterns (owner request) — PLANNED
+
+- Request: AI drawings (looks, line sketch, tech pack) are not accurate to the patterns; can we build the garment from the patterns without AI, live? Answer: yes — Option 1 (deterministic flats) now, Option 2 (3D cloth simulation) deferred.
+- Written: ADR-065 and `docs/plan/11-pattern-flats.md` (outputs, where they appear, the assembly algorithm, accuracy rules and tests, limits, 5-session build order, defaults). No code.
+- **Next step:** session 1 of the flats plan — engine core in `packages/pattern-model/src/flat/` (piece preparation, recipe registry + edge-align solver, tops without sleeves, dresses, skirts, markings, SVG, matrix tests).
+
 ### 2026-11-09 — Tool roadmap + look preview (owner request) — DONE
 
 - Request: record the agreed tool list/order for future tool work; build a "see the final look" button that draws the garment from the on-screen patterns (front, back, left, right) and keeps each look with its patterns so earlier variations can be reopened.
@@ -143,6 +149,7 @@ _Newest first. One entry per session. Keep entries short but sufficient for anot
 - **Owner actions:** `pnpm install`, **`pnpm db:migrate`** (migration `20261109100000_design_looks`), restart `pnpm dev`. Use a real image provider to judge the drawings (the demo provider draws placeholders).
 - Follow-up (same day): the user chooses the views (Front / Back / Left side / Right side chips, "All four", live "N AI images" count; front only by default). API `views` 1–4 → preflight counts that many; worker draws only those, first drawn = reference. No new migration.
 - Follow-up 2 (same day): two kinds of look — **on a model** (real model from the audience, front/back/left/right) and **line sketch** (flat drawing of each garment on its own, no model/dummy, front/back; a set gives one drawing per garment). Dialog: kind first, then its views and the image count. `realistic` style removed (old rows read as model). No new migration.
+- Follow-up 3 (same day): **patterns only** — the sketch/reference images are no longer sent; the prompt is built from the patterns (pieces with seam lengths, edited flags, settings, finished measurements, sewing order). Line sketches: black lines only, no colour. Model looks: plain off-white fabric.
 - **Next step:** owner tries looks with a real provider and tunes the prompt; then Phase 1 of the tool roadmap (pencil tools).
 
 ### 2026-11-09 — Pattern editor tools (owner request) — DONE

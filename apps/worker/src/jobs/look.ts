@@ -18,7 +18,6 @@ import { z } from 'zod';
 import {
   type AiStudioDeps,
   errorOf,
-  loadImage,
   storeImage,
   studioProvider,
   usageRecorder,
@@ -41,8 +40,9 @@ interface StoredView {
  * `look.generate` (ADR-064): draws the garment sewn from the pattern pieces of one committed
  * revision. The drawings to make are the row's initial `views` (written by the API): on a model,
  * one per chosen view (whole outfit); as a line sketch, one per garment and view (front/back), each
- * garment on its own. Inputs to the image model: the pattern sheet (of that garment for a sketch),
- * the first drawing made (of the same garment, so the others match) and the original sketch (mood).
+ * garment on its own. Inputs to the image model are the patterns only: the pattern sheet (of that
+ * garment for a sketch) and the first drawing made from it (so the others match). The original
+ * sketch and reference photos are never sent — the look shows the edited patterns.
  * Each view is stored as soon as it is ready so the editor shows progress; a failed view is
  * recorded with its reason and the others still run. The design is never changed.
  */
@@ -126,17 +126,6 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
         }
         return sheet;
       };
-      let sketch: AiImageInput | null = null;
-      for (const src of (state.sources ?? []).filter(
-        (x) => x.role === 'sketch' || x.role === 'reference',
-      )) {
-        const img = await loadImage(deps, row.organizationId, src.assetId).catch(() => null);
-        if (img) {
-          sketch = { ...img.image, label: 'original sketch (mood only)' };
-          break;
-        }
-      }
-
       // Legacy 'realistic' looks were a dress form; they are drawn on a model now.
       const style: LookStyle = row.style === 'sketch' ? 'sketch' : 'model';
       const references = new Map<string, { view: LookView; image: AiImageInput }>();
@@ -155,7 +144,6 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
               state,
               style,
               reference: reference?.view ?? null,
-              hasSketch: !!sketch,
               garment:
                 style === 'sketch'
                   ? {
@@ -165,9 +153,9 @@ export function lookHandler(deps: AiStudioDeps): JobHandler {
                     }
                   : null,
             }),
-            referenceImages: [sheet, reference?.image, sketch].filter(
-              (x): x is AiImageInput => !!x,
-            ),
+            // Only the patterns (and a drawing already made from them) — never the original
+            // sketch or reference photos (ADR-064).
+            referenceImages: [sheet, reference?.image].filter((x): x is AiImageInput => !!x),
             aspect: 'portrait',
           });
           // Normalize to PNG (the fake provider returns SVG placeholders).

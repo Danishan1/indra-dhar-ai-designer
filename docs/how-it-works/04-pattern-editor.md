@@ -117,11 +117,15 @@ line sketch of a set it is views × garments). Add an optional note ("longer sle
 
 - A look always belongs to a **committed revision**: uncommitted pattern changes are committed first
   (one step). So every look is the record of "these patterns look like this".
-- What the model gets (`packages/design-ai/src/look.ts`, worker `apps/worker/src/jobs/look.ts`):
-  the **pattern sheet** as the first image (the shapes — source of truth), every piece with its
-  size and cut, which pieces were edited by hand, the garment description from the spec; after the
-  front view, the **front image** again so the other views show the same garment; the original
-  sketch for mood only.
+- What the model gets — **the patterns only** (`packages/design-ai/src/look.ts`, worker
+  `apps/worker/src/jobs/look.ts`): the **pattern sheet** image; every piece with its size, cut and
+  seam lengths, marked when edited by hand; the pattern settings and finished measurements; how the
+  pieces are sewn together (sewing order); and, after the first drawing, that drawing again so the
+  other views match. The **original sketch, reference photos and the AI's reading of them are never
+  sent**: the designer edits the patterns, so the look shows what the edited pieces make — it can
+  look quite different from the sketch the design started from.
+- Colour is not part of the patterns: on a model the garment is in a plain neutral off-white fabric;
+  a line sketch is **black lines only** (no colour, fill, print or shading).
 - Views appear in the **Looks** tab one by one as they are drawn (one AI image call per drawing,
   counted in the daily allowance; the preflight checks exactly that number). A view that fails shows why; the others still run.
 - Every look stays in the list, newest first, with its kind (_on a model_ / _line sketch_), its
