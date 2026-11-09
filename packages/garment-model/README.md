@@ -62,7 +62,7 @@ sleeve.properties['construction.sleeve_type'] = promote(proposal, {
 
 // 4. Identity and comparison
 contentHash(state); // sha256 of the canonical JSON (everything)
-semanticHash(state); // ignores editor flags, metadata, provenance, schema version
+semanticHash(state); // ignores editor flags, metadata, provenance, schema version, canvas placement; includes pattern spec + pieces
 const d = diffDesignStates(before, after);
 d.metadataOnly; // true when only flags/metadata changed
 

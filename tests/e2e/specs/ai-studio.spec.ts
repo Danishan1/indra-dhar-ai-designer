@@ -141,6 +141,7 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(page.getByTestId('piece-edges')).toContainText('fold');
 
   // Direct point editing: select a point, type its exact X.
+  await page.getByTestId('category-points').click();
   await page.getByTestId('tool-point').click();
   await canvas.getByTestId('path-node').first().click();
   const nx = page.getByTestId('node-x');
@@ -150,7 +151,9 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(nx).toHaveValue('-2.0');
 
   // Resize and rotate a piece.
-  await page.getByTestId('tool-select').click();
+  await page.getByTestId('category-select').click();
+  await expect(page.getByTestId('tool-select')).toHaveAttribute('aria-pressed', 'true');
+  await expect(canvas.getByTestId('node-layer')).toHaveCount(0);
   await item('Sleeve band').click();
   const width = page.getByTestId('piece-input-width');
   await width.fill('30');
@@ -158,9 +161,11 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(dim('Sleeve band', 'width')).toHaveText('30.0 cm');
   await page.getByTestId('rotate-right').click();
   await expect(dim('Sleeve band', 'height')).toHaveText('30.0 cm');
-  await expect(canvas.getByTestId('node-layer')).toBeVisible();
+  // The select tool never shows or edits points.
+  await expect(canvas.getByTestId('node-layer')).toHaveCount(0);
 
   // True-size outputs.
+  await page.getByTestId('category-view').click();
   const [dxf] = await Promise.all([
     page.waitForEvent('download'),
     page.getByTestId('export-dxf').click(),
@@ -252,4 +257,233 @@ test('AI studio: a shirt + shorts sketch becomes a co-ord set with every bottom 
   await expect(
     page.getByTestId('piece-list-item').filter({ hasText: 'Belt loop strip' }),
   ).toHaveCount(0);
+});
+
+test('pattern editor tools: categories, scale, spread at lines, size by measurement, seams, notches, rotate, arrange, panels (ADR-062)', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const email = await createVerifiedAccount(undefined, 'Tia Tools');
+  await page.goto('/sign-in');
+  await submitSignIn(page, email);
+  await createOrganizationInOnboarding(page);
+  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('button', { name: 'New project' }).first().click();
+  await page.getByRole('dialog', { name: 'New project' }).getByLabel('Name').fill('Tools');
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('tab', { name: 'Designs' }).click();
+  await page.getByRole('link', { name: 'New design with AI' }).first().click();
+  await page
+    .getByTestId('upload-dropzone')
+    .locator('input[type=file]')
+    .setInputFiles([{ name: 'shorts.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(page.getByTestId('analysis-input')).toHaveCount(1, { timeout: 45_000 });
+  await page.getByLabel('Garment', { exact: true }).click();
+  await page.getByRole('option', { name: 'Shirt', exact: false }).first().click();
+  await page.getByTestId('analyze-button').click();
+  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible({
+    timeout: 60_000,
+  });
+  await page.getByLabel('Design name').fill('Tool test');
+  await page.getByTestId('create-patterns-button').click();
+  await expect(page.getByTestId('pattern-workspace')).toBeVisible({ timeout: 30_000 });
+
+  const canvas = page.getByTestId('pattern-canvas');
+  const cad = page.getByTestId('pattern-cad');
+  const item = (name: string) => page.getByTestId('piece-list-item').filter({ hasText: name });
+  const dim = (name: string, which: 'width' | 'height') =>
+    canvas.locator(`[data-piece-name="${name}"] [data-testid="piece-${which}"]`);
+  const num = async (name: string, which: 'width' | 'height') =>
+    parseFloat((await dim(name, which).textContent()) ?? '0');
+  await page.getByTestId('zoom-fit').click();
+
+  // Categories show their tools in the rail; keyboard shortcuts switch category too.
+  await page.getByTestId('category-points').click();
+  await expect(page.getByTestId('tool-rail')).toContainText('');
+  await expect(page.getByTestId('tool-add-point')).toBeVisible();
+  await expect(page.getByTestId('tool-scale')).toHaveCount(0);
+  await cad.focus();
+  await page.keyboard.press('s');
+  await expect(page.getByTestId('tool-scale')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('tool-options')).toContainText('Scale the whole piece');
+
+  // Scale: a piece 30 → 40 cm wide by typing (proportional).
+  await item('Back').first().click();
+  await expect(canvas.getByTestId('scale-box')).toBeVisible();
+  const w0 = await num('Back', 'width');
+  const h0 = await num('Back', 'height');
+  await page.getByTestId('scale-width').fill(String(w0 + 10));
+  await page.getByTestId('scale-width').press('Enter');
+  await expect(dim('Back', 'width')).toHaveText(`${(w0 + 10).toFixed(1)} cm`);
+  expect(await num('Back', 'height')).toBeGreaterThan(h0 + 5);
+  // Undo returns it.
+  await cad.focus();
+  await page.keyboard.press('Control+z');
+  await expect(dim('Back', 'width')).toHaveText(`${w0.toFixed(1)} cm`);
+
+  // Lengthen at two lines: the amount is shared between them.
+  await page.getByTestId('tool-lengthen').click();
+  const box = (await canvas.locator('[data-piece-name="Back"]').boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.45);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.7);
+  await expect(page.getByTestId('spread-bar')).toContainText('2 lines');
+  await page.getByTestId('spread-amount').fill('4');
+  await page.getByTestId('spread-amount').press('Enter');
+  await expect(dim('Back', 'height')).toHaveText(`${(h0 + 4).toFixed(1)} cm`);
+  // Switching tools cancels a spread in progress.
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.5);
+  await expect(page.getByTestId('spread-bar')).toBeVisible();
+  await page.getByTestId('tool-scale').click();
+  await expect(page.getByTestId('spread-bar')).toHaveCount(0);
+
+  // Size by measurement: back width +4 cm by changing the chest measurement → front follows.
+  await page.getByTestId('tool-fit').click();
+  const fw0 = await num('Front', 'width');
+  const bw0 = await num('Back', 'width');
+  await page.getByTestId('fit-target').fill(String(bw0 + 4));
+  await page.getByTestId('fit-apply').click();
+  await expect(page.getByTestId('fit-result')).toContainText('now');
+  await expect.poll(() => num('Back', 'width')).toBeGreaterThan(bw0 + 3.4);
+  expect(await num('Front', 'width')).toBeGreaterThan(fw0 + 2);
+
+  // Point on the Back's seam line: hover along the bottom until the outline marker shows.
+  const clickOutline = async () => {
+    const b2 = (await canvas.locator('[data-piece-name="Back"] path').first().boundingBox())!;
+    for (const f of [0.998, 0.995, 0.99, 0.985, 0.98, 1, 0.975, 0.97]) {
+      await page.mouse.move(b2.x + b2.width * 0.5, b2.y + b2.height * f);
+      if (await canvas.getByTestId('outline-hover').count()) {
+        await page.mouse.down();
+        await page.mouse.up();
+        return true;
+      }
+    }
+    return false;
+  };
+  await page.getByTestId('category-select').click();
+  await item('Back').first().click();
+
+  // Seam tool: click a seam, set its allowance.
+  await page.getByTestId('category-mark').click();
+  await page.getByTestId('tool-seam').click();
+  expect(await clickOutline()).toBe(true);
+  await expect(page.getByTestId('seam-bar')).toBeVisible();
+  await expect(canvas.getByTestId('seam-highlight')).toHaveCount(1);
+  await page.getByTestId('seam-allowance').fill('25');
+  await page.getByTestId('seam-allowance').press('Tab');
+  await expect(page.getByTestId('seam-bar')).toBeVisible();
+
+  // Notch tool: add a notch on the back.
+  await page.getByTestId('tool-notch').click();
+  await expect(page.getByTestId('seam-bar')).toHaveCount(0);
+  const notches0 = await canvas.locator('[data-piece-name="Back"] [data-testid="notch"]').count();
+  expect(await clickOutline()).toBe(true);
+  await expect(canvas.locator('[data-piece-name="Back"] [data-testid="notch"]')).toHaveCount(
+    notches0 + 1,
+  );
+
+  // Rotate by typing an angle.
+  await page.getByTestId('category-transform').click();
+  await page.getByTestId('tool-rotate').click();
+  const bw = await num('Back', 'width');
+  await page.getByTestId('rotate-input').fill('90');
+  await page.getByTestId('rotate-input').press('Enter');
+  await expect.poll(() => num('Back', 'height')).toBeCloseTo(bw, 0);
+  await page.getByTestId('rail-rotate-left').click();
+  await expect.poll(() => num('Back', 'width')).toBeCloseTo(bw, 0);
+
+  // Arrange: pack on 150 cm fabric (one undo step).
+  await page.getByTestId('category-arrange').click();
+  await expect(canvas.getByTestId('fabric-band')).toBeVisible();
+  await expect(page.getByTestId('pack-length')).toContainText('cm');
+  await page.getByTestId('arrange-pack').click();
+
+  // Right panel: history, changes, validation, sketch are back.
+  await page.locator('#pattern-right-tab-changes').click();
+  await expect(page.getByTestId('changes-panel')).toContainText(/Pack pieces|changes/);
+  await page.locator('#pattern-right-tab-history').click();
+  await expect(page.getByText('R001').first()).toBeVisible();
+  await page.locator('#pattern-right-tab-checks').click();
+  await page.locator('#pattern-right-tab-references').click();
+  await expect(page.getByTestId('references-panel').locator('img')).toBeVisible();
+  await page.locator('#pattern-right-tab-pattern').click();
+  await expect(page.getByRole('tab', { name: 'Sizes' })).toBeVisible();
+});
+
+test('look preview: the garment drawn from the patterns, kept with its revision (ADR-064)', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const email = await createVerifiedAccount(undefined, 'Lola Looks');
+  await page.goto('/sign-in');
+  await submitSignIn(page, email);
+  await createOrganizationInOnboarding(page);
+  await page.getByRole('link', { name: 'Projects' }).click();
+  await page.getByRole('button', { name: 'New project' }).first().click();
+  await page.getByRole('dialog', { name: 'New project' }).getByLabel('Name').fill('Looks');
+  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('tab', { name: 'Designs' }).click();
+  await page.getByRole('link', { name: 'New design with AI' }).first().click();
+  await page
+    .getByTestId('upload-dropzone')
+    .locator('input[type=file]')
+    .setInputFiles([{ name: 'shorts.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(page.getByTestId('analysis-input')).toHaveCount(1, { timeout: 45_000 });
+  await page.getByLabel('Garment', { exact: true }).click();
+  await page.getByRole('option', { name: 'Shirt', exact: false }).first().click();
+  await page.getByTestId('analyze-button').click();
+  await expect(page.getByRole('heading', { level: 1, name: /^Review/ })).toBeVisible({
+    timeout: 60_000,
+  });
+  await page.getByLabel('Design name').fill('Look test');
+  await page.getByTestId('create-patterns-button').click();
+  await expect(page.getByTestId('pattern-workspace')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('zoom-fit').click();
+  const cards = page.getByTestId('look-card');
+  const turnBack = async () => {
+    await page.getByTestId('piece-list-item').filter({ hasText: 'Back' }).first().click();
+    await page.getByTestId('category-transform').click();
+    await page.getByTestId('rail-rotate-right').click();
+  };
+  const drawLook = async (note: string) => {
+    await page.getByTestId('look-button').click();
+    const dialog = page.getByRole('dialog', { name: 'Preview the look' });
+    await expect(dialog.getByTestId('look-uncommitted')).toBeVisible();
+    await dialog.getByTestId('look-note').fill(note);
+    await dialog.getByTestId('look-generate').click();
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+  };
+
+  // Before any look: the tab explains the button.
+  await page.locator('#pattern-right-tab-looks').click();
+  await expect(page.getByTestId('looks-empty')).toBeVisible();
+
+  // Edit the patterns, preview: the changes are committed first and four views are drawn.
+  await turnBack();
+  await drawLook('first try');
+  await expect(page.locator('#pattern-right-tab-looks')).toHaveAttribute('aria-selected', 'true');
+  await expect(cards).toHaveCount(1);
+  const first = cards.first();
+  for (const view of ['front', 'back', 'left', 'right'])
+    await expect(first.getByTestId(`look-view-${view}`)).toBeVisible({ timeout: 90_000 });
+  await expect(first).toContainText('patterns R002');
+  await expect(first).toContainText('first try');
+  await expect(first.getByTestId('look-current')).toBeVisible();
+  await first.getByTestId('look-view-back').click();
+  await expect(page.getByTestId('look-viewer')).toContainText('Back view');
+  await page.keyboard.press('Escape');
+
+  // Another change and another look: newest first; the first look keeps its own patterns.
+  await turnBack();
+  await drawLook('second try');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText('second try');
+  await expect(cards.first().getByTestId('look-view-right')).toBeVisible({ timeout: 90_000 });
+  await expect(cards.first()).toContainText('patterns R003');
+  const older = cards.nth(1);
+  await expect(older.getByTestId('look-current')).toHaveCount(0);
+
+  // Go back to the patterns of the first look.
+  await older.getByTestId('look-restore').click();
+  await page.getByRole('button', { name: /^Restore/ }).click();
+  await expect(older.getByTestId('look-restored')).toBeVisible({ timeout: 15_000 });
 });

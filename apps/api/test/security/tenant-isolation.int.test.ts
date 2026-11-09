@@ -41,6 +41,7 @@ const BODIES: Record<string, unknown> = {
   },
   'POST /v1/orgs/:orgId/analyses/:analysisId/design': { name: 'Probe' },
   'POST /v1/orgs/:orgId/designs/:designId/techpacks': {},
+  'POST /v1/orgs/:orgId/designs/:designId/looks': {},
   'PUT /v1/orgs/:orgId/ai/providers/key': { provider: 'gemini', apiKey: 'AIza-isolation-probe' },
   'POST /v1/orgs/:orgId/ai/providers/key/remove': { provider: 'gemini' },
   'POST /v1/orgs/:orgId/ai/providers/refresh': { provider: 'gemini' },
@@ -107,6 +108,7 @@ describe('cross-tenant isolation', () => {
   const runIds = new Map<string, string>();
   const analysisIds = new Map<string, string>();
   const techPackIds = new Map<string, string>();
+  const lookIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -122,6 +124,7 @@ describe('cross-tenant isolation', () => {
     runId: runIds.get(t.orgId) ?? '',
     analysisId: analysisIds.get(t.orgId) ?? '',
     techPackId: techPackIds.get(t.orgId) ?? '',
+    lookId: lookIds.get(t.orgId) ?? '',
   });
 
   /** AI studio rows are inserted directly (creating them needs processed images / the worker). */
@@ -155,6 +158,19 @@ describe('cross-tenant isolation', () => {
       },
     });
     techPackIds.set(t.orgId, techPackId);
+    const lookId = newId();
+    await prisma.designLook.create({
+      data: {
+        id: lookId,
+        organizationId: t.orgId,
+        designId: design.id,
+        revisionId: design.headRevisionId,
+        displayId: `LOK-${lookId.slice(-6)}`,
+        status: 'queued',
+        provider: 'fake',
+      },
+    });
+    lookIds.set(t.orgId, lookId);
   }
 
   async function startArtifact(t: TenantFixture): Promise<void> {
@@ -258,7 +274,7 @@ describe('cross-tenant isolation', () => {
   it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
       routes: routes.filter((r) =>
-        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId|:analysisId|:techPackId/.test(
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId|:analysisId|:techPackId|:lookId/.test(
           r.path,
         ),
       ),

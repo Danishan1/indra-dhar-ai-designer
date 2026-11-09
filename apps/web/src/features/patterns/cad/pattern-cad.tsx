@@ -4,14 +4,21 @@ import type { PatternPiece } from '@ai-designer/garment-model';
 import {
   type CutLine,
   deleteNodes,
+  EDGE_LABELS,
   ensurePath,
   insertNode,
+  layoutCanvas,
   moveHandle,
   moveNodes,
   nearestOnPath,
-  layoutCanvas,
+  pathEdgeLength,
   pieceBounds,
-  spreadPiece,
+  rotatePiece,
+  scalePieceFrom,
+  setEdgeLength,
+  setSegmentCurved,
+  setSmooth,
+  spreadAtLines,
   withPath,
 } from '@ai-designer/pattern-model';
 import {
@@ -31,15 +38,17 @@ import { cn } from '@/lib/utils';
 import { fmt, type Unit } from '../options';
 
 import { PieceVector } from './piece-vector';
+import { type CadTool, POINT_TOOLS, TOOL_BY_KEY, TOOLS } from './tools';
+
+export type { CadTool } from './tools';
 
 /**
- * CAD canvas for flat patterns (ADR-059): real-scale rulers and grid, zoom to true size (1:1,
- * calibrated), snapping to grid and points, and tools — select/move, direct point & curve editing,
- * measure, lengthen and widen across a line. Everything is in millimetres; edits are committed once
- * per gesture through `onCommit` (one undo step).
+ * CAD canvas for flat patterns (ADR-059, tools ADR-062): real-scale rulers and grid, zoom to true
+ * size (1:1, calibrated), snapping to grid and points, and one active tool at a time. Each tool
+ * only reacts to the gestures it owns; switching tools cancels what the previous one had started.
+ * Everything is in millimetres; edits are committed once per gesture through `onCommit` (one undo
+ * step).
  */
-
-export type CadTool = 'select' | 'point' | 'measure' | 'lengthen' | 'widen' | 'pan';
 
 export interface CadSettings {
   snapGrid: boolean;
@@ -58,20 +67,30 @@ export interface CadApi {
 
 const RULER = 22;
 const STEPS = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+/** Pick distance in screen pixels. */
+const HIT = 9;
 
 type Pt = { x: number; y: number };
-
-function autoLayout(pieces: readonly PatternPiece[]): Map<string, Pt> {
-  return layoutCanvas(pieces);
-}
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 type Gesture =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move-piece'; piece: PatternPiece; start: Pt; origin: Pt }
+  | { kind: 'move-piece'; piece: PatternPiece; start: Pt; origin: Pt; moved: boolean }
   | { kind: 'nodes'; piece: PatternPiece; start: Pt; indices: number[]; anchor: Pt }
   | { kind: 'handle'; piece: PatternPiece; index: number; which: 'in' | 'out' }
-  | { kind: 'box'; piece: PatternPiece; start: Pt; end: Pt; add: boolean }
-  | { kind: 'spread'; piece: PatternPiece; line: CutLine; start: Pt };
+  | { kind: 'box'; piece: PatternPiece; start: Pt; add: boolean }
+  | { kind: 'spread'; start: Pt; base: number }
+  | { kind: 'scale'; piece: PatternPiece; handle: Handle }
+  | { kind: 'rotate'; piece: PatternPiece; center: Pt; a0: number }
+  | { kind: 'grain'; piece: PatternPiece; from: Pt };
+
+/** Multi-line spread in progress (lengthen / widen). Lines are in piece coordinates. */
+interface Spread {
+  pieceId: string;
+  dir: Pt;
+  points: Pt[];
+  amount: number;
+}
 
 export function PatternCad({
   pieces,
@@ -87,6 +106,7 @@ export function PatternCad({
   onCommit,
   apiRef,
   overlay,
+  fabric,
 }: {
   pieces: readonly PatternPiece[];
   unit: Unit;
@@ -101,6 +121,8 @@ export function PatternCad({
   onCommit: (piece: PatternPiece, label: string, group?: string) => void;
   apiRef?: React.RefObject<CadApi | null>;
   overlay?: ReactNode;
+  /** Arrange: the fabric band pieces are packed into (canvas mm). */
+  fabric?: { x: number; y: number; width: number; length: number } | null;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -110,12 +132,35 @@ export function PatternCad({
   const [cursor, setCursor] = useState<Pt | null>(null);
   const [snapMark, setSnapMark] = useState<Pt | null>(null);
   const [measure, setMeasure] = useState<{ a: Pt; b: Pt | null } | null>(null);
-  const [spread, setSpread] = useState<{ pieceId: string; line: CutLine; amount: number } | null>(
+  const [spread, setSpread] = useState<Spread | null>(null);
+  const [box, setBox] = useState<{ start: Pt; end: Pt } | null>(null);
+  const [seam, setSeam] = useState<{ pieceId: string; edge: string } | null>(null);
+  const [hover, setHover] = useState<{ pieceId: string; point: Pt; edge: string | null } | null>(
     null,
   );
   const [space, setSpace] = useState(false);
   const gesture = useRef<Gesture | null>(null);
   const nudgeGroup = useRef<{ id: string; at: number } | null>(null);
+  const onNodesRef = useRef(onNodes);
+  onNodesRef.current = onNodes;
+
+  // Switching tools cancels whatever the previous tool had started.
+  useEffect(() => {
+    gesture.current = null;
+    setMeasure(null);
+    setSpread(null);
+    setDraft(null);
+    setBox(null);
+    setSeam(null);
+    setHover(null);
+    setSnapMark(null);
+    if (!POINT_TOOLS.has(tool)) onNodesRef.current([]);
+  }, [tool]);
+  // A spread or seam belongs to one piece: selecting another piece drops it.
+  useEffect(() => {
+    setSpread((s) => (s && s.pieceId !== selectedId ? null : s));
+    setSeam((s) => (s && s.pieceId !== selectedId ? null : s));
+  }, [selectedId]);
 
   useLayoutEffect(() => {
     const el = wrap.current;
@@ -131,7 +176,7 @@ export function PatternCad({
     return () => ro.disconnect();
   }, []);
 
-  const layout = useMemo(() => autoLayout(pieces), [pieces]);
+  const layout = useMemo(() => layoutCanvas(pieces), [pieces]);
   const shown = useMemo(
     () => pieces.map((p) => (draft && p.pieceId === draft.pieceId ? draft : p)),
     [pieces, draft],
@@ -157,8 +202,14 @@ export function PatternCad({
       x1 = Math.max(x1, b.x + b.width + o.x);
       y1 = Math.max(y1, b.y + b.height + o.y);
     }
+    if (fabric) {
+      x0 = Math.min(x0, fabric.x);
+      y0 = Math.min(y0, fabric.y);
+      x1 = Math.max(x1, fabric.x + fabric.width);
+      y1 = Math.max(y1, fabric.y + fabric.length);
+    }
     return Number.isFinite(x0) ? { x0, y0, x1, y1 } : { x0: 0, y0: 0, x1: 1000, y1: 800 };
-  }, [pieces, layout]);
+  }, [pieces, layout, fabric]);
 
   const fit = useCallback(() => {
     const pad = 60;
@@ -216,7 +267,7 @@ export function PatternCad({
   const step = STEPS.find((s) => s * v.z >= 8) ?? 1000;
   const major = step * (STEPS.indexOf(step) % 3 === 1 ? 5 : 10) >= 10 ? step * 10 : step * 5;
 
-  /** Snap a canvas point (mm): other pieces' nodes and this piece's nodes, then the grid. */
+  /** Snap a canvas point (mm): pieces' points first, then the grid. */
   const snap = useCallback(
     (
       p: Pt,
@@ -251,17 +302,72 @@ export function PatternCad({
     [shown, offset, settings.snapGrid, settings.snapPoints, step, v.z],
   );
 
-  const constrain = (from: Pt, to: Pt, on: boolean): Pt => {
+  const constrain = (from: Pt, to: Pt, on: boolean, stepDeg = 45): Pt => {
     if (!on) return to;
     const dx = to.x - from.x;
     const dy = to.y - from.y;
-    const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+    const unitA = (stepDeg * Math.PI) / 180;
+    const a = Math.round(Math.atan2(dy, dx) / unitA) * unitA;
     const L = Math.hypot(dx, dy);
     return { x: from.x + Math.cos(a) * L, y: from.y + Math.sin(a) * L };
   };
 
   const selected = shown.find((p) => p.pieceId === selectedId) ?? null;
+  const base = pieces.find((p) => p.pieceId === selectedId) ?? null;
   const selectedPath = useMemo(() => (selected ? ensurePath(selected) : null), [selected]);
+
+  /** Piece under a canvas point (topmost), via the SVG hit target or a geometric test. */
+  const pieceAt = (target: Element): PatternPiece | null => {
+    const id = target.closest('[data-piece-id]')?.getAttribute('data-piece-id') ?? null;
+    return id ? (shown.find((x) => x.pieceId === id) ?? null) : null;
+  };
+  /** Nearest seam-line point of a piece (piece coords) and the edge it is on. */
+  const nearOutline = (piece: PatternPiece, p: Pt) => {
+    const o = offset(piece);
+    const path = ensurePath(piece);
+    const near = nearestOnPath(path, { x: p.x - o.x, y: p.y - o.y });
+    return { ...near, edge: path[near.seg]?.seg ?? null, path, o };
+  };
+  /** Piece whose seam line is within the pick distance (selected piece first). */
+  const outlineAt = (p: Pt) => {
+    const order = selected ? [selected, ...shown.filter((x) => x !== selected)] : shown;
+    for (const piece of order) {
+      const n = nearOutline(piece, p);
+      if (n.d * v.z <= HIT) return { piece, ...n };
+    }
+    return null;
+  };
+
+  // Scale tool geometry (piece coords) for the selected piece.
+  const scaleBox = selected && tool === 'scale' ? pieceBounds(selected) : null;
+  const handlePoint = (b: ReturnType<typeof pieceBounds>, h: Handle): Pt => ({
+    x: h.includes('w') ? b.x : h.includes('e') ? b.x + b.width : b.cx,
+    y: h.includes('n') ? b.y : h.includes('s') ? b.y + b.height : b.cy,
+  });
+
+  const commitSpread = useCallback(
+    (typed?: number) => {
+      if (!spread) return;
+      const amount = typed ?? spread.amount;
+      const piece = pieces.find((p) => p.pieceId === spread.pieceId);
+      if (piece && Math.abs(amount) >= 0.1 && spread.points.length) {
+        const lines: CutLine[] = spread.points.map((point) => ({ point, dir: spread.dir }));
+        const verb = spread.dir.x
+          ? amount > 0
+            ? 'Lengthen'
+            : 'Shorten'
+          : amount > 0
+            ? 'Widen'
+            : 'Narrow';
+        onCommit(
+          spreadAtLines(piece, lines, amount),
+          `${verb} ${piece.name} by ${fmt(Math.abs(amount), unit)} ${unit}${lines.length > 1 ? ` at ${lines.length} lines` : ''}`,
+        );
+      }
+      setSpread(null);
+    },
+    [spread, pieces, onCommit, unit],
+  );
 
   // ── pointer handling ──
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
@@ -272,54 +378,195 @@ export function PatternCad({
       gesture.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: v.x, vy: v.y };
       return;
     }
-    const target = e.target as Element;
-    const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id') ?? null;
-    const piece = pieceId ? (shown.find((x) => x.pieceId === pieceId) ?? null) : null;
-    if (tool === 'measure') {
-      const s = snap(p).p;
-      setMeasure((m) => (!m || m.b ? { a: s, b: null } : { a: m.a, b: s }));
-      return;
-    }
-    if ((tool === 'lengthen' || tool === 'widen') && editable) {
-      const target2 = piece ?? selected;
-      if (!target2) return;
-      const o = offset(target2);
-      const local = { x: p.x - o.x, y: p.y - o.y };
-      const line: CutLine =
-        tool === 'lengthen'
-          ? { point: local, dir: { x: 1, y: 0 } }
-          : { point: local, dir: { x: 0, y: 1 } };
-      onSelect(target2.pieceId);
-      gesture.current = { kind: 'spread', piece: target2, line, start: p };
-      setSpread({ pieceId: target2.pieceId, line, amount: 0 });
-      return;
-    }
-    if (!piece) {
-      if (tool === 'point' && selected && editable) {
-        gesture.current = { kind: 'box', piece: selected, start: p, end: p, add: e.shiftKey };
+    if (e.button !== 0) return;
+    const piece = pieceAt(e.target as Element);
+    const startPan = () => {
+      gesture.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: v.x, vy: v.y };
+    };
+    const choose = (pc: PatternPiece | null) => {
+      if ((pc?.pieceId ?? null) !== selectedId) {
+        onSelect(pc?.pieceId ?? null);
+        onNodes([]);
+      }
+    };
+    switch (tool) {
+      case 'measure': {
+        const s = snap(p).p;
+        setMeasure((m) => (!m || m.b ? { a: s, b: null } : { a: m.a, b: s }));
         return;
       }
-      onSelect(null);
-      onNodes([]);
-      gesture.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: v.x, vy: v.y };
-      return;
-    }
-    if (piece.pieceId !== selectedId) {
-      onSelect(piece.pieceId);
-      onNodes([]);
-    }
-    if (editable && tool === 'select')
-      gesture.current = { kind: 'move-piece', piece, start: p, origin: offset(piece) };
-    else if (editable && tool === 'point') {
-      // Click on the outline body with the point tool: start a box selection.
-      gesture.current = { kind: 'box', piece, start: p, end: p, add: e.shiftKey };
+      case 'select': {
+        choose(piece);
+        if (!piece) return startPan();
+        if (editable)
+          gesture.current = {
+            kind: 'move-piece',
+            piece,
+            start: p,
+            origin: offset(piece),
+            moved: false,
+          };
+        return;
+      }
+      case 'point': {
+        if (piece && piece.pieceId !== selectedId) {
+          choose(piece);
+          return;
+        }
+        if (!selected) return startPan();
+        gesture.current = { kind: 'box', piece: selected, start: p, add: e.shiftKey };
+        setBox({ start: p, end: p });
+        return;
+      }
+      case 'delete-point':
+      case 'convert': {
+        // Points are handled by onNodeDown; here: segments (convert) or choosing a piece.
+        if (tool === 'convert' && editable && selected) {
+          const n = nearOutline(selected, p);
+          if (n.d * v.z <= HIT) {
+            const path = n.path;
+            const curved = !!(path[n.seg]?.out || path[(n.seg + 1) % path.length]?.in);
+            onCommit(
+              withPath(selected, setSegmentCurved(path, n.seg, !curved)),
+              `${curved ? 'Straighten' : 'Curve'} a seam of ${selected.name}`,
+            );
+            return;
+          }
+        }
+        if (piece) choose(piece);
+        else startPan();
+        return;
+      }
+      case 'add-point':
+      case 'notch': {
+        const hit = outlineAt(p);
+        if (!hit) {
+          if (piece) choose(piece);
+          else startPan();
+          return;
+        }
+        choose(hit.piece);
+        if (!editable) return;
+        if (tool === 'add-point') {
+          const next = insertNode(hit.path, hit.seg, hit.t);
+          onCommit(withPath(hit.piece, next), `Add a point to ${hit.piece.name}`);
+          return;
+        }
+        // Notch: remove the one under the cursor, else add one on the seam line.
+        const local = { x: p.x - hit.o.x, y: p.y - hit.o.y };
+        const existing = hit.piece.notches.findIndex(
+          (q) => Math.hypot(q.x - local.x, q.y - local.y) * v.z <= HIT,
+        );
+        if (existing >= 0)
+          onCommit(
+            { ...hit.piece, notches: hit.piece.notches.filter((_, i) => i !== existing) },
+            `Remove a notch from ${hit.piece.name}`,
+          );
+        else
+          onCommit(
+            {
+              ...hit.piece,
+              notches: [
+                ...hit.piece.notches,
+                { x: Math.round(hit.point.x * 10) / 10, y: Math.round(hit.point.y * 10) / 10 },
+              ],
+            },
+            `Add a notch to ${hit.piece.name}`,
+          );
+        return;
+      }
+      case 'seam': {
+        const hit = outlineAt(p);
+        if (hit && hit.edge) {
+          choose(hit.piece);
+          setSeam({ pieceId: hit.piece.pieceId, edge: hit.edge });
+        } else {
+          setSeam(null);
+          if (piece) choose(piece);
+          else startPan();
+        }
+        return;
+      }
+      case 'lengthen':
+      case 'widen': {
+        const target = piece ?? selected;
+        if (!target || !editable) return startPan();
+        choose(target);
+        const o = offset(target);
+        const local = { x: p.x - o.x, y: p.y - o.y };
+        const dir = tool === 'lengthen' ? { x: 1, y: 0 } : { x: 0, y: 1 };
+        setSpread((s) =>
+          s && s.pieceId === target.pieceId
+            ? { ...s, points: [...s.points, local] }
+            : { pieceId: target.pieceId, dir, points: [local], amount: 0 },
+        );
+        gesture.current = {
+          kind: 'spread',
+          start: p,
+          base: spread && spread.pieceId === target.pieceId ? spread.amount : 0,
+        };
+        return;
+      }
+      case 'scale': {
+        // Handles are hit on their own elements (onHandle); a click elsewhere selects.
+        choose(piece);
+        if (!piece) startPan();
+        return;
+      }
+      case 'rotate': {
+        const target = piece ?? selected;
+        if (!target) return startPan();
+        choose(target);
+        if (!editable) return;
+        const b = pieceBounds(target);
+        const o = offset(target);
+        const center = { x: b.cx + o.x, y: b.cy + o.y };
+        gesture.current = {
+          kind: 'rotate',
+          piece: target,
+          center,
+          a0: Math.atan2(p.y - center.y, p.x - center.x),
+        };
+        return;
+      }
+      case 'grain': {
+        const target = piece ?? selected;
+        if (!target) return startPan();
+        choose(target);
+        if (!editable) return;
+        const o = offset(target);
+        gesture.current = { kind: 'grain', piece: target, from: { x: p.x - o.x, y: p.y - o.y } };
+        return;
+      }
+      case 'fit':
+      default: {
+        choose(piece);
+        if (!piece) startPan();
+      }
     }
   };
 
   const onNodeDown = (e: ReactPointerEvent, piece: PatternPiece, index: number) => {
-    if (!editable || tool === 'measure' || tool === 'pan') return;
+    if (!editable || !POINT_TOOLS.has(tool) || space) return;
     e.stopPropagation();
     wrap.current?.focus();
+    if (tool === 'delete-point') {
+      const path = ensurePath(piece);
+      if (path.length <= 3) return;
+      onCommit(withPath(piece, deleteNodes(path, [index])), `Delete a point of ${piece.name}`);
+      onNodes([]);
+      return;
+    }
+    if (tool === 'convert') {
+      const path = ensurePath(piece);
+      const smooth = !path[index]!.smooth;
+      onCommit(
+        withPath(piece, setSmooth(path, index, smooth)),
+        `Make a point ${smooth ? 'smooth' : 'a corner'} on ${piece.name}`,
+      );
+      onNodes([index]);
+      return;
+    }
     svgRef.current?.setPointerCapture(e.pointerId);
     const sel = e.shiftKey
       ? nodes.includes(index)
@@ -346,25 +593,42 @@ export function PatternCad({
     index: number,
     which: 'in' | 'out',
   ) => {
-    if (!editable) return;
+    if (!editable || tool !== 'point') return;
     e.stopPropagation();
     svgRef.current?.setPointerCapture(e.pointerId);
     gesture.current = { kind: 'handle', piece, index, which };
+  };
+
+  const onScaleHandleDown = (e: ReactPointerEvent, h: Handle) => {
+    if (!editable || !base) return;
+    e.stopPropagation();
+    svgRef.current?.setPointerCapture(e.pointerId);
+    gesture.current = { kind: 'scale', piece: base, handle: h };
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
     const p = toMm(e);
     setCursor(p);
     const g = gesture.current;
-    if (tool === 'measure' && measure && !measure.b)
-      setSnapMark(snap(p).snapped ? snap(p).p : null);
-    if (!g) return;
+    if (!g) {
+      if (tool === 'measure' && measure && !measure.b) {
+        const s = snap(p);
+        setSnapMark(s.snapped ? s.p : null);
+      }
+      if (tool === 'add-point' || tool === 'notch' || tool === 'seam' || tool === 'convert') {
+        const hit = outlineAt(p);
+        setHover(hit ? { pieceId: hit.piece.pieceId, point: hit.point, edge: hit.edge } : null);
+      }
+      return;
+    }
     if (g.kind === 'pan') {
       setView({ z: v.z, x: g.vx - (e.clientX - g.sx) / v.z, y: g.vy - (e.clientY - g.sy) / v.z });
       return;
     }
     if (g.kind === 'move-piece') {
       const to = constrain(g.start, p, e.shiftKey);
+      if (!g.moved && Math.hypot(to.x - g.start.x, to.y - g.start.y) * v.z < 3) return;
+      g.moved = true;
       setDraft({
         ...g.piece,
         canvas: {
@@ -400,27 +664,75 @@ export function PatternCad({
       return;
     }
     if (g.kind === 'box') {
-      gesture.current = { ...g, end: p };
-      setDraft(null);
-      setSnapMark(null);
+      setBox({ start: g.start, end: p });
       return;
     }
     if (g.kind === 'spread') {
-      const nrm = { x: -g.line.dir.y, y: g.line.dir.x };
-      const amount =
-        Math.round(
-          ((p.x - g.start.x) * nrm.x + (p.y - g.start.y) * nrm.y) * (settings.snapGrid ? 1 : 10),
-        ) / (settings.snapGrid ? 1 : 10);
-      setSpread({ pieceId: g.piece.pieceId, line: g.line, amount });
+      if (!spread) return;
+      const nrm = { x: -spread.dir.y, y: spread.dir.x };
+      const raw = (p.x - g.start.x) * nrm.x + (p.y - g.start.y) * nrm.y;
+      if (Math.abs(raw) * v.z < 3) return;
+      const r = settings.snapGrid ? 1 : 10;
+      setSpread({ ...spread, amount: Math.round((g.base + raw) * r) / r });
+      return;
+    }
+    if (g.kind === 'scale') {
+      const piece = g.piece;
+      const b = pieceBounds(piece);
+      const o = offset(piece);
+      const local = { x: p.x - o.x, y: p.y - o.y };
+      const fromCentre = e.altKey;
+      const opposite: Handle = (
+        {
+          nw: 'se',
+          n: 's',
+          ne: 'sw',
+          e: 'w',
+          se: 'nw',
+          s: 'n',
+          sw: 'ne',
+          w: 'e',
+        } as const
+      )[g.handle];
+      const anchor = fromCentre ? { x: b.cx, y: b.cy } : handlePoint(b, opposite);
+      const grip = handlePoint(b, g.handle);
+      const horiz = g.handle.includes('e') || g.handle.includes('w');
+      const vert = g.handle.includes('n') || g.handle.includes('s');
+      let sx =
+        horiz && Math.abs(grip.x - anchor.x) > 0.01
+          ? (local.x - anchor.x) / (grip.x - anchor.x)
+          : 1;
+      let sy =
+        vert && Math.abs(grip.y - anchor.y) > 0.01 ? (local.y - anchor.y) / (grip.y - anchor.y) : 1;
+      if (horiz && vert && !e.shiftKey) sx = sy = Math.max(sx, sy);
+      sx = Math.max(0.05, sx);
+      sy = Math.max(0.05, sy);
+      // Round to 0.5 mm of the resulting size.
+      const W = Math.round(b.width * sx * 2) / 2;
+      const H = Math.round(b.height * sy * 2) / 2;
+      setDraft({ ...scalePieceFrom(piece, W / b.width, H / b.height, anchor), canvas: o });
+      return;
+    }
+    if (g.kind === 'rotate') {
+      let deg = ((Math.atan2(p.y - g.center.y, p.x - g.center.x) - g.a0) * 180) / Math.PI;
+      deg = e.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg * 2) / 2;
+      setDraft({ ...rotatePiece(g.piece, deg), canvas: offset(g.piece), notes: [String(deg)] });
+      return;
+    }
+    if (g.kind === 'grain') {
+      const o = offset(g.piece);
+      const to0 = { x: p.x - o.x, y: p.y - o.y };
+      const to = constrain(g.from, to0, e.shiftKey);
+      setDraft({ ...g.piece, grainline: { from: g.from, to }, canvas: o });
     }
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: ReactPointerEvent) => {
     const g = gesture.current;
     gesture.current = null;
     setSnapMark(null);
     if (!g) return;
-    if (g.kind === 'move-piece' && draft?.canvas)
+    if (g.kind === 'move-piece' && g.moved && draft?.canvas)
       onCommit({ ...g.piece, canvas: draft.canvas }, `Move ${g.piece.name}`);
     else if ((g.kind === 'nodes' || g.kind === 'handle') && draft)
       onCommit(
@@ -430,58 +742,86 @@ export function PatternCad({
           : `Shape a curve of ${draft.name}`,
       );
     else if (g.kind === 'box') {
+      const end = toMm(e);
       const o = offset(g.piece);
-      const x0 = Math.min(g.start.x, g.end.x) - o.x;
-      const x1 = Math.max(g.start.x, g.end.x) - o.x;
-      const y0 = Math.min(g.start.y, g.end.y) - o.y;
-      const y1 = Math.max(g.start.y, g.end.y) - o.y;
-      const hit = ensurePath(g.piece)
-        .map((nd, i) => (nd.x >= x0 && nd.x <= x1 && nd.y >= y0 && nd.y <= y1 ? i : -1))
-        .filter((i) => i >= 0);
+      const x0 = Math.min(g.start.x, end.x) - o.x;
+      const x1 = Math.max(g.start.x, end.x) - o.x;
+      const y0 = Math.min(g.start.y, end.y) - o.y;
+      const y1 = Math.max(g.start.y, end.y) - o.y;
+      const moved = Math.hypot(end.x - g.start.x, end.y - g.start.y) * v.z > 3;
+      const hit = moved
+        ? ensurePath(g.piece)
+            .map((nd, i) => (nd.x >= x0 && nd.x <= x1 && nd.y >= y0 && nd.y <= y1 ? i : -1))
+            .filter((i) => i >= 0)
+        : [];
       onNodes(g.add ? [...new Set([...nodes, ...hit])] : hit);
+      setBox(null);
+    } else if (g.kind === 'scale' && draft) {
+      const b0 = pieceBounds(g.piece);
+      const b1 = pieceBounds(draft);
+      if (Math.abs(b1.width - b0.width) > 0.2 || Math.abs(b1.height - b0.height) > 0.2)
+        onCommit(
+          { ...draft, canvas: g.piece.canvas ?? draft.canvas },
+          `Scale ${g.piece.name} to ${fmt(b1.width, unit)} × ${fmt(b1.height, unit)} ${unit}`,
+        );
+    } else if (g.kind === 'rotate' && draft) {
+      const deg = Number(draft.notes[0] ?? 0);
+      if (Math.abs(deg) >= 0.5)
+        onCommit(
+          { ...rotatePiece(g.piece, deg), canvas: g.piece.canvas ?? offset(g.piece) },
+          `Rotate ${g.piece.name} ${deg > 0 ? '+' : ''}${deg}°`,
+        );
+    } else if (g.kind === 'grain' && draft?.grainline) {
+      const gl = draft.grainline;
+      if (Math.hypot(gl.to.x - gl.from.x, gl.to.y - gl.from.y) * v.z > 6)
+        onCommit(
+          {
+            ...g.piece,
+            grainline: {
+              from: { x: Math.round(gl.from.x * 10) / 10, y: Math.round(gl.from.y * 10) / 10 },
+              to: { x: Math.round(gl.to.x * 10) / 10, y: Math.round(gl.to.y * 10) / 10 },
+            },
+          },
+          `Set the grainline of ${g.piece.name}`,
+        );
     }
     setDraft(null);
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
-    if (!editable || tool !== 'point' || !selected || !selectedPath) return;
-    const o = offset(selected);
-    const p = toMm(e);
-    const near = nearestOnPath(selectedPath, { x: p.x - o.x, y: p.y - o.y });
-    if (near.d * v.z > 10) return;
-    const next = insertNode(selectedPath, near.seg, near.t);
-    onCommit(withPath(selected, next), `Add a point to ${selected.name}`);
-    onNodes([near.seg + 1]);
+    // Point tool shortcut: double-click a seam to add a point.
+    if (!editable || tool !== 'point' || !selected) return;
+    const n = nearOutline(selected, toMm(e));
+    if (n.d * v.z > HIT) return;
+    onCommit(withPath(selected, insertNode(n.path, n.seg, n.t)), `Add a point to ${selected.name}`);
+    onNodes([n.seg + 1]);
   };
 
-  const applySpread = useCallback(() => {
-    if (!spread) return;
-    const piece = pieces.find((p) => p.pieceId === spread.pieceId);
-    if (piece && Math.abs(spread.amount) >= 0.1)
-      onCommit(
-        spreadPiece(piece, spread.line, spread.amount),
-        `${spread.line.dir.x ? 'Lengthen' : 'Widen'} ${piece.name} by ${fmt(Math.abs(spread.amount), unit)} ${unit}`,
-      );
-    setSpread(null);
-  }, [spread, pieces, onCommit, unit]);
-
   // ── keyboard ──
+  const cancel = () => {
+    if (gesture.current) {
+      gesture.current = null;
+      setDraft(null);
+      setBox(null);
+      return true;
+    }
+    if (spread || measure || seam || nodes.length) {
+      setSpread(null);
+      setMeasure(null);
+      setSeam(null);
+      onNodes([]);
+      return true;
+    }
+    return false;
+  };
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (e.ctrlKey || e.metaKey) return; // undo/redo/save stay global
     const k = e.key.toLowerCase();
-    const map: Record<string, CadTool> = {
-      v: 'select',
-      a: 'point',
-      m: 'measure',
-      l: 'lengthen',
-      w: 'widen',
-      h: 'pan',
-    };
-    if (map[k] && !e.altKey) {
-      onTool(map[k]!);
-      setMeasure(null);
-      setSpread(null);
+    if (TOOL_BY_KEY[k] && !e.altKey) {
+      const t = TOOL_BY_KEY[k]!;
+      if (editable || !TOOLS[t].edits) onTool(t);
       e.stopPropagation();
       e.preventDefault();
       return;
@@ -492,14 +832,13 @@ export function PatternCad({
       return;
     }
     if (k === 'escape') {
-      setMeasure(null);
-      setSpread(null);
-      onNodes([]);
+      // First Esc cancels what is in progress; the next returns to the select tool.
+      if (!cancel() && tool !== 'select') onTool('select');
       e.stopPropagation();
       return;
     }
     if (k === 'enter' && spread) {
-      applySpread();
+      commitSpread();
       e.stopPropagation();
       return;
     }
@@ -507,13 +846,24 @@ export function PatternCad({
     else if (k === '-') zoomAt(0.8);
     else if (k === '0') fit();
     else if (k === '1') zoomAt(settings.pxPerMm / v.z);
-    else if ((k === 'delete' || k === 'backspace') && editable && selected && nodes.length) {
+    else if (
+      (k === 'delete' || k === 'backspace') &&
+      editable &&
+      selected &&
+      tool === 'point' &&
+      nodes.length
+    ) {
       onCommit(
         withPath(selected, deleteNodes(ensurePath(selected), nodes)),
         `Delete ${nodes.length} point${nodes.length > 1 ? 's' : ''} of ${selected.name}`,
       );
       onNodes([]);
-    } else if (k.startsWith('arrow') && editable && selected) {
+    } else if (
+      k.startsWith('arrow') &&
+      editable &&
+      selected &&
+      (tool === 'select' || (tool === 'point' && nodes.length))
+    ) {
       const d = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
       const dx = k === 'arrowleft' ? -d : k === 'arrowright' ? d : 0;
       const dy = k === 'arrowup' ? -d : k === 'arrowdown' ? d : 0;
@@ -521,7 +871,7 @@ export function PatternCad({
       if (!nudgeGroup.current || now - nudgeGroup.current.at > 1200)
         nudgeGroup.current = { id: crypto.randomUUID(), at: now };
       nudgeGroup.current.at = now;
-      if (nodes.length)
+      if (tool === 'point')
         onCommit(
           withPath(selected, moveNodes(ensurePath(selected), nodes, dx, dy)),
           `Nudge points of ${selected.name}`,
@@ -541,7 +891,6 @@ export function PatternCad({
   };
 
   // ── render helpers ──
-  const sw = (px: number) => px; // with vector-effect the width is in screen px
   const fs = 12 / v.z;
   const visible = { x0: v.x, y0: v.y, x1: v.x + size.w / v.z, y1: v.y + size.h / v.z };
   const gridLines = useMemo(() => {
@@ -569,14 +918,29 @@ export function PatternCad({
   }, [settings.showGrid, view, step, major, visible.x0, visible.x1, visible.y0, visible.y1]);
 
   const spreadPreview = useMemo(() => {
-    if (!spread) return null;
+    if (!spread || !spread.points.length) return null;
     const piece = pieces.find((p) => p.pieceId === spread.pieceId);
-    return piece ? spreadPiece(piece, spread.line, spread.amount) : null;
+    return piece
+      ? spreadAtLines(
+          piece,
+          spread.points.map((point) => ({ point, dir: spread.dir })),
+          spread.amount,
+        )
+      : null;
   }, [spread, pieces]);
 
-  const box = gesture.current?.kind === 'box' ? gesture.current : null;
   const cursorLabel = cursor ? `X ${fmt(cursor.x, unit)}  Y ${fmt(cursor.y, unit)} ${unit}` : '';
   const zoomPct = Math.round((v.z / settings.pxPerMm) * 100);
+  const showNodes = !!(selected && selectedPath && editable && POINT_TOOLS.has(tool));
+  const seamPiece = seam ? (shown.find((p) => p.pieceId === seam.pieceId) ?? null) : null;
+  const cursorClass =
+    tool === 'pan' || space
+      ? 'cursor-grab'
+      : tool === 'select'
+        ? 'cursor-default'
+        : tool === 'rotate'
+          ? 'cursor-alias'
+          : 'cursor-crosshair';
 
   return (
     <div
@@ -587,6 +951,7 @@ export function PatternCad({
       className="relative h-full min-h-0 w-full overflow-hidden bg-white outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       data-testid="pattern-cad"
       data-zoom={zoomPct}
+      data-tool={tool}
     >
       <Rulers v={v} size={size} unit={unit} cursor={cursor} />
       <svg
@@ -594,19 +959,15 @@ export function PatternCad({
         width={size.w}
         height={size.h}
         viewBox={`${v.x} ${v.y} ${size.w / v.z} ${size.h / v.z}`}
-        className={cn(
-          'absolute touch-none select-none',
-          tool === 'pan' || space
-            ? 'cursor-grab'
-            : tool === 'measure' || tool === 'lengthen' || tool === 'widen'
-              ? 'cursor-crosshair'
-              : 'cursor-default',
-        )}
+        className={cn('absolute touch-none select-none', cursorClass)}
         style={{ left: RULER, top: RULER }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => setCursor(null)}
+        onPointerLeave={() => {
+          setCursor(null);
+          setHover(null);
+        }}
         onDoubleClick={onDoubleClick}
         onWheel={(e) => zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, toMm(e))}
         role="img"
@@ -618,10 +979,30 @@ export function PatternCad({
             key={i}
             {...l}
             stroke={isMajor ? '#d6dde8' : '#eef2f7'}
-            strokeWidth={sw(1)}
+            strokeWidth={1}
             vectorEffect="non-scaling-stroke"
           />
         ))}
+        {fabric ? (
+          <g pointerEvents="none" data-testid="fabric-band">
+            <rect
+              x={fabric.x}
+              y={fabric.y}
+              width={fabric.width}
+              height={Math.max(fabric.length, 1)}
+              fill="#fef9c3"
+              fillOpacity={0.45}
+              stroke="#ca8a04"
+              strokeDasharray="10 6"
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+            <text x={fabric.x + 8 * (1 / v.z)} y={fabric.y - 6 / v.z} fontSize={fs} fill="#a16207">
+              Fabric {fmt(fabric.width, unit)} {unit} wide · used length {fmt(fabric.length, unit)}{' '}
+              {unit}
+            </text>
+          </g>
+        ) : null}
         {shown.map((p) => {
           const o = offset(p);
           const isSel = p.pieceId === selectedId;
@@ -646,8 +1027,42 @@ export function PatternCad({
             </g>
           );
         })}
-        {/* Nodes and handles of the selected piece. */}
-        {selected && selectedPath && editable && (tool === 'point' || tool === 'select') ? (
+        {/* Seam tool: highlight of the chosen / hovered seam. */}
+        {seamPiece && seam ? (
+          <EdgeHighlight
+            piece={seamPiece}
+            edge={seam.edge}
+            offset={offset(seamPiece)}
+            color="#ea580c"
+            width={4}
+            testId="seam-highlight"
+          />
+        ) : null}
+        {hover && tool === 'seam' && hover.edge && hover.edge !== seam?.edge ? (
+          <EdgeHighlight
+            piece={shown.find((p) => p.pieceId === hover.pieceId)!}
+            edge={hover.edge}
+            offset={offset(shown.find((p) => p.pieceId === hover.pieceId)!)}
+            color="#fb923c"
+            width={2.5}
+          />
+        ) : null}
+        {hover &&
+        (tool === 'add-point' || tool === 'notch' || tool === 'convert' || tool === 'seam') ? (
+          <circle
+            cx={hover.point.x + offset(shown.find((p) => p.pieceId === hover.pieceId)!).x}
+            cy={hover.point.y + offset(shown.find((p) => p.pieceId === hover.pieceId)!).y}
+            r={5 / v.z}
+            fill={tool === 'notch' ? '#0f172a' : '#fff'}
+            stroke="#2563eb"
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            data-testid="outline-hover"
+          />
+        ) : null}
+        {/* Points and handles of the selected piece (point tools only). */}
+        {showNodes && selected && selectedPath ? (
           <g
             transform={`translate(${offset(selected).x} ${offset(selected).y})`}
             data-testid="node-layer"
@@ -655,13 +1070,12 @@ export function PatternCad({
             {selectedPath.map((nd, i) => {
               const sel = nodes.includes(i);
               const r = (sel ? 5 : 4) / v.z;
-              const prev = selectedPath[(i - 1 + selectedPath.length) % selectedPath.length]!;
               const showHandles =
                 tool === 'point' &&
                 (sel ||
                   nodes.includes((i + 1) % selectedPath.length) ||
                   nodes.includes((i - 1 + selectedPath.length) % selectedPath.length));
-              void prev;
+              const stroke = tool === 'delete-point' ? '#dc2626' : '#2563eb';
               return (
                 <g key={i}>
                   {showHandles
@@ -698,11 +1112,11 @@ export function PatternCad({
                       cx={nd.x}
                       cy={nd.y}
                       r={r}
-                      fill={sel ? '#2563eb' : '#fff'}
-                      stroke="#2563eb"
+                      fill={sel ? stroke : '#fff'}
+                      stroke={stroke}
                       strokeWidth={1.5}
                       vectorEffect="non-scaling-stroke"
-                      className="cursor-move"
+                      className={tool === 'point' ? 'cursor-move' : 'cursor-pointer'}
                       data-testid="path-node"
                       data-index={i}
                       onPointerDown={(e) => onNodeDown(e, selected, i)}
@@ -713,11 +1127,11 @@ export function PatternCad({
                       y={nd.y - r}
                       width={r * 2}
                       height={r * 2}
-                      fill={sel ? '#2563eb' : '#fff'}
-                      stroke="#2563eb"
+                      fill={sel ? stroke : '#fff'}
+                      stroke={stroke}
                       strokeWidth={1.5}
                       vectorEffect="non-scaling-stroke"
-                      className="cursor-move"
+                      className={tool === 'point' ? 'cursor-move' : 'cursor-pointer'}
                       data-testid="path-node"
                       data-index={i}
                       onPointerDown={(e) => onNodeDown(e, selected, i)}
@@ -726,6 +1140,89 @@ export function PatternCad({
                 </g>
               );
             })}
+          </g>
+        ) : null}
+        {/* Scale tool: bounding box with 8 handles. */}
+        {scaleBox && selected && editable ? (
+          <g
+            transform={`translate(${offset(selected).x} ${offset(selected).y})`}
+            data-testid="scale-box"
+          >
+            <rect
+              x={scaleBox.x}
+              y={scaleBox.y}
+              width={scaleBox.width}
+              height={scaleBox.height}
+              fill="none"
+              stroke="#7c3aed"
+              strokeDasharray="5 4"
+              strokeWidth={1.2}
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+            {(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as Handle[]).map((h) => {
+              const q = handlePoint(scaleBox, h);
+              const r = 5 / v.z;
+              return (
+                <rect
+                  key={h}
+                  x={q.x - r}
+                  y={q.y - r}
+                  width={r * 2}
+                  height={r * 2}
+                  fill="#fff"
+                  stroke="#7c3aed"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                  className={
+                    h === 'n' || h === 's'
+                      ? 'cursor-ns-resize'
+                      : h === 'e' || h === 'w'
+                        ? 'cursor-ew-resize'
+                        : h === 'nw' || h === 'se'
+                          ? 'cursor-nwse-resize'
+                          : 'cursor-nesw-resize'
+                  }
+                  data-testid={`scale-handle-${h}`}
+                  onPointerDown={(e) => onScaleHandleDown(e, h)}
+                />
+              );
+            })}
+            <text
+              x={scaleBox.cx}
+              y={scaleBox.y - 10 / v.z}
+              fontSize={fs}
+              textAnchor="middle"
+              fill="#7c3aed"
+              data-testid="scale-size"
+            >
+              {fmt(scaleBox.width, unit)} × {fmt(scaleBox.height, unit)} {unit}
+            </text>
+          </g>
+        ) : null}
+        {/* Rotate tool: centre mark and live angle. */}
+        {tool === 'rotate' && selected ? (
+          <g pointerEvents="none">
+            <circle
+              cx={pieceBounds(selected).cx + offset(selected).x}
+              cy={pieceBounds(selected).cy + offset(selected).y}
+              r={5 / v.z}
+              fill="none"
+              stroke="#7c3aed"
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+            {draft && gesture.current?.kind === 'rotate' ? (
+              <text
+                x={pieceBounds(selected).cx + offset(selected).x + 10 / v.z}
+                y={pieceBounds(selected).cy + offset(selected).y - 10 / v.z}
+                fontSize={fs * 1.1}
+                fill="#7c3aed"
+                data-testid="rotate-angle"
+              >
+                {draft.notes[0]}°
+              </text>
+            ) : null}
           </g>
         ) : null}
         {box ? (
@@ -739,12 +1236,14 @@ export function PatternCad({
             strokeDasharray="4 3"
             strokeWidth={1}
             vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            data-testid="box-select"
           />
         ) : null}
         {spread ? (
-          <SpreadLine
+          <SpreadLines
             spread={spread}
-            offset={offset(pieces.find((p) => p.pieceId === spread.pieceId)!)}
+            offset={offset(pieces.find((p) => p.pieceId === spread.pieceId) ?? pieces[0]!)}
             visible={visible}
             k={1 / v.z}
             unit={unit}
@@ -788,101 +1287,420 @@ export function PatternCad({
         className="pointer-events-none absolute bottom-1 left-7 rounded bg-background/85 px-2 py-0.5 text-[11px] tabular-nums shadow-sm"
         data-testid="cad-status"
       >
-        {cursorLabel ? `${cursorLabel} · ` : ''}zoom {zoomPct}% · grid{' '}
+        {TOOLS[tool].label} · {cursorLabel ? `${cursorLabel} · ` : ''}zoom {zoomPct}% · grid{' '}
         {fmt(step < 1 ? 1 : step, unit)} {unit}
         {measure?.b
           ? ` · distance ${fmt(Math.hypot(measure.b.x - measure.a.x, measure.b.y - measure.a.y), unit)} ${unit}`
           : ''}
       </div>
       {spread ? (
-        <div
-          className="absolute top-2 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border bg-background px-2 py-1 text-[12px] shadow"
-          data-testid="spread-bar"
-        >
-          {spread.line.dir.x ? 'Lengthen' : 'Widen'} by
-          <input
-            className="h-6 w-20 rounded border px-1 text-right"
-            aria-label="Spread amount"
-            value={fmt(spread.amount, unit)}
-            onChange={(e) => {
-              const val = Number(e.target.value.replace(',', '.'));
-              if (Number.isFinite(val))
-                setSpread({
-                  ...spread,
-                  amount: unit === 'mm' ? val : unit === 'in' ? val * 25.4 : val * 10,
-                });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applySpread();
-              if (e.key === 'Escape') setSpread(null);
-            }}
-            data-testid="spread-amount"
+        <FloatingBar testId="spread-bar">
+          {spread.dir.x ? 'Lengthen' : 'Widen'} at {spread.points.length} line
+          {spread.points.length > 1 ? 's' : ''} by
+          <NumberInput
+            label="Spread amount"
+            mm={spread.amount}
+            unit={unit}
+            allowNegative
+            onCommit={(mm) => setSpread({ ...spread, amount: mm })}
+            onEnter={(mm) => commitSpread(mm ?? undefined)}
+            testId="spread-amount"
           />
           {unit}
-          <button
-            type="button"
-            className="rounded bg-primary px-2 py-0.5 text-primary-foreground"
-            onClick={applySpread}
-            data-testid="spread-apply"
-          >
+          <BarButton primary onClick={() => commitSpread()} testId="spread-apply">
             Apply
-          </button>
-          <button
-            type="button"
-            className="rounded border px-2 py-0.5"
-            onClick={() => setSpread(null)}
-          >
-            Cancel
-          </button>
-        </div>
+          </BarButton>
+          <BarButton onClick={() => setSpread({ ...spread, points: spread.points.slice(0, -1) })}>
+            Remove last line
+          </BarButton>
+          <BarButton onClick={() => setSpread(null)}>Cancel</BarButton>
+        </FloatingBar>
+      ) : null}
+      {tool === 'scale' && base && editable ? (
+        <ScaleBar piece={base} unit={unit} onCommit={onCommit} />
+      ) : null}
+      {tool === 'rotate' && base && editable ? (
+        <RotateBar
+          piece={base}
+          onCommit={(p, l) => onCommit({ ...p, canvas: base.canvas ?? offset(base) }, l)}
+        />
+      ) : null}
+      {seam && seamPiece && editable ? (
+        <SeamBar
+          piece={pieces.find((p) => p.pieceId === seam.pieceId) ?? seamPiece}
+          edge={seam.edge}
+          unit={unit}
+          onCommit={onCommit}
+          onClose={() => setSeam(null)}
+        />
       ) : null}
       {overlay}
     </div>
   );
 }
 
-function SpreadLine({
+// ── tool bars ─────────────────────────────────────────────────────────────────
+
+function FloatingBar({ children, testId }: { children: ReactNode; testId?: string }) {
+  return (
+    <div
+      className="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-1 text-[12px] shadow"
+      data-testid={testId}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BarButton({
+  children,
+  onClick,
+  primary,
+  testId,
+  title,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+  testId?: string;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      className={cn(
+        'rounded px-2 py-0.5',
+        primary ? 'bg-primary text-primary-foreground' : 'border hover:bg-accent',
+      )}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      {children}
+    </button>
+  );
+}
+
+const toUnit = (mm: number, unit: Unit) => fmt(mm, unit);
+const fromUnit = (v: number, unit: Unit) => (unit === 'mm' ? v : unit === 'in' ? v * 25.4 : v * 10);
+
+/** A length typed in the current unit; commits on Enter / blur. */
+function NumberInput({
+  label,
+  mm,
+  unit,
+  onCommit,
+  onEnter,
+  allowNegative,
+  testId,
+  width = 'w-20',
+}: {
+  label: string;
+  mm: number;
+  unit: Unit;
+  onCommit: (mm: number) => void;
+  /** Enter: called with the value just typed (null when nothing changed). */
+  onEnter?: (mm: number | null) => void;
+  allowNegative?: boolean;
+  testId?: string;
+  width?: string;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const commit = (): number | null => {
+    if (text === null) return null;
+    const val = Number(text.replace(',', '.'));
+    setText(null);
+    if (!Number.isFinite(val) || (!allowNegative && val <= 0)) return null;
+    const mm = Math.round(fromUnit(val, unit) * 100) / 100;
+    onCommit(mm);
+    return mm;
+  };
+  return (
+    <input
+      className={cn('h-6 rounded border px-1 text-right tabular-nums', width)}
+      aria-label={label}
+      inputMode="decimal"
+      value={text ?? toUnit(mm, unit)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          const mm = commit();
+          onEnter?.(mm);
+        }
+        if (e.key === 'Escape') setText(null);
+      }}
+      data-testid={testId}
+    />
+  );
+}
+
+/** Scale tool: exact width / height with an aspect lock and an anchor. */
+function ScaleBar({
+  piece,
+  unit,
+  onCommit,
+}: {
+  piece: PatternPiece;
+  unit: Unit;
+  onCommit: (piece: PatternPiece, label: string) => void;
+}) {
+  const b = pieceBounds(piece);
+  const [lock, setLock] = useState(true);
+  const [anchor, setAnchor] = useState<'top-left' | 'centre'>('top-left');
+  const apply = (w: number, h: number) => {
+    const sx = w / b.width;
+    const sy = h / b.height;
+    const a = anchor === 'centre' ? { x: b.cx, y: b.cy } : { x: b.x, y: b.y };
+    onCommit(
+      { ...scalePieceFrom(piece, sx, sy, a), ...(piece.canvas ? { canvas: piece.canvas } : {}) },
+      `Scale ${piece.name} to ${fmt(w, unit)} × ${fmt(h, unit)} ${unit}`,
+    );
+  };
+  return (
+    <FloatingBar testId="scale-bar">
+      Scale {piece.name}: W
+      <NumberInput
+        label="Scaled width"
+        mm={b.width}
+        unit={unit}
+        onCommit={(w) => apply(w, lock ? (b.height * w) / b.width : b.height)}
+        testId="scale-width"
+      />
+      H
+      <NumberInput
+        label="Scaled height"
+        mm={b.height}
+        unit={unit}
+        onCommit={(h) => apply(lock ? (b.width * h) / b.height : b.width, h)}
+        testId="scale-height"
+      />
+      {unit}
+      <label className="flex items-center gap-1">
+        <input
+          type="checkbox"
+          checked={lock}
+          onChange={(e) => setLock(e.target.checked)}
+          data-testid="scale-lock"
+        />
+        keep proportions
+      </label>
+      <select
+        className="h-6 rounded border px-1"
+        aria-label="Scale from"
+        value={anchor}
+        onChange={(e) => setAnchor(e.target.value as 'top-left' | 'centre')}
+      >
+        <option value="top-left">from top-left</option>
+        <option value="centre">from centre</option>
+      </select>
+    </FloatingBar>
+  );
+}
+
+/** Rotate tool: exact angle, 90° turns and flips. */
+function RotateBar({
+  piece,
+  onCommit,
+}: {
+  piece: PatternPiece;
+  onCommit: (piece: PatternPiece, label: string) => void;
+}) {
+  const [text, setText] = useState('');
+  const rotate = (deg: number) => {
+    if (!Number.isFinite(deg) || Math.abs(deg) < 0.01) return;
+    onCommit(rotatePiece(piece, deg), `Rotate ${piece.name} ${deg > 0 ? '+' : ''}${deg}°`);
+  };
+  return (
+    <FloatingBar testId="rotate-bar">
+      Rotate {piece.name}
+      <input
+        className="h-6 w-16 rounded border px-1 text-right"
+        aria-label="Rotate by degrees"
+        inputMode="decimal"
+        placeholder="°"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            rotate(Number(text.replace(',', '.')));
+            setText('');
+          }
+        }}
+        data-testid="rotate-input"
+      />
+      °
+      <BarButton onClick={() => rotate(-90)} testId="rotate-left-90">
+        ⟲ 90°
+      </BarButton>
+      <BarButton onClick={() => rotate(90)} testId="rotate-right-90">
+        ⟳ 90°
+      </BarButton>
+      <BarButton onClick={() => rotate(180)}>180°</BarButton>
+    </FloatingBar>
+  );
+}
+
+/** Seam tool: exact length (moving the end or start point) and the seam's allowance. */
+function SeamBar({
+  piece,
+  edge,
+  unit,
+  onCommit,
+  onClose,
+}: {
+  piece: PatternPiece;
+  edge: string;
+  unit: Unit;
+  onCommit: (piece: PatternPiece, label: string) => void;
+  onClose: () => void;
+}) {
+  const path = ensurePath(piece);
+  const length = pathEdgeLength(path, edge);
+  const [end, setEnd] = useState<'end' | 'start'>('end');
+  const label = EDGE_LABELS[edge] ?? edge.replaceAll('_', ' ');
+  const sa = piece.allowances?.[edge] ?? piece.seamAllowanceMm ?? 0;
+  return (
+    <FloatingBar testId="seam-bar">
+      <span className="font-medium">{label}</span> of {piece.name}: length
+      <NumberInput
+        label="Seam length"
+        mm={length}
+        unit={unit}
+        onCommit={(mm) =>
+          onCommit(
+            setEdgeLength(piece, edge, mm, end),
+            `Set the ${label} of ${piece.name} to ${fmt(mm, unit)} ${unit}`,
+          )
+        }
+        testId="seam-length"
+      />
+      {unit}
+      <select
+        className="h-6 rounded border px-1"
+        aria-label="Point that moves"
+        value={end}
+        onChange={(e) => setEnd(e.target.value as 'end' | 'start')}
+      >
+        <option value="end">move the end</option>
+        <option value="start">move the start</option>
+      </select>
+      · seam allowance
+      <input
+        className="h-6 w-14 rounded border px-1 text-right"
+        aria-label="Seam allowance (mm)"
+        type="number"
+        min={0}
+        max={100}
+        defaultValue={sa}
+        key={`${piece.pieceId}-${edge}-${sa}`}
+        onKeyDown={(e) => e.stopPropagation()}
+        onBlur={(e) => {
+          const v = Number(e.target.value);
+          if (!Number.isFinite(v) || v < 0 || v > 100 || v === sa) return;
+          const rest = { ...(piece.allowances ?? {}) };
+          if (v === (piece.seamAllowanceMm ?? 0)) delete rest[edge];
+          else rest[edge] = v;
+          onCommit(
+            { ...piece, allowances: rest },
+            `Seam allowance of the ${label} of ${piece.name}: ${v} mm`,
+          );
+        }}
+        data-testid="seam-allowance"
+      />
+      mm
+      <BarButton onClick={onClose}>Done</BarButton>
+    </FloatingBar>
+  );
+}
+
+/** One named seam drawn over the piece (seam tool). */
+function EdgeHighlight({
+  piece,
+  edge,
+  offset,
+  color,
+  width,
+  testId,
+}: {
+  piece: PatternPiece;
+  edge: string;
+  offset: Pt;
+  color: string;
+  width: number;
+  testId?: string;
+}) {
+  const e = piece.edges?.filter((x) => x.name === edge) ?? [];
+  const n = piece.outline.length;
+  const polys = e.map((ed) => {
+    const pts = [piece.outline[ed.from]!];
+    for (let i = ed.from, g = 0; i !== ed.to && g < n; g++) {
+      i = (i + 1) % n;
+      pts.push(piece.outline[i]!);
+    }
+    return pts;
+  });
+  return (
+    <g transform={`translate(${offset.x} ${offset.y})`} pointerEvents="none" data-testid={testId}>
+      {polys.map((pts, i) => (
+        <polyline
+          key={i}
+          points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
+          fill="none"
+          stroke={color}
+          strokeWidth={width}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  );
+}
+
+function SpreadLines({
   spread,
   offset,
   visible,
   k,
   unit,
 }: {
-  spread: { line: CutLine; amount: number };
+  spread: Spread;
   offset: Pt;
   visible: { x0: number; x1: number; y0: number; y1: number };
   k: number;
   unit: Unit;
 }) {
-  const p = { x: spread.line.point.x + offset.x, y: spread.line.point.y + offset.y };
-  const horiz = !!spread.line.dir.x;
-  const nrm = { x: -spread.line.dir.y, y: spread.line.dir.x };
-  const q = { x: p.x + nrm.x * spread.amount, y: p.y + nrm.y * spread.amount };
+  const horiz = !!spread.dir.x;
+  const nrm = { x: -spread.dir.y, y: spread.dir.x };
+  const each = spread.amount / Math.max(1, spread.points.length);
   return (
     <g pointerEvents="none" data-testid="spread-line">
-      <line
-        x1={horiz ? visible.x0 : p.x}
-        y1={horiz ? p.y : visible.y0}
-        x2={horiz ? visible.x1 : p.x}
-        y2={horiz ? p.y : visible.y1}
-        stroke="#db2777"
-        strokeWidth={1.5}
-        strokeDasharray="6 4"
-        vectorEffect="non-scaling-stroke"
-      />
-      <line
-        x1={horiz ? visible.x0 : q.x}
-        y1={horiz ? q.y : visible.y0}
-        x2={horiz ? visible.x1 : q.x}
-        y2={horiz ? q.y : visible.y1}
-        stroke="#db2777"
-        strokeWidth={1}
-        vectorEffect="non-scaling-stroke"
-      />
-      <text x={q.x + 6 * k} y={q.y - 6 * k} fontSize={12 * k} fill="#db2777">
-        {spread.amount >= 0 ? '+' : ''}
-        {fmt(spread.amount, unit)} {unit}
-      </text>
+      {spread.points.map((pt, i) => {
+        const p = { x: pt.x + offset.x, y: pt.y + offset.y };
+        const q = { x: p.x + nrm.x * each, y: p.y + nrm.y * each };
+        return (
+          <g key={i}>
+            <line
+              x1={horiz ? visible.x0 : p.x}
+              y1={horiz ? p.y : visible.y0}
+              x2={horiz ? visible.x1 : p.x}
+              y2={horiz ? p.y : visible.y1}
+              stroke="#db2777"
+              strokeWidth={1.5}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+            />
+            {Math.abs(each) > 0.05 ? (
+              <text x={q.x + 6 * k} y={q.y - 6 * k} fontSize={12 * k} fill="#db2777">
+                {each >= 0 ? '+' : ''}
+                {fmt(each, unit)} {unit}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
     </g>
   );
 }

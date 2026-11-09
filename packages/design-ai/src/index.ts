@@ -15,3 +15,4 @@ export * from './techpack-html.js';
 export * from './fake-responders.js';
 export * from './sketch.js';
 export * from './techpack-pattern.js';
+export * from './look.js';

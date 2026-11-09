@@ -143,11 +143,11 @@ export function meteredProvider(inner: AiProvider, record: UsageSink): AiProvide
 }
 
 /** One AI processing record per provider call (ADR-057): operation, subject, attempt, error. */
-function usageRecorder(
+export function usageRecorder(
   prisma: PrismaClient,
   organizationId: string,
   jobId: string,
-  subject: { type: 'design_analysis' | 'tech_pack'; id: string },
+  subject: { type: 'design_analysis' | 'tech_pack' | 'design_look'; id: string },
 ): UsageSink {
   const attempts = new Map<string, number>();
   return async (usage, outcome, error) => {
@@ -226,7 +226,7 @@ async function loadCatalog(
  * busy and capability-safe fallback to other compatible models. Every call is metered; the
  * returned `history` is stored with the result.
  */
-async function studioProvider(
+export async function studioProvider(
   deps: AiStudioDeps,
   organizationId: string,
   requested: string,
@@ -273,7 +273,7 @@ async function studioProvider(
   return Object.assign(router, { chains });
 }
 
-function errorOf(err: unknown): {
+export function errorOf(err: unknown): {
   message: string;
   kind: string | null;
   history?: AttemptRecord[];
@@ -306,7 +306,7 @@ function errorBase(err: unknown): { message: string; kind: string | null } {
 }
 
 /** Loads an asset of the organization and returns a provider-friendly image (≤ 1600 px). */
-async function loadImage(
+export async function loadImage(
   deps: AiStudioDeps,
   organizationId: string,
   assetId: string,
@@ -336,7 +336,7 @@ async function loadImage(
   };
 }
 
-async function storeImage(
+export async function storeImage(
   deps: AiStudioDeps,
   input: {
     organizationId: string;

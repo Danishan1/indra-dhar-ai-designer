@@ -55,6 +55,7 @@ export const TASK_OPERATION: Record<AiTask, AiOperation> = {
   image_mannequin: 'image_generation',
   image_model: 'image_generation',
   image_component: 'image_generation',
+  image_look_view: 'image_generation',
 };
 
 export interface DiscoveredModel {

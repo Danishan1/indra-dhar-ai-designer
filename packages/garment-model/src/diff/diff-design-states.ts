@@ -69,6 +69,11 @@ export interface DesignDiff {
     /** Same binding, different pinned revision. */
     repinned: { componentId: string; artifactId: string; before: string; after: string }[];
   };
+  /**
+   * Pattern-first designs: the pattern spec and pieces (by name). Canvas placement is layout only
+   * and not counted. Semantic — editing a pattern changes the garment.
+   */
+  patterns: { specChanged: boolean; added: string[]; removed: string[]; changed: string[] };
   /** Non-semantic: metadata keys, annotations, provenance, schema version. */
   metadata: { changedKeys: string[]; fields: FieldChange[] };
   hasChanges: boolean;
@@ -271,7 +276,29 @@ export function diffDesignStates(a: GarmentDesignState, b: GarmentDesignState): 
     .sort();
   const metaFields = diffFields(a, b, ['annotationsRef', 'provenance', 'schemaVersion'] as const);
 
+  const piecesBefore = a.patternPieces ?? [];
+  const piecesAfter = b.patternPieces ?? [];
+  const pieceDiff = diffById(piecesBefore, piecesAfter, (p) => p.pieceId);
+  const geometry = (p: (typeof piecesAfter)[number]) => {
+    const { canvas: _c, ...rest } = p;
+    return rest;
+  };
+  const patterns = {
+    specChanged: !same(a.patternSpec ?? null, b.patternSpec ?? null),
+    added: pieceDiff.added.map((p) => p.name),
+    removed: pieceDiff.removed.map((p) => p.name),
+    changed: pieceDiff.pairs
+      .filter(([x, y]) => !same(geometry(x), geometry(y)))
+      .map(([, y]) => y.name),
+  };
+  const patternsChanged =
+    patterns.specChanged ||
+    patterns.added.length > 0 ||
+    patterns.removed.length > 0 ||
+    patterns.changed.length > 0;
+
   const hasSemanticChanges =
+    patternsChanged ||
     stateFields.length > 0 ||
     comps.added.length > 0 ||
     comps.removed.length > 0 ||
@@ -291,6 +318,7 @@ export function diffDesignStates(a: GarmentDesignState, b: GarmentDesignState): 
     relationships: { added: rels.added, removed: rels.removed, changed: relChanged },
     constraints: { added: csts.added, removed: csts.removed, changed: cstChanged },
     artifactRefs: { added: artifactAdded, removed: artifactRemoved, repinned },
+    patterns,
     metadata: { changedKeys: metaKeys, fields: metaFields },
     hasChanges: hasSemanticChanges || hasNonSemantic,
     hasSemanticChanges,

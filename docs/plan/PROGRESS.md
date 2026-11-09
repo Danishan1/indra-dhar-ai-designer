@@ -135,6 +135,22 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-09 — Tool roadmap + look preview (owner request) — DONE
+
+- Request: record the agreed tool list/order for future tool work; build a "see the final look" button that draws the garment from the on-screen patterns (front, back, left, right) and keeps each look with its patterns so earlier variations can be reopened.
+- Built: ADR-063 roadmap in `docs/plan/10-editor-tools-roadmap.md` (linked from CLAUDE.md + plan README). ADR-064: `design_looks` + module `looks` (POST/GET looks, GET look), job `look.generate` (`apps/worker/src/jobs/look.ts`, prompt in `design-ai/src/look.ts`), task `image_look_view`; editor Preview look button (commits first) and Looks tab (views, viewer, current/restored, compare, use these patterns). **Fix:** pattern spec/pieces now count in `semanticView` and `diffDesignStates` (pattern-only edits could not be committed before; tech pack commit-first was affected too).
+- Tests: design-ai look prompt, garment-model semantic hash + diff with patterns, integration (looks API, permissions, tenant isolation, asset reference), e2e "look preview" (commit, 4 views, viewer, second look, restore). `pnpm verify`, integration (152) and e2e (33) green.
+- **Owner actions:** `pnpm install`, **`pnpm db:migrate`** (migration `20261109100000_design_looks`), restart `pnpm dev`. Use a real image provider to judge the drawings (the demo provider draws placeholders).
+- **Next step:** owner tries looks with a real provider and tunes the prompt; then Phase 1 of the tool roadmap (pencil tools).
+
+### 2026-11-09 — Pattern editor tools (owner request) — DONE
+
+- Request: tools must behave exactly as named and switch cleanly; more tools; categories on top with a left tool rail; a space-optimised rearrangement; expand a whole structure (30 → 40 cm) not only points; restore history and the other right-panel features.
+- Built (ADR-062): 15 tools in 7 categories (`cad/tools.ts`), rewritten canvas with per-tool pointer behaviour and a reset on every tool switch; scale (handles/typed), spread at chosen lines, size by measurement with redraft (`blocks/levers.ts`), rotate/flip, seam length + SA, notches, grain; pack on fabric width / tidy (`packCanvas`, one undo step); right panel tabs Pattern · History · Changes · Validation · Sketch.
+- Tests: pattern-model levers (fit by measurement, anchored scale + 2-line spread, packing without overlap); e2e "pattern editor tools" (categories, keys, scale + undo, spread, switch cancels, fit, seam SA, notch, rotate, pack, panels). `pnpm verify` green; ai-studio e2e 4/4.
+- **Owner actions:** restart `pnpm dev` (no migration).
+- **Next step:** owner tries the tools; tune packing (nesting/rotation 180°) and lever suggestions from feedback.
+
 ### 2026-11-08 — "How it works" guide for the owner — DONE
 
 - Request: a docs folder explaining how the product works today — the journey, each component, the services they use and how each works — so the owner can propose strategy against the existing model.

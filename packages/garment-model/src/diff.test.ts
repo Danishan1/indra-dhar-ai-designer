@@ -194,4 +194,27 @@ describe('diffDesignStates (AC5, DSN-011)', () => {
       'missing',
     );
   });
+
+  it('counts pattern edits as semantic, not canvas placement (ADR-064)', () => {
+    const piece = {
+      pieceId: 'pat_aaaaaaaa',
+      componentId: 'cmp_aaaaaaaa',
+      name: 'Back',
+      outline: [
+        { x: 0, y: 0 },
+        { x: 200, y: 0 },
+        { x: 200, y: 600 },
+      ],
+    } as unknown as NonNullable<ReturnType<typeof shirt>['patternPieces']>[number];
+    const a = { ...shirt(), patternPieces: [piece] };
+    const moved = { ...a, patternPieces: [{ ...piece, canvas: { x: 9, y: 9 } }] };
+    expect(diffDesignStates(a, moved).hasChanges).toBe(false);
+    const longer = {
+      ...a,
+      patternPieces: [{ ...piece, outline: [...piece.outline.slice(0, 2), { x: 200, y: 650 }] }],
+    };
+    const d = diffDesignStates(a, longer);
+    expect(d.hasSemanticChanges).toBe(true);
+    expect(d.patterns).toEqual({ specChanged: false, added: [], removed: [], changed: ['Back'] });
+  });
 });

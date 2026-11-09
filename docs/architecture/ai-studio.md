@@ -36,9 +36,17 @@ Sketch → **Component 1** (AI reads) → pattern engine → **Component 2** (pa
 | Canvas: rulers, grid, zoom/1:1, snapping, tools, overlays                                                                                  | `web/features/patterns/cad/pattern-cad.tsx`            |
 | Toolbar, calibration, inspector (transform, points, seam lengths, numeric lengthen/widen)                                                  | `web/features/editor/patterns/pattern-workspace.tsx`   |
 
-Keys (canvas focused): V select · A points · M measure · L lengthen · W widen · H / Space pan ·
-0 fit · 1 true size · +/− zoom · arrows nudge (Shift ×10, Alt ×0.1) · Delete points · Enter apply
-spread · Esc cancel. Undo/redo stay global (Ctrl+Z / Ctrl+Shift+Z).
+Tools (ADR-062) are defined in `web/features/patterns/cad/tools.ts` (category, key, hint); the
+chrome (category bar, tool rail, options strip, arrange/view/fit options) is in
+`web/features/editor/patterns/cad-chrome.tsx`, shared editor context and the multi-piece commit
+(`useEditPieces`, one undo group) in `pattern-ui.tsx`, the right panel tabs in
+`pattern-right-panel.tsx`. Engine helpers: `scalePieceFrom`, `spreadAtLines` (`cad/path.ts`),
+`packCanvas` (`cut.ts`), `measurementLevers` / `suggestLevers` / `solveLever` (`blocks/levers.ts`).
+
+Keys (canvas focused): V select · H pan · A points · P add point · X delete point · C convert ·
+S scale · L lengthen · W widen · F size by measurement · R rotate · M measure · E seam · N notch ·
+G grain · 0 fit · 1 true size · +/− zoom · arrows nudge (Shift ×10, Alt ×0.1) · Enter apply ·
+Esc cancel, Esc again → select. Undo/redo stay global (Ctrl+Z / Ctrl+Shift+Z).
 
 Size charts are approximations to start from — every measurement is editable. Pieces edited by
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
@@ -77,6 +85,19 @@ The tech pack of a pattern-first design adds a **Cutting layout** page per fabri
 % used — a planning estimate, not a production marker), takes the fabric yardage from it, lists
 per-seam allowances, and uses the deterministic sewing order when the AI drafts no notes (the AI
 gets it as context either way).
+
+### Look preview (ADR-064)
+
+| Piece                                                                                                                                                                                     | Where                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `design_looks` (one row per look: revision, style, note, status/stage, `views[]` = `{view, assetId, note}`), routes, preflight (4 image calls, `image_generation`)                        | `apps/api/src/modules/looks` — `POST/GET /designs/:designId/looks`, `GET /looks/:lookId` |
+| Job `look.generate`: verify the revision, pattern sheet PNG (`patternSheetSvg`), sketch, 4 × `image_look_view` (front image fed back for the other views), store each view as it is ready | `apps/worker/src/jobs/look.ts`                                                           |
+| Prompt: pieces with size/cut, edited pieces, description from the spec, style (sketch / realistic), view                                                                                  | `packages/design-ai/src/look.ts` (`lookPrompt`, `lookPieceList`)                         |
+| Preview look button (commits uncommitted patterns first), Looks tab (views, zoom, current/restored, compare, restore)                                                                     | `web/features/editor/looks/`                                                             |
+
+A look is tied to an immutable revision, so restoring that revision brings its patterns back.
+Pattern edits are semantic (`semanticView` and `diffDesignStates` include `patternSpec` and
+`patternPieces`, minus canvas placement), otherwise pattern-only edits could not be committed.
 
 ## Reconstruct, don't crop (ADR-057)
 

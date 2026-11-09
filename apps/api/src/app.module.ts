@@ -9,6 +9,7 @@ import { AuthorizationModule } from './modules/authorization/authorization.modul
 import { DesignsModule } from './modules/designs/designs.module.js';
 import { DevExamplesModule } from './modules/dev-examples/dev-examples.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { LooksModule } from './modules/looks/looks.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
 import { OrganizationsModule } from './modules/organizations/organizations.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
@@ -42,6 +43,7 @@ const FEATURE_MODULES: DynamicModule['imports'] = [
   AiModule,
   AnalysisModule,
   TechPacksModule,
+  LooksModule,
   OrganizationsModule,
 ];
 

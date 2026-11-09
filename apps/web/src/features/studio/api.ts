@@ -8,7 +8,11 @@ import {
   type CreateDesignFromAnalysisRequest,
   createDesignFromAnalysisRequestSchema,
   createDesignFromAnalysisResponseSchema,
+  type CreateLookRequest,
+  createLookRequestSchema,
   type CreateTechPackRequest,
+  lookListResponseSchema,
+  lookSchema,
   createTechPackRequestSchema,
   techPackListResponseSchema,
   techPackSchema,
@@ -104,6 +108,18 @@ export const studioApi = {
       body: createTechPackRequestSchema.parse(body),
       schema: techPackSummarySchema,
       idempotencyKey,
+    }),
+  createLook: (orgId: string, designId: string, body: CreateLookRequest, idempotencyKey: string) =>
+    apiRequest(`${org(orgId)}/designs/${encodeURIComponent(designId)}/looks`, {
+      method: 'POST',
+      body: createLookRequestSchema.parse(body),
+      schema: lookSchema,
+      idempotencyKey,
+    }),
+  looks: (orgId: string, designId: string, signal?: AbortSignal) =>
+    apiRequest(`${org(orgId)}/designs/${encodeURIComponent(designId)}/looks`, {
+      schema: lookListResponseSchema,
+      ...withSignal(signal),
     }),
   techPacks: (orgId: string, designId: string, signal?: AbortSignal) =>
     apiRequest(`${org(orgId)}/designs/${encodeURIComponent(designId)}/techpacks`, {

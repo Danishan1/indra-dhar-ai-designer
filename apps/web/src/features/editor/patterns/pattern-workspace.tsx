@@ -1,6 +1,6 @@
 'use client';
 
-import { type PatternPiece, type PatternSpec, patternSpecSchema } from '@ai-designer/garment-model';
+import { type PatternPiece, patternSpecSchema } from '@ai-designer/garment-model';
 import {
   deleteNodes,
   draftPattern,
@@ -26,54 +26,45 @@ import {
   withPath,
 } from '@ai-designer/pattern-model';
 import {
-  DownloadIcon,
+  LayoutGridIcon,
+  PackageIcon,
   FlipHorizontal2Icon,
   FlipVertical2Icon,
-  Grid2x2CheckIcon,
-  Grid3x3Icon,
-  HandIcon,
-  ImageIcon,
-  MagnetIcon,
-  MinusIcon,
-  MousePointer2Icon,
-  MoveHorizontalIcon,
-  MoveVerticalIcon,
-  PanelRightCloseIcon,
-  PenToolIcon,
-  PlusIcon,
-  PrinterIcon,
   RotateCcwIcon,
   RotateCwIcon,
-  RulerDimensionLineIcon,
-  RulerIcon,
   ScissorsIcon,
-  SquareDashedIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { assetContentUrl } from '@/features/assets/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
-import {
-  type CadApi,
-  type CadSettings,
-  type CadTool,
-  PatternCad,
-} from '@/features/patterns/cad/pattern-cad';
+import { type CadApi, type CadSettings, PatternCad } from '@/features/patterns/cad/pattern-cad';
+import { TOOLS } from '@/features/patterns/cad/tools';
 import { GarmentStyleForms } from '@/features/patterns/garment-forms';
 import { fmt, type Unit } from '@/features/patterns/options';
-import {
-  ChecksList,
-  GarmentBasics,
-  MeasurementsForm,
-  UnitToggle,
-} from '@/features/patterns/pattern-forms';
+import { ChecksList, GarmentBasics, MeasurementsForm } from '@/features/patterns/pattern-forms';
 import { cn } from '@/lib/utils';
 
 import { useEditor } from '../store-context';
+
+import {
+  ArrangeOptions,
+  CategoryBar,
+  FitOptions,
+  OptionsStrip,
+  RailAction,
+  ToolRail,
+  TransformActions,
+  useArrange,
+  ViewOptions,
+} from './cad-chrome';
+import { PatternUiProvider, useEditPiece, usePatternUi, useRedraft } from './pattern-ui';
+
+export { PatternUiProvider };
 
 /**
  * Component 2 (ADR-058/059): the pattern editor — a small CAD for flat patterns. Pieces only, with
@@ -82,120 +73,6 @@ import { useEditor } from '../store-context';
  * curves with exact coordinates, lengthen/widen across a line, exact seam lengths, resize, rotate,
  * mirror, move. Every change is a design operation (undo, save, revisions). DXF and 1:1 print out.
  */
-
-interface PatternUi {
-  selected: string | null;
-  setSelected: (id: string | null) => void;
-  unit: Unit;
-  setUnit: (u: Unit) => void;
-  nodes: number[];
-  setNodes: (n: number[]) => void;
-  tool: CadTool;
-  setTool: (t: CadTool) => void;
-  settings: CadSettings;
-  setSettings: (s: CadSettings) => void;
-}
-const Ctx = createContext<PatternUi | null>(null);
-
-const CAL_KEY = 'aid.cad.pxPerMm';
-const DEFAULT_PX_PER_MM = 96 / 25.4;
-
-function readCalibration(): number {
-  try {
-    const v = Number(window.localStorage.getItem(CAL_KEY));
-    return v > 0.5 && v < 20 ? v : DEFAULT_PX_PER_MM;
-  } catch {
-    return DEFAULT_PX_PER_MM;
-  }
-}
-
-export function PatternUiProvider({ children }: { children: ReactNode }) {
-  const [selected, setSelectedRaw] = useState<string | null>(null);
-  const [unit, setUnit] = useState<Unit>('cm');
-  const [nodes, setNodes] = useState<number[]>([]);
-  const [tool, setTool] = useState<CadTool>('select');
-  const [settings, setSettingsRaw] = useState<CadSettings>(() => ({
-    snapGrid: false,
-    snapPoints: true,
-    showGrid: true,
-    showAllowance: true,
-    showDimensions: true,
-    pxPerMm: typeof window === 'undefined' ? DEFAULT_PX_PER_MM : readCalibration(),
-  }));
-  const setSelected = (id: string | null) => {
-    setSelectedRaw(id);
-    setNodes([]);
-  };
-  const setSettings = (next: CadSettings) => {
-    setSettingsRaw(next);
-    try {
-      window.localStorage.setItem(CAL_KEY, String(next.pxPerMm));
-    } catch {
-      // per-browser convenience only
-    }
-  };
-  return (
-    <Ctx.Provider
-      value={{
-        selected,
-        setSelected,
-        unit,
-        setUnit,
-        nodes,
-        setNodes,
-        tool,
-        setTool,
-        settings,
-        setSettings,
-      }}
-    >
-      {children}
-    </Ctx.Provider>
-  );
-}
-
-function usePatternUi(): PatternUi {
-  const v = useContext(Ctx);
-  if (!v) throw new Error('PatternUiProvider missing');
-  return v;
-}
-
-/** Redraft from a new spec and apply it as one operation. */
-function useRedraft() {
-  const state = useEditor((s) => s.display);
-  const apply = useEditor((s) => s.apply);
-  return (spec: PatternSpec, label: string, redraftEdited = false) => {
-    const draft = draftPattern(spec);
-    const next = draftToState(state, draft, { redraftEdited });
-    apply(
-      {
-        type: 'set_pattern_draft',
-        patternSpec: draft.spec,
-        components: next.components,
-        patternPieces: next.patternPieces,
-        garmentType: draft.garmentType,
-        garmentCategory: draft.category,
-      },
-      { label },
-    );
-  };
-}
-
-function useEditPiece() {
-  const state = useEditor((s) => s.display);
-  const apply = useEditor((s) => s.apply);
-  return (piece: PatternPiece, label: string, groupId?: string) => {
-    const own = (state.patternPieces ?? []).filter((p) => p.componentId === piece.componentId);
-    apply(
-      {
-        type: 'replace_pattern_pieces',
-        componentId: piece.componentId,
-        pieces: own.map((p) => (p.pieceId === piece.pieceId ? piece : p)),
-      },
-      { label, ...(groupId ? { groupId } : {}) },
-    );
-  };
-}
 
 // ── left: pieces ─────────────────────────────────────────────────────────────
 
@@ -273,15 +150,6 @@ export function PatternPieceList() {
 
 // ── centre: canvas + side reference ─────────────────────────────────────────
 
-const TOOLS: { tool: CadTool; label: string; key: string; icon: typeof MousePointer2Icon }[] = [
-  { tool: 'select', label: 'Select and move pieces', key: 'V', icon: MousePointer2Icon },
-  { tool: 'point', label: 'Edit points and curves', key: 'A', icon: PenToolIcon },
-  { tool: 'measure', label: 'Measure', key: 'M', icon: RulerIcon },
-  { tool: 'lengthen', label: 'Lengthen / shorten across a line', key: 'L', icon: MoveVerticalIcon },
-  { tool: 'widen', label: 'Widen / narrow across a line', key: 'W', icon: MoveHorizontalIcon },
-  { tool: 'pan', label: 'Pan (or hold Space)', key: 'H', icon: HandIcon },
-];
-
 export function PatternViewport() {
   const state = useEditor((s) => s.display);
   const designName = useEditor((s) => s.meta.design.name);
@@ -291,9 +159,9 @@ export function PatternViewport() {
     selected,
     setSelected,
     unit,
-    setUnit,
     tool,
     setTool,
+    category,
     settings,
     setSettings,
     nodes,
@@ -303,13 +171,14 @@ export function PatternViewport() {
   const { active } = useOrganization();
   const [refOpen, setRefOpen] = useState(true);
   const [calOpen, setCalOpen] = useState(false);
+  const [fabricCm, setFabricCm] = useState(150);
   const cad = useRef<CadApi | null>(null);
   const pieces = useMemo(() => state.patternPieces ?? [], [state.patternPieces]);
+  const piece = pieces.find((p) => p.pieceId === selected) ?? null;
+  const arrange = useArrange(pieces, fabricCm);
   const sources = (state.sources ?? []).filter(
     (s) => s.role === 'sketch' || s.role === 'reference',
   );
-  const toggle = (k: 'snapGrid' | 'snapPoints' | 'showGrid' | 'showAllowance' | 'showDimensions') =>
-    setSettings({ ...settings, [k]: !settings[k] });
   const exportDxf = () => {
     const blob = new Blob([piecesToDxf(pieces)], { type: 'application/dxf' });
     const url = URL.createObjectURL(blob);
@@ -333,146 +202,61 @@ export function PatternViewport() {
     );
     w.document.close();
   };
+  const options =
+    category === 'arrange' ? (
+      <ArrangeOptions
+        fabricCm={fabricCm}
+        onFabric={setFabricCm}
+        usedMm={arrange.packed.lengthMm}
+        unit={unit}
+        onPack={arrange.pack}
+        onTidy={arrange.tidy}
+        canEdit={canEdit}
+      />
+    ) : category === 'view' ? (
+      <ViewOptions
+        settings={settings}
+        onSettings={setSettings}
+        onCalibrate={() => setCalOpen((v) => !v)}
+        onPrint={() => print('a4')}
+        onDxf={exportDxf}
+        refOpen={refOpen}
+        onRef={() => setRefOpen((v) => !v)}
+        hasRef={sources.length > 0}
+      />
+    ) : tool === 'fit' ? (
+      <FitOptions spec={state.patternSpec!} piece={piece} unit={unit} canEdit={canEdit} />
+    ) : null;
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="pattern-workspace">
-      <div
-        className="flex flex-wrap items-center gap-1 border-b bg-panel/95 px-2 py-1 text-xs"
-        data-testid="cad-toolbar"
-      >
-        <div role="toolbar" aria-label="Pattern tools" className="flex rounded-md border p-0.5">
-          {TOOLS.map((t) => (
-            <Button
-              key={t.tool}
-              size="icon-sm"
-              variant="ghost"
-              title={`${t.label} (${t.key})`}
-              aria-label={t.label}
-              aria-pressed={tool === t.tool}
-              className={cn(tool === t.tool && 'bg-accent text-accent-foreground')}
-              disabled={
-                !canEdit && (t.tool === 'point' || t.tool === 'lengthen' || t.tool === 'widen')
-              }
-              onClick={() => setTool(t.tool)}
-              data-testid={`tool-${t.tool}`}
-            >
-              <t.icon />
-            </Button>
-          ))}
-        </div>
-        <UnitToggle unit={unit} onChange={setUnit} />
-        <div
-          className="flex rounded-md border p-0.5"
-          role="group"
-          aria-label="Snapping and display"
-        >
-          {(
-            [
-              ['snapPoints', 'Snap to points', MagnetIcon],
-              ['snapGrid', 'Snap to grid', Grid2x2CheckIcon],
-              ['showGrid', 'Show grid', Grid3x3Icon],
-              ['showAllowance', 'Show seam allowance', SquareDashedIcon],
-              ['showDimensions', 'Show dimensions on all pieces', RulerDimensionLineIcon],
-            ] as const
-          ).map(([k, label, Icon]) => (
-            <Button
-              key={k}
-              size="icon-sm"
-              variant="ghost"
-              title={label}
-              aria-label={label}
-              aria-pressed={settings[k]}
-              className={cn(settings[k] && 'bg-accent text-accent-foreground')}
-              onClick={() => toggle(k)}
-              data-testid={`toggle-${k}`}
-            >
-              <Icon />
-            </Button>
-          ))}
-        </div>
-        <div className="flex rounded-md border p-0.5" role="group" aria-label="Zoom">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs"
-            title="Fit all (0)"
-            onClick={() => cad.current?.zoomTo('fit')}
-            data-testid="zoom-fit"
-          >
-            Fit
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs"
-            title="True size (1)"
-            onClick={() => cad.current?.zoomTo('actual')}
-            data-testid="zoom-actual"
-          >
-            1:1
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Zoom out"
-            onClick={() => cad.current?.zoomTo('out')}
-          >
-            <MinusIcon />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Zoom in"
-            onClick={() => cad.current?.zoomTo('in')}
-          >
-            <PlusIcon />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs"
-            title="Calibrate true size for this screen"
-            onClick={() => setCalOpen((v) => !v)}
-            data-testid="calibrate"
-          >
-            Calibrate
-          </Button>
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-            onClick={() => print('a4')}
-            title="Print at true size on A4 (tiled)"
-            data-testid="print-1to1"
-          >
-            <PrinterIcon /> Print 1:1
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-            onClick={exportDxf}
-            title="DXF for pattern CAD software and plotters"
-            data-testid="export-dxf"
-          >
-            <DownloadIcon /> DXF
-          </Button>
-          {sources.length ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-xs"
-              onClick={() => setRefOpen((v) => !v)}
-              aria-pressed={refOpen}
-              data-testid="toggle-reference"
-            >
-              {refOpen ? <PanelRightCloseIcon /> : <ImageIcon />} Reference
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <CategoryBar canEdit={canEdit} cad={cad} />
+      <OptionsStrip>{options}</OptionsStrip>
       <div className="flex min-h-0 flex-1">
+        <ToolRail
+          canEdit={canEdit}
+          actions={
+            category === 'transform' ? (
+              <TransformActions piece={piece} canEdit={canEdit} />
+            ) : category === 'arrange' ? (
+              <>
+                <RailAction
+                  label="Pack on fabric"
+                  icon={PackageIcon}
+                  disabled={!canEdit}
+                  onClick={arrange.pack}
+                  testId="rail-pack"
+                />
+                <RailAction
+                  label="Tidy by part"
+                  icon={LayoutGridIcon}
+                  disabled={!canEdit}
+                  onClick={arrange.tidy}
+                  testId="rail-tidy"
+                />
+              </>
+            ) : null
+          }
+        />
         <div className="relative min-w-0 flex-1">
           <PatternCad
             pieces={pieces}
@@ -487,6 +271,11 @@ export function PatternViewport() {
             onNodes={setNodes}
             onCommit={(p, label, group) => edit(p, label, group)}
             apiRef={cad}
+            fabric={
+              category === 'arrange'
+                ? { x: 0, y: 0, width: fabricCm * 10, length: arrange.packed.lengthMm }
+                : null
+            }
             overlay={
               calOpen ? (
                 <Calibration
@@ -500,7 +289,7 @@ export function PatternViewport() {
         </div>
         {refOpen && sources.length ? (
           <aside
-            className="flex w-60 shrink-0 flex-col gap-2 overflow-auto border-l bg-muted/30 p-2"
+            className="flex w-56 shrink-0 flex-col gap-2 overflow-auto border-l bg-muted/30 p-2"
             aria-label="Reference"
             data-testid="reference-panel"
           >
@@ -1235,5 +1024,27 @@ function SpreadSection({
         spread.
       </p>
     </section>
+  );
+}
+
+/** Status bar of the pattern editor: connection, active tool, selection, pending saves. */
+export function PatternStatusBar() {
+  const online = useEditor((s) => s.save.online);
+  const pending = useEditor((s) => s.queue.queued.length + (s.queue.inFlight?.ops.length ?? 0));
+  const pieces = useEditor((s) => s.display.patternPieces ?? []);
+  const { tool, selected, nodes } = usePatternUi();
+  const piece = pieces.find((p) => p.pieceId === selected);
+  return (
+    <>
+      <span data-testid="connectivity">{online ? 'Online' : 'Offline — changes are kept'}</span>
+      <span data-testid="status-tool">{TOOLS[tool].label}</span>
+      <span>
+        {piece
+          ? `${piece.name}${nodes.length ? ` · ${nodes.length} point${nodes.length > 1 ? 's' : ''}` : ''}`
+          : 'Nothing selected'}
+      </span>
+      <span>{pieces.length} pieces</span>
+      {pending ? <span>{pending} pending</span> : null}
+    </>
   );
 }

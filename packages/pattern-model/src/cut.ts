@@ -298,3 +298,66 @@ export function edgeMidFrame(
   }
   return { p: outline[e.from]!, angle: 0, normal: { x: 0, y: -1 }, segment: e.from };
 }
+
+/**
+ * "Rearrange" (ADR-062): packs the pieces on the canvas within a fabric width — cut-line boxes,
+ * grain kept as drafted (vertical), biggest first, skyline (bottom-left) fill, `gap` mm between
+ * pieces. Returns canvas offsets per piece and the used length. Deterministic.
+ */
+export function packCanvas(
+  pieces: readonly (CutPiece & Pick<PatternPiece, 'pieceId'>)[],
+  opts: { widthMm?: number; gapMm?: number; origin?: { x: number; y: number } } = {},
+): { positions: Map<string, { x: number; y: number }>; lengthMm: number; widthMm: number } {
+  const gap = opts.gapMm ?? 20;
+  const boxes = pieces.map((p) => ({ p, b: cutBounds(p) }));
+  const widest = Math.max(1, ...boxes.map((x) => x.b.width + gap));
+  const W = Math.max(opts.widthMm ?? 1500, widest);
+  const ox = opts.origin?.x ?? 0;
+  const oy = opts.origin?.y ?? 0;
+  const order = [...boxes].sort(
+    (a, b) =>
+      b.b.height - a.b.height || b.b.width - a.b.width || a.p.pieceId.localeCompare(b.p.pieceId),
+  );
+  // Skyline across the width: segments [x, x+w) with their filled depth y.
+  let sky: { x: number; w: number; y: number }[] = [{ x: 0, w: W, y: 0 }];
+  const positions = new Map<string, { x: number; y: number }>();
+  let length = 0;
+  for (const { p, b } of order) {
+    const need = Math.min(b.width + gap, W);
+    let best: { x: number; y: number } | null = null;
+    for (let i = 0; i < sky.length; i++) {
+      let w = 0;
+      let y = 0;
+      for (let j = i; j < sky.length && w < need; j++) {
+        y = Math.max(y, sky[j]!.y);
+        w += sky[j]!.w;
+      }
+      if (w + 1e-6 < need) break;
+      if (!best || y < best.y - 1e-6) best = { x: sky[i]!.x, y };
+    }
+    const at = best ?? { x: 0, y: Math.max(...sky.map((s) => s.y)) };
+    positions.set(p.pieceId, { x: Math.round(ox + at.x - b.x), y: Math.round(oy + at.y - b.y) });
+    length = Math.max(length, at.y + b.height);
+    const x0 = at.x;
+    const x1 = Math.min(W, at.x + need);
+    const next: typeof sky = [];
+    for (const s of sky) {
+      const a = s.x;
+      const z = s.x + s.w;
+      if (z <= x0 || a >= x1) next.push(s);
+      else {
+        if (a < x0) next.push({ x: a, w: x0 - a, y: s.y });
+        if (z > x1) next.push({ x: x1, w: z - x1, y: s.y });
+      }
+    }
+    next.push({ x: x0, w: x1 - x0, y: at.y + b.height + gap });
+    next.sort((m, n) => m.x - n.x);
+    sky = next.reduce<typeof sky>((acc, s) => {
+      const last = acc[acc.length - 1];
+      if (last && Math.abs(last.y - s.y) < 1e-6) last.w += s.w;
+      else acc.push({ ...s });
+      return acc;
+    }, []);
+  }
+  return { positions, lengthMm: Math.round(length), widthMm: W };
+}

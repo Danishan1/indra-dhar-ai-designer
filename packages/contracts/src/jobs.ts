@@ -17,6 +17,8 @@ export const JobKinds = {
   designAnalysis: 'design.analysis',
   /** AI tech pack generation from a design revision (ADR-056). */
   techPackGenerate: 'techpack.generate',
+  /** Look preview: front/back/left/right views drawn from the pattern pieces (ADR-064). */
+  lookGenerate: 'look.generate',
 } as const;
 export type JobKind = (typeof JobKinds)[keyof typeof JobKinds] | (string & {});
 

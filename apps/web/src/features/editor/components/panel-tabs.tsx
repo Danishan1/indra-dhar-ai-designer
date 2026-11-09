@@ -38,7 +38,7 @@ export function PanelTabs<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="flex h-8 shrink-0 items-end gap-3 border-b px-3"
+      className="flex h-8 shrink-0 items-end gap-3 overflow-x-auto overflow-y-hidden border-b px-3 [scrollbar-width:none]"
     >
       {tabs.map((t) => (
         <button
@@ -59,7 +59,7 @@ export function PanelTabs<T extends string>({
             document.getElementById(`${name}-tab-${next}`)?.focus();
           }}
           className={cn(
-            '-mb-px border-b-2 pb-1.5 text-[11px] font-semibold tracking-wide uppercase',
+            '-mb-px shrink-0 border-b-2 pb-1.5 text-[11px] font-semibold tracking-wide whitespace-nowrap uppercase',
             tab === t.id
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',

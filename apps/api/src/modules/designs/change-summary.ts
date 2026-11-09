@@ -78,6 +78,11 @@ export function summarizeDiff(
     lines.push(
       `${nameOf(r.componentId)}: no longer uses artifact revision ${r.artifactRevisionId}`,
     );
+  const pat = diff.patterns;
+  if (pat.specChanged) lines.push('Pattern measurements or style changed');
+  if (pat.added.length) lines.push(`Added pattern pieces: ${pat.added.join(', ')}`);
+  if (pat.removed.length) lines.push(`Removed pattern pieces: ${pat.removed.join(', ')}`);
+  if (pat.changed.length) lines.push(`Pattern pieces changed: ${pat.changed.join(', ')}`);
   const rel = diff.relationships;
   if (rel.added.length) lines.push(`Added ${plural(rel.added.length, 'relationship')}`);
   if (rel.removed.length) lines.push(`Removed ${plural(rel.removed.length, 'relationship')}`);

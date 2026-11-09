@@ -87,7 +87,8 @@ export function canonicalize(state: GarmentDesignState): string {
 /**
  * The part of a state that describes the garment itself. Editor flags (`visible`, `locked`),
  * descriptive `metadata`, `annotationsRef`, `provenance` and `schemaVersion` are excluded
- * (DSN-007, FR-EDT-024).
+ * (DSN-007, FR-EDT-024). The pattern spec and pattern pieces are included (without canvas
+ * placement): editing a pattern is a change to the garment and must be committable.
  */
 export function semanticView(state: GarmentDesignState): Record<string, unknown> {
   const n = normalizeOrder(state);
@@ -97,6 +98,17 @@ export function semanticView(state: GarmentDesignState): Record<string, unknown>
     components: n.components.map(({ visible: _v, locked: _l, ...rest }) => rest),
     relationships: n.relationships,
     constraints: n.constraints,
+    // Pattern-first designs (ADR-064 fix): the patterns are the garment too. Only present when the
+    // design has them, so hashes of designs without patterns are unchanged. Where a piece sits on
+    // the canvas (`canvas`) is layout, not garment.
+    ...(state.patternSpec !== undefined ? { patternSpec: state.patternSpec } : {}),
+    ...(state.patternPieces?.length
+      ? {
+          patternPieces: sortBy(state.patternPieces, (p) => p.pieceId).map(
+            ({ canvas: _c, ...rest }) => rest,
+          ),
+        }
+      : {}),
   };
 }
 

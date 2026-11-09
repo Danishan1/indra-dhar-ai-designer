@@ -123,6 +123,10 @@ Two kinds of change (details on page 4):
 
 Every change is one **operation**, saved automatically; undo/redo works on operations.
 
+At any point **Preview look** commits the patterns and asks the image model to draw the garment
+from them — front, back, left and right. Every look is kept in the **Looks** tab with its revision,
+so the designer can compare variations and go back to the patterns of any earlier look (page 4).
+
 ## Step 7 — Commit and create the tech pack (Component 3)
 
 **Create tech pack** opens a dialog. If there are uncommitted changes, it offers to **commit them as

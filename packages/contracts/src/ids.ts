@@ -37,6 +37,8 @@ export const DisplayIdPrefixes = {
   // AI design analyzer and tech packs (ADR-056)
   analysis: 'ANL',
   techPack: 'TPK',
+  // Look previews from the patterns (ADR-064)
+  look: 'LOK',
 } as const;
 
 export type DisplayIdPrefix = (typeof DisplayIdPrefixes)[keyof typeof DisplayIdPrefixes];

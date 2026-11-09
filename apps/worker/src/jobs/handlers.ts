@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { type AiStudioDeps, designAnalysisHandler, techPackHandler } from './ai-studio.js';
 import type { JobHandler } from './durable-job-processor.js';
+import { lookHandler } from './look.js';
 
 const noopPayload = z.object({
   message: z.string().optional(),
@@ -46,6 +47,7 @@ export function createJobHandlers(deps: JobHandlerDeps = {}): Map<string, JobHan
     const ai: AiStudioDeps = { ...deps.aiStudio, assets: deps.assets };
     handlers.set(JobKinds.designAnalysis, designAnalysisHandler(ai));
     handlers.set(JobKinds.techPackGenerate, techPackHandler(ai));
+    handlers.set(JobKinds.lookGenerate, lookHandler(ai));
   }
   return handlers;
 }

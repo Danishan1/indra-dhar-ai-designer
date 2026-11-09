@@ -3,6 +3,7 @@ import type {
   AiStatus,
   Analysis,
   Design,
+  Look,
   Project,
   TechPack,
   TechPackSummary,
@@ -322,6 +323,51 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
       expect.arrayContaining(['neck', 'shoulder', 'armhole', 'side', 'waist']),
     );
     expect(front.draft).toMatchObject({ method: 'parametric', template: 'bodice_front' });
+
+    // Look preview (ADR-064): drawn from the patterns of the committed head revision.
+    const lookRes = await designer.post(`${org()}/designs/${out.design.id}/looks`, {
+      provider: 'fake',
+      note: 'first try',
+    });
+    expect(lookRes.status, await lookRes.clone().text()).toBe(201);
+    const look = await json<Look>(lookRes);
+    expect(look).toMatchObject({
+      status: 'queued',
+      style: 'sketch',
+      note: 'first try',
+      revisionLabel: 'R001',
+      designId: out.design.id,
+    });
+    expect(look.displayId).toMatch(/^LOK-/);
+    expect(look.views.map((v) => [v.view, v.assetId])).toEqual([
+      ['front', null],
+      ['back', null],
+      ['left', null],
+      ['right', null],
+    ]);
+    expect(
+      (
+        await prisma.job.findFirst({
+          where: { kind: 'look.generate' },
+          orderBy: { createdAt: 'desc' },
+        })
+      )?.payload,
+    ).toEqual({ lookId: look.id });
+    const looks = await json<{ items: Look[] }>(
+      await viewer.get(`${org()}/designs/${out.design.id}/looks`),
+    );
+    expect(looks.items.map((l) => l.id)).toEqual([look.id]);
+    expect((await viewer.get(`${org()}/looks/${look.id}`)).status).toBe(200);
+    expect((await viewer.post(`${org()}/designs/${out.design.id}/looks`, {})).status).toBe(403);
+    expect((await other.owner.client.get(`/v1/orgs/${orgId}/looks/${look.id}`)).status).toBe(404);
+    // A stored view is protected from deletion while the look references it.
+    const view = await uploadImage('front.png', '#dddddd');
+    await prisma.designLook.update({
+      where: { id: look.id },
+      data: { status: 'succeeded', views: [{ view: 'front', assetId: view, note: null }] },
+    });
+    const del = await t.owner.client.delete(`${org()}/assets/${view}`);
+    expect(del.status, await del.clone().text()).toBe(409);
   });
 
   it('rejects inputs that are not ready images and unconfigured providers', async () => {

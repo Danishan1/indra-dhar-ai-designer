@@ -316,6 +316,7 @@ model Organization {
   validationRuns    ValidationRun[]
   designAnalyses    DesignAnalysis[]
   techPacks         TechPack[]
+  looks             DesignLook[]
   aiUsageRecords    AiUsageRecord[]
   aiProviderConnections AiProviderConnection[]
   aiSettings        AiSettings?
@@ -609,6 +610,7 @@ model Design {
   operations             DesignOperation[]
   validationRuns         ValidationRun[]
   techPacks              TechPack[]
+  looks                  DesignLook[]
 
   @@unique([organizationId, displayId])
   @@index([organizationId, projectId, updatedAt])
@@ -674,6 +676,7 @@ model DesignRevision {
   design                 Design        @relation(fields: [designId], references: [id], onDelete: Restrict)
   workingCopies          WorkingCopy[] @relation("WorkingCopyBase")
   techPacks              TechPack[]
+  looks                  DesignLook[]
 
   @@unique([designId, revisionNumber])
   @@unique([organizationId, displayId])
@@ -965,6 +968,40 @@ model TechPack {
   @@index([designId])
   @@index([revisionId])
   @@map("tech_packs")
+}
+
+/// Look preview (ADR-064): the garment drawn from the patterns of one committed revision, from four
+/// sides (front, back, left, right). Restoring the revision brings those patterns back.
+model DesignLook {
+  id             String         @id @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  designId       String         @map("design_id") @db.Uuid
+  revisionId     String         @map("revision_id") @db.Uuid
+  displayId      String         @map("display_id")
+  /// queued | running | succeeded | failed
+  status         String
+  stage          String?
+  provider       String
+  /// sketch | realistic
+  style          String         @default("sketch")
+  note           String?
+  /// [{ view: front|back|left|right, assetId: uuid|null, note: string|null }]
+  views          Json           @default("[]")
+  jobId          String?        @map("job_id") @db.Uuid
+  error          Json?
+  createdBy      String?        @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(6)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  design         Design         @relation(fields: [designId], references: [id], onDelete: Restrict)
+  revision       DesignRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, displayId])
+  @@index([organizationId, designId, createdAt])
+  @@index([designId])
+  @@index([revisionId])
+  @@map("design_looks")
 }
 
 /// One AI provider call (ADR-056): simple usage log and daily preflight until metering (I24).

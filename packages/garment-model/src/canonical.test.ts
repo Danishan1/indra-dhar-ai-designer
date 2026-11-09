@@ -153,4 +153,36 @@ describe('semanticHash', () => {
     );
     expect(semanticHash(b)).not.toBe(semanticHash(a));
   });
+
+  it('counts pattern edits but not where a piece sits on the canvas', () => {
+    const piece = {
+      pieceId: 'pat_aaaaaaaa',
+      componentId: byType(shirt(), 'collar').componentId,
+      name: 'Back',
+      outline: [
+        { x: 0, y: 0 },
+        { x: 200, y: 0 },
+        { x: 200, y: 600 },
+      ],
+      seamAllowanceMm: 10,
+      grainline: null,
+      foldLine: null,
+      notches: [],
+      cutQuantity: 1,
+      mirrored: false,
+      fabricRole: 'main',
+      source: 'generated',
+      status: 'provisional',
+    } as unknown as NonNullable<ReturnType<typeof shirt>['patternPieces']>[number];
+    const a = { ...shirt(), patternPieces: [piece] };
+    const moved = { ...a, patternPieces: [{ ...piece, canvas: { x: 500, y: 40 } }] };
+    expect(semanticHash(moved)).toBe(semanticHash(a));
+    const longer = {
+      ...a,
+      patternPieces: [{ ...piece, outline: [...piece.outline.slice(0, 2), { x: 200, y: 640 }] }],
+    };
+    expect(semanticHash(longer)).not.toBe(semanticHash(a));
+    // Designs without patterns keep their hash.
+    expect(semanticHash({ ...shirt(), patternPieces: [] })).toBe(GOLDEN.semantic);
+  });
 });

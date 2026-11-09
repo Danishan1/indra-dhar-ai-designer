@@ -608,3 +608,31 @@ export function scalePiece(piece: Piece, sx: number, sy: number): Piece {
     sx * sy < 0,
   );
 }
+
+/**
+ * Scales around a fixed point (the anchor stays where it is) — the scale tool's box handles
+ * (ADR-062). Negative factors are refused (use mirror).
+ */
+export function scalePieceFrom(piece: Piece, sx: number, sy: number, anchor: Pt): Piece {
+  const fx = Math.max(0.05, sx);
+  const fy = Math.max(0.05, sy);
+  return mapPiece(
+    piece,
+    (p) => ({ x: anchor.x + (p.x - anchor.x) * fx, y: anchor.y + (p.y - anchor.y) * fy }),
+    false,
+  );
+}
+
+/**
+ * Spreads a piece at several parallel lines at once (ADR-062): the total `amount` is shared equally.
+ * Lines are applied from the far side of their common normal first, so each spread leaves the
+ * remaining lines where they were drawn.
+ */
+export function spreadAtLines(piece: Piece, lines: readonly CutLine[], amount: number): Piece {
+  if (!lines.length || Math.abs(amount) < 0.05) return piece;
+  const dir = norm(lines[0]!.dir);
+  const nrm = { x: -dir.y, y: dir.x };
+  const each = amount / lines.length;
+  const ordered = [...lines].sort((a, b) => dot(b.point, nrm) - dot(a.point, nrm));
+  return ordered.reduce((p, l) => spreadPiece(p, { point: l.point, dir }, each), piece);
+}

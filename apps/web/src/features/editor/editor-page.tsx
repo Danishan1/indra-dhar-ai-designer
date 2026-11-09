@@ -43,9 +43,11 @@ import { PanelTitle, Placeholder, ToolButton, WorkspaceLayout } from './editor-w
 import { useEditorShortcuts } from './hooks/use-editor-shortcuts';
 import { useUnsavedGuard } from './hooks/use-unsaved-guard';
 import { LeftPanelContent, LeftPanelTabs } from './library/left-panel';
+import { LookButton } from './looks/look-button';
+import { PatternRightContent, PatternRightTabs } from './patterns/pattern-right-panel';
 import {
   PatternPieceList,
-  PatternSidePanel,
+  PatternStatusBar,
   PatternUiProvider,
   PatternViewport,
 } from './patterns/pattern-workspace';
@@ -145,14 +147,14 @@ function Editor() {
           hierarchy={<PatternPieceList />}
           hierarchyHeader={<PanelTitle>Pattern pieces</PanelTitle>}
           viewport={<PatternViewport />}
-          properties={<PatternSidePanel />}
-          propertiesHeader={<PanelTitle>Pattern</PanelTitle>}
+          properties={<PatternRightContent changes={<HistoryList />} />}
+          propertiesHeader={<PatternRightTabs />}
           takeover={inspect ? <RevisionInspector inspect={inspect} /> : undefined}
           operations={<HistoryList />}
           validation={<ValidationPanel />}
           validationBadge={<ValidationTabCount />}
           jobs={<Placeholder>Generation jobs (I21).</Placeholder>}
-          statusBar={<StatusBar />}
+          statusBar={<PatternStatusBar />}
         />
         <ConflictDialog />
       </PatternUiProvider>
@@ -262,6 +264,7 @@ function EditorHeader() {
       ) : null}
       <div className="ml-auto flex items-center gap-2">
         <SaveStatusConnected />
+        <LookButton />
         <TechPackButton />
         <CommitButton />
       </div>
@@ -283,10 +286,18 @@ function WorkflowSteps() {
     { label: 'Tech pack', state: 'next' as const },
   ];
   return (
-    <ol aria-label="Design steps" className="hidden items-center gap-1 text-[11px] xl:flex" data-testid="workflow-steps">
+    <ol
+      aria-label="Design steps"
+      className="hidden items-center gap-1 text-[11px] xl:flex"
+      data-testid="workflow-steps"
+    >
       {steps.map((st, i) => (
         <li key={st.label} className="flex items-center gap-1">
-          {i ? <span className="text-muted-foreground" aria-hidden>›</span> : null}
+          {i ? (
+            <span className="text-muted-foreground" aria-hidden>
+              ›
+            </span>
+          ) : null}
           <span
             aria-current={st.state === 'current' ? 'step' : undefined}
             className={cn(

@@ -40,6 +40,7 @@ const OWNERS: Record<string, string | string[]> = {
   // ADR-056: the worker (apps/worker) also writes these three while running AI jobs.
   designAnalysis: 'modules/analysis',
   techPack: 'modules/techpacks',
+  designLook: 'modules/looks',
   aiUsageRecord: 'modules/ai',
   aiProviderConnection: 'modules/ai',
   aiSettings: 'modules/ai',

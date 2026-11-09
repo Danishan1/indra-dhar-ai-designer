@@ -56,6 +56,7 @@ export const queryKeys = {
       analysis: (analysisId: string) => [...all, 'analysis', analysisId] as const,
       techPacks: (designId: string) => [...all, 'design', designId, 'techpacks'] as const,
       techPack: (techPackId: string) => [...all, 'techpack', techPackId] as const,
+      looks: (designId: string) => [...all, 'design', designId, 'looks'] as const,
       compare: (designId: string, from: string, to: string) =>
         [...all, 'design', designId, 'compare', from, to] as const,
     };

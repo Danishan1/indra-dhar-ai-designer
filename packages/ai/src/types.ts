@@ -21,7 +21,9 @@ export type AiTask =
   | 'image_design_view'
   | 'image_mannequin'
   | 'image_model'
-  | 'image_component';
+  | 'image_component'
+  /** Look preview: the garment drawn from its pattern pieces (ADR-064). */
+  | 'image_look_view';
 
 export interface AiImageInput {
   /** image/png · image/jpeg · image/webp */

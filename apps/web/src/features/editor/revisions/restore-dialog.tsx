@@ -32,7 +32,7 @@ export function RestoreDialog({
   revision,
   onClose,
 }: {
-  revision: RevisionSummary | null;
+  revision: Pick<RevisionSummary, 'id' | 'displayId'> | null;
   onClose: () => void;
 }) {
   const { active } = useOrganization();
@@ -43,7 +43,7 @@ export function RestoreDialog({
   const uncommitted = useEditor((s) => s.server.hasUncommittedChanges);
   const [key, setKey] = useState(() => globalThis.crypto.randomUUID());
   const restore = useMutation({
-    mutationFn: async (r: RevisionSummary) => {
+    mutationFn: async (r: Pick<RevisionSummary, 'id' | 'displayId'>) => {
       await store.getState().flush();
       return api.restore(
         { revisionId: r.id, expectedVersion: store.getState().server.version },

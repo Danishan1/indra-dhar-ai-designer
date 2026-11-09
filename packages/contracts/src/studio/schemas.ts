@@ -152,6 +152,57 @@ export type TechPack = z.infer<typeof techPackSchema>;
 export const techPackListResponseSchema = z.object({ items: z.array(techPackSummarySchema) });
 export const techPackParamsSchema = z.object({ orgId: z.uuid(), techPackId: z.uuid() });
 
+// ── look previews (ADR-064) ──────────────────────────────────────────────────
+
+export const LookViews = ['front', 'back', 'left', 'right'] as const;
+export const lookViewSchema = z.enum(LookViews);
+export type LookView = z.infer<typeof lookViewSchema>;
+export const lookStyleSchema = z.enum(['sketch', 'realistic']);
+export type LookStyle = z.infer<typeof lookStyleSchema>;
+
+export const createLookRequestSchema = z.object({
+  /** Revision whose patterns are drawn; defaults to the latest committed revision. */
+  revisionId: z.uuid().optional(),
+  provider: aiProviderNameSchema.optional(),
+  /** sketch = fashion illustration (line drawing, light shading) · realistic = product render. */
+  style: lookStyleSchema.default('sketch'),
+  /** Short note shown with the look ("longer sleeves", "final?"). */
+  note: z.string().trim().max(200).optional(),
+});
+export type CreateLookRequest = z.input<typeof createLookRequestSchema>;
+
+export const lookViewImageSchema = z.object({
+  view: lookViewSchema,
+  assetId: z.uuid().nullable(),
+  /** Why the view is missing (provider error), when `assetId` is null. */
+  note: z.string().nullable(),
+});
+export type LookViewImage = z.infer<typeof lookViewImageSchema>;
+
+export const lookSchema = z.object({
+  id: z.uuid(),
+  displayId: z.string(),
+  designId: z.uuid(),
+  /** The committed patterns this look shows — restore it to get these patterns back. */
+  revisionId: z.uuid(),
+  revisionLabel: z.string(),
+  revisionDisplayId: z.string(),
+  status: studioJobStatusSchema,
+  stage: z.string().nullable(),
+  provider: aiProviderNameSchema,
+  style: lookStyleSchema,
+  note: z.string().nullable(),
+  views: z.array(lookViewImageSchema),
+  error: z.object({ message: z.string(), kind: z.string().nullable() }).nullable(),
+  createdBy: z.uuid().nullable(),
+  createdAt: isoDateTimeSchema,
+  completedAt: isoDateTimeSchema.nullable(),
+});
+export type Look = z.infer<typeof lookSchema>;
+
+export const lookListResponseSchema = z.object({ items: z.array(lookSchema) });
+export const lookParamsSchema = z.object({ orgId: z.uuid(), lookId: z.uuid() });
+
 // ── AI providers & models (ADR-057) ──────────────────────────────────────────
 
 export const AiOperationKeys = [

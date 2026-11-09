@@ -13,6 +13,7 @@ export * from './blocks/geom.js';
 export * from './blocks/draft-pattern.js';
 export * from './blocks/checks.js';
 export * from './blocks/state.js';
+export * from './blocks/levers.js';
 export {
   arcLength,
   bez,
