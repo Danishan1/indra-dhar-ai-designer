@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-10 — Start from a garment photo or a fabric (owner request) — DONE
+
+- Request: complete the three starting points. Photo/design (worn or not) → line sketch → sketch flow. Fabric → wearer (or AI decides) → garment suggestions → design (reference) + line sketch → sketch flow.
+- Built (ADR-066): analysis modes `photo` and `fabric` (no migration); worker steps with tasks `image_line_sketch`, `image_fabric_design`, `fabric_suggest` (`design-ai/src/starts.ts`); `POST /analyses/:id/fabric-choice`; start page modes, fabric suggestions page, review shows the generated sketch/design; design sources include them. `readSketch` takes image labels. Also: start phrase "Start pattern flats" for ADR-065.
+- Tests: design-ai starts (prompts, suggestions for a chosen/AI-decided wearer), integration (modes, limits, choose step: 409 before suggestions / while running, 400 bad index, 403 viewer, 404 other tenant), e2e `ai-starts.spec.ts` (photo → sketch → editor; fabric → suggestions → set → editor). `pnpm verify` green.
+- **Owner actions:** restart `pnpm dev` (no migration). Try both starts with a real provider (Gemini/OpenAI image model needed for the photo → sketch and fabric design steps).
+- **Next step:** owner tries the new starts; then "Start pattern flats" (ADR-065 session 1).
+
 ### 2026-11-09 — Plan: garment flats from the patterns (owner request) — PLANNED
 
 - Request: AI drawings (looks, line sketch, tech pack) are not accurate to the patterns; can we build the garment from the patterns without AI, live? Answer: yes — Option 1 (deterministic flats) now, Option 2 (3D cloth simulation) deferred.

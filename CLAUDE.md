@@ -16,7 +16,7 @@ Stack: TypeScript · pnpm + Turborepo · Next.js (web) · NestJS modular monolit
   - `08-session-playbook.md` — the protocol you follow every session.
   - `iterations/I<NN>-*.md` — what to build in each iteration.
   - `10-editor-tools-roadmap.md` — **the pattern editor tools to build and their order (ADR-063). Read before adding a tool; tick it off when shipped.**
-  - `11-pattern-flats.md` — **garment flats drawn from the patterns without AI (ADR-065): the plan and build order. Next build work.**
+  - `11-pattern-flats.md` — **garment flats drawn from the patterns without AI (ADR-065): the plan and build order. Start phrase: "Start pattern flats".**
   - `01-architecture.md`, `02-conventions.md`, `03-domain-model.md`, `05-decisions.md` — rules you must follow.
 - `docs/plan/claude-commands/` — source of the `/next-iteration`, `/finish-iteration`, `/handoff` slash commands (copy into `.claude/commands/`; I01 does this).
 - Code layout (as it gets created): `apps/web`, `apps/api`, `apps/worker`, `packages/*` (`contracts`, `db`, `logger`, `config`, …), `infra/*`, `tests/*`.

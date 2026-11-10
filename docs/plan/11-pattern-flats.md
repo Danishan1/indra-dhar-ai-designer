@@ -3,6 +3,9 @@
 **Status:** agreed with the owner on 2026-11-09 (Option 1); to be built from the next session.
 **Read this before starting.** Build in the order of §9 and tick items off here as they ship.
 
+**Start phrase:** when the owner says **"Start pattern flats"** (or "continue pattern flats"), pick
+the first `todo` session in §9 and build it.
+
 ## 1. Goal
 
 Draw the finished garment — front and back technical flats — **directly from the pattern pieces,

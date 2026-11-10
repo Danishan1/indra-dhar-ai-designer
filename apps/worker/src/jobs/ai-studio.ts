@@ -48,6 +48,12 @@ import {
   type Presentation,
   readSketch,
   patternDescription,
+  designToSketchPrompt,
+  type FabricAudience,
+  fabricDesignPrompt,
+  type FabricSuggestions,
+  photoToSketchPrompt,
+  suggestFromFabric,
   patternSection,
 } from '@ai-designer/design-ai';
 import {
@@ -434,6 +440,149 @@ export function designAnalysisHandler(deps: AiStudioDeps): JobHandler {
         }),
         stage,
       });
+      // ADR-066: a photo or a fabric first becomes a line sketch; the sketch is then read as usual.
+      const toPng = (data: Uint8Array) =>
+        sharp(Buffer.from(data)).flatten({ background: '#ffffff' }).png().toBuffer();
+      const keep = async (png: Buffer, name: string) =>
+        storeImage(deps, {
+          organizationId: row.organizationId,
+          projectId: row.projectId,
+          buffer: png,
+          fileName: `${row.displayId}-${name}.png`,
+          assetType: 'generated_image',
+          provenance: { sourceType: 'ai_job', sourceEntityId: row.id, jobId: ctx.job.id },
+          createdBy: row.createdBy,
+        });
+      const asImage = (png: Buffer, label: string): AiImageInput => ({
+        mediaType: 'image/png',
+        data: new Uint8Array(png),
+        label,
+      });
+      const audienceOf = (a: string | null) =>
+        ['women', 'men', 'girls', 'boys'].includes(a ?? '') ? (a as PatternAudience) : null;
+      const finishSketch = async (sketch: object, extra: object) => {
+        await prisma.designAnalysis.update({
+          where: { id: row.id },
+          data: {
+            status: 'succeeded',
+            stage: null,
+            result: JSON.parse(
+              JSON.stringify({
+                ...sketch,
+                ...extra,
+                processing: { chains: provider.chains, history: provider.history },
+              }),
+            ) as object,
+            completedAt: new Date(),
+          },
+        });
+      };
+      if (row.mode === 'photo') {
+        await stage('Turning the photo into a line sketch');
+        const drawn = await provider.generateImage({
+          task: 'image_line_sketch',
+          prompt: photoToSketchPrompt({
+            garmentHint: row.garmentHint,
+            notes: row.notes,
+            views: images.length,
+          }),
+          referenceImages: images.map((i, n) => ({
+            ...i.image,
+            label: n === 0 ? 'garment photo' : `photo ${n + 1} of the same outfit`,
+          })),
+          aspect: 'portrait',
+        });
+        const png = await toPng(drawn.image.data);
+        const sketchAssetId = await keep(png, 'line-sketch');
+        const sketch = await readSketch(
+          {
+            images: [asImage(png, 'line sketch'), ...images.map((i) => i.image)],
+            labels: [
+              'line sketch',
+              ...images.map((_, n) => `photo ${n + 1} of the same garment (details only)`),
+            ],
+            garmentHint: row.garmentHint,
+            audience: audienceOf(row.audience),
+            size: row.size,
+            notes: row.notes,
+          },
+          { provider, progress: stage },
+        );
+        await finishSketch(sketch, { generated: { sketchAssetId } });
+        return { family: sketch.spec.family, from: 'photo' };
+      }
+      if (row.mode === 'fabric') {
+        const prev = row.result as (FabricSuggestions & { chosen?: number | null }) | null;
+        const chosen = prev?.chosen ?? null;
+        if (chosen === null || !prev?.suggestions?.[chosen]) {
+          // Step 1: read the fabric and suggest garments (the user picks one).
+          const suggestions = await suggestFromFabric(
+            {
+              images: images.map((i) => i.image),
+              audience: audienceOf(row.audience) as FabricAudience | null,
+              notes: row.notes,
+            },
+            { provider, progress: stage },
+          );
+          await prisma.designAnalysis.update({
+            where: { id: row.id },
+            data: {
+              status: 'succeeded',
+              stage: null,
+              result: JSON.parse(
+                JSON.stringify({
+                  ...suggestions,
+                  processing: { chains: provider.chains, history: provider.history },
+                }),
+              ) as object,
+              completedAt: new Date(),
+            },
+          });
+          return { suggestions: suggestions.suggestions.length };
+        }
+        // Step 2: the chosen garment drawn in the fabric, then its line sketch, then the reading.
+        const s = prev.suggestions[chosen]!;
+        await stage(`Designing the ${s.title.toLowerCase()} in your fabric`);
+        const design = await provider.generateImage({
+          task: 'image_fabric_design',
+          prompt: fabricDesignPrompt(s, prev.fabric),
+          referenceImages: images.map((i, n) => ({
+            ...i.image,
+            label: n === 0 ? 'fabric swatch' : `fabric photo ${n + 1}`,
+          })),
+          aspect: 'portrait',
+        });
+        const designPng = await toPng(design.image.data);
+        const designAssetId = await keep(designPng, 'design');
+        await stage('Drawing the line sketch');
+        const drawn = await provider.generateImage({
+          task: 'image_line_sketch',
+          prompt: designToSketchPrompt(s),
+          referenceImages: [asImage(designPng, 'design picture')],
+          aspect: 'portrait',
+        });
+        const png = await toPng(drawn.image.data);
+        const sketchAssetId = await keep(png, 'line-sketch');
+        const sketch = await readSketch(
+          {
+            images: [asImage(png, 'line sketch'), asImage(designPng, 'design picture')],
+            labels: ['line sketch', 'design picture of the same garment (details only)'],
+            garmentHint: `${s.title} (${s.garmentType.replaceAll('_', ' ')})`,
+            audience: s.audience,
+            size: row.size,
+            notes: s.styleDetails.length ? `Details: ${s.styleDetails.join('; ')}` : row.notes,
+          },
+          { provider, progress: stage },
+        );
+        await finishSketch(sketch, {
+          fabric: prev.fabric,
+          bestFor: prev.bestFor,
+          suggestions: prev.suggestions,
+          chosen,
+          generated: { sketchAssetId, designAssetId },
+        });
+        return { family: sketch.spec.family, from: 'fabric' };
+      }
       if (row.mode === 'sketch') {
         // ADR-058: the AI reads the sketch; patterns are drafted by the engine when the user confirms.
         const audience = ['women', 'men', 'girls', 'boys'].includes(row.audience ?? '')

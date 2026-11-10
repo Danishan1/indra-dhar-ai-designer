@@ -40,6 +40,7 @@ const BODIES: Record<string, unknown> = {
     inputs: [{ assetId: '0197b0a0-0000-7000-8000-000000000000', role: 'sketch' }],
   },
   'POST /v1/orgs/:orgId/analyses/:analysisId/design': { name: 'Probe' },
+  'POST /v1/orgs/:orgId/analyses/:analysisId/fabric-choice': { suggestion: 0 },
   'POST /v1/orgs/:orgId/designs/:designId/techpacks': {},
   'POST /v1/orgs/:orgId/designs/:designId/looks': {},
   'PUT /v1/orgs/:orgId/ai/providers/key': { provider: 'gemini', apiKey: 'AIza-isolation-probe' },

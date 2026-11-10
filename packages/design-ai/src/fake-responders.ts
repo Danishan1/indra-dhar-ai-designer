@@ -394,6 +394,7 @@ export const fakeResponders: Partial<Record<AiTask, FakeResponder>> = {
     };
   },
   sketch_classify: (req) => fakeClassify(req.prompt),
+  fabric_suggest: (req) => fakeFabricSuggestions(req.prompt),
   sketch_details: (req) => fakeDetails(req.prompt),
   component_detail: (req) => ({
     details: [...req.prompt.matchAll(/^- ([a-z0-9_]+): /gm)].map((m) => ({
@@ -601,5 +602,63 @@ function fakeDetails(prompt: string) {
       };
     }),
     uncertain: ['Back view not shown'],
+  };
+}
+
+/** Fabric reading and four suggestions (ADR-066); the wearer follows the prompt. */
+function fakeFabricSuggestions(prompt: string) {
+  const chosen = /made from this fabric for (women|men|girls|boys)\./.exec(prompt)?.[1] ?? null;
+  const audience = chosen ?? 'girls';
+  return {
+    fabric: {
+      colors: ['navy', 'white'],
+      pattern: 'floral',
+      motif: 'small white daisies',
+      texture: 'smooth plain weave',
+      weight: 'light',
+      drape: 'soft',
+      stretch: false,
+      sheen: 'matte',
+      likelyMaterial: 'cotton lawn',
+      season: 'spring/summer',
+      notes: 'Fake reading for tests.',
+    },
+    bestFor: chosen
+      ? null
+      : { audience, why: 'A small, cheerful print in a light cotton suits children.' },
+    suggestions: [
+      {
+        title: 'Tiered sundress',
+        garmentType: 'dress',
+        audience,
+        description: 'A sleeveless dress with two gathered tiers.',
+        styleDetails: ['square neckline', 'two gathered tiers', 'back zip'],
+        why: 'The soft drape gathers well.',
+      },
+      {
+        title: 'Shirt and shorts set',
+        garmentType: 'shirt',
+        audience,
+        description: 'A camp-collar shirt with matching shorts.',
+        styleDetails: ['camp collar', 'short sleeves', 'elastic-waist shorts'],
+        why: 'A matching set shows off the print.',
+      },
+      {
+        title: 'A-line skirt',
+        garmentType: 'skirt',
+        audience,
+        description: 'A simple knee-length A-line skirt.',
+        styleDetails: ['fitted waistband', 'side zip', 'knee length'],
+        why: 'Few seams keep the print unbroken.',
+      },
+      {
+        title: 'Camp-collar shirt',
+        garmentType: 'shirt',
+        audience,
+        description: 'A relaxed short-sleeve shirt.',
+        styleDetails: ['camp collar', 'button front', 'chest pocket'],
+        why: 'A light cotton is ideal for a summer shirt.',
+      },
+    ],
   };
 }

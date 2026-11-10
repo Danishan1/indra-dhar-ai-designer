@@ -2,6 +2,8 @@
 
 **Code:** `packages/design-ai/src/sketch.ts` (`readSketch`, `specFromSketch`), run by the worker job
 `design.analysis` (`apps/worker/src/jobs/ai-studio.ts`). Decision record: ADR-058, ADR-061.
+A garment photo or a fabric first becomes a line sketch (`packages/design-ai/src/starts.ts`,
+ADR-066); that sketch is then read exactly as described here.
 
 ## The principle
 

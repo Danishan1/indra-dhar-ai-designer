@@ -9,7 +9,12 @@ import type {
   TechPackSummary,
   WorkingCopy,
 } from '@ai-designer/contracts';
-import { analyzeDesign, fakeResponders, readSketch } from '@ai-designer/design-ai';
+import {
+  analyzeDesign,
+  fakeResponders,
+  readSketch,
+  suggestFromFabric,
+} from '@ai-designer/design-ai';
 import type { GarmentDesignState } from '@ai-designer/garment-model';
 import { EicarTestScanner, processAsset } from '@ai-designer/media';
 import { createTenant, type TenantFixture } from '@ai-designer/test-utils';
@@ -395,6 +400,85 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
     });
     const del = await t.owner.client.delete(`${org()}/assets/${view}`);
     expect(del.status, await del.clone().text()).toBe(409);
+  });
+
+  it('from a photo and from a fabric (ADR-066): modes, suggestions, choosing one', async () => {
+    const photo = await uploadImage('model.png', '#aa3355');
+    const photoRes = await designer.post(`${org()}/projects/${project.id}/analyses`, {
+      mode: 'photo',
+      inputs: [{ assetId: photo, role: 'reference' }],
+      provider: 'fake',
+    });
+    expect(photoRes.status, await photoRes.clone().text()).toBe(201);
+    expect(await json<Analysis>(photoRes)).toMatchObject({ mode: 'photo', status: 'queued' });
+
+    const fabric = await uploadImage('daisy.png', '#223366');
+    const tooMany = await designer.post(`${org()}/projects/${project.id}/analyses`, {
+      mode: 'fabric',
+      inputs: Array.from({ length: 4 }, () => ({ assetId: fabric, role: 'fabric' })),
+      provider: 'fake',
+    });
+    expect(tooMany.status).toBe(400);
+    const res = await designer.post(`${org()}/projects/${project.id}/analyses`, {
+      mode: 'fabric',
+      inputs: [{ assetId: fabric, role: 'fabric' }],
+      provider: 'fake',
+    });
+    expect(res.status, await res.clone().text()).toBe(201);
+    const a = await json<Analysis>(res);
+    expect(a.mode).toBe('fabric');
+    const choose = (body: object, who = designer) =>
+      who.post(`${org()}/analyses/${a.id}/fabric-choice`, body);
+    // Nothing to choose until the suggestions are there.
+    expect((await choose({ suggestion: 0 })).status).toBe(409);
+
+    // Simulate the worker's first step: the fabric reading and suggestions (AI decided the wearer).
+    const suggestions = await suggestFromFabric(
+      { images: [{ mediaType: 'image/png', data: new Uint8Array([1]) }], audience: null },
+      { provider: new FakeProvider(fakeResponders) },
+    );
+    await prisma.designAnalysis.update({
+      where: { id: a.id },
+      data: {
+        status: 'succeeded',
+        stage: null,
+        result: JSON.parse(JSON.stringify(suggestions)) as object,
+        completedAt: new Date(),
+      },
+    });
+    // A design needs a chosen, drawn and read garment first.
+    expect((await designer.post(`${org()}/analyses/${a.id}/design`, { name: 'x' })).status).toBe(
+      409,
+    );
+    expect((await choose({ suggestion: 9 })).status).toBe(400);
+    expect((await choose({ suggestion: 0 }, viewer)).status).toBe(403);
+    expect(
+      (
+        await other.owner.client.post(`/v1/orgs/${orgId}/analyses/${a.id}/fabric-choice`, {
+          suggestion: 0,
+        })
+      ).status,
+    ).toBe(404);
+    const chosen = await choose({ suggestion: 1, size: '8y' });
+    expect(chosen.status, await chosen.clone().text()).toBe(201);
+    const queued = await json<Analysis>(chosen);
+    expect(queued).toMatchObject({
+      status: 'queued',
+      audience: 'girls',
+      garmentHint: 'Shirt and shorts set',
+      size: '8y',
+    });
+    expect(queued.result).toMatchObject({ mode: 'fabric_suggestions', chosen: 1 });
+    expect(
+      (
+        await prisma.job.findFirst({
+          where: { kind: 'design.analysis' },
+          orderBy: { createdAt: 'desc' },
+        })
+      )?.payload,
+    ).toEqual({ analysisId: a.id });
+    // While it runs, it cannot be chosen again.
+    expect((await choose({ suggestion: 0 })).status).toBe(409);
   });
 
   it('rejects inputs that are not ready images and unconfigured providers', async () => {

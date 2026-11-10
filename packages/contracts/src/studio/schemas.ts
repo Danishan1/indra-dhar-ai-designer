@@ -29,6 +29,10 @@ export type AiStatus = z.infer<typeof aiStatusSchema>;
 export const AnalysisInputRoles = ['auto', 'sketch', 'reference', 'pattern', 'fabric'] as const;
 export const analysisInputRoleSchema = z.enum(AnalysisInputRoles);
 
+export const AnalysisModes = ['images', 'sketch', 'photo', 'fabric'] as const;
+export const analysisModeSchema = z.enum(AnalysisModes);
+export type AnalysisMode = z.infer<typeof analysisModeSchema>;
+
 export const createAnalysisRequestSchema = z.object({
   inputs: z
     .array(z.object({ assetId: z.uuid(), role: analysisInputRoleSchema.default('auto') }))
@@ -39,10 +43,12 @@ export const createAnalysisRequestSchema = z.object({
   audience: z.enum(['men', 'women', 'kids', 'unisex', 'girls', 'boys']).optional(),
   provider: aiProviderNameSchema.optional(),
   /**
-   * How the design starts (ADR-058): `sketch` = the AI reads a sketch and the pattern engine drafts
-   * editable flat patterns; `images` = the earlier component analysis.
+   * How the design starts (ADR-058, ADR-066): `sketch` = the AI reads a sketch and the pattern
+   * engine drafts editable flat patterns; `photo` = a garment photo is first redrawn as a line
+   * sketch; `fabric` = garments are suggested for a fabric, the chosen one is drawn as a design and a
+   * line sketch; `images` = the earlier component analysis.
    */
-  mode: z.enum(['images', 'sketch']).default('images'),
+  mode: analysisModeSchema.default('images'),
   /** Size chart entry for sketch mode (e.g. `M`, `6y`); default per audience. */
   size: z.string().trim().min(1).max(20).optional(),
 });
@@ -63,7 +69,7 @@ export const analysisSchema = z.object({
   notes: z.string().nullable(),
   garmentHint: z.string().nullable(),
   audience: z.string().nullable(),
-  mode: z.enum(['images', 'sketch']),
+  mode: analysisModeSchema,
   size: z.string().nullable(),
   provider: aiProviderNameSchema,
   /** `AnalysisResult` from `@ai-designer/design-ai` (decomposition, details, matches…). */
@@ -78,6 +84,16 @@ export const analysisSchema = z.object({
 export type Analysis = z.infer<typeof analysisSchema>;
 
 export const analysisParamsSchema = z.object({ orgId: z.uuid(), analysisId: z.uuid() });
+
+/** From a fabric (ADR-066): design the chosen suggestion — draw it, make its line sketch, read it. */
+export const chooseFabricSuggestionRequestSchema = z.object({
+  /** Index in the analysis' `result.suggestions`. */
+  suggestion: z.number().int().min(0).max(9),
+  /** Size chart entry; default per wearer. */
+  size: z.string().trim().min(1).max(20).optional(),
+  provider: aiProviderNameSchema.optional(),
+});
+export type ChooseFabricSuggestionRequest = z.input<typeof chooseFabricSuggestionRequestSchema>;
 
 export const createDesignFromAnalysisRequestSchema = z.object({
   name: z.string().trim().min(1, { message: 'Enter a name' }).max(120),

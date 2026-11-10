@@ -21,6 +21,8 @@ const IMAGE_TITLES: Partial<Record<AiTask, string>> = {
   image_model: 'On model',
   image_component: 'Component detail',
   image_look_view: 'Look preview',
+  image_line_sketch: 'Line sketch',
+  image_fabric_design: 'Design in your fabric',
 };
 
 /**

@@ -85,6 +85,44 @@ export function SketchReview({
   });
 
   const reading = result.reading;
+  // ADR-066: a photo or fabric start shows the line sketch the AI made (what was read) first.
+  const made = (result as { generated?: { sketchAssetId?: string; designAssetId?: string } })
+    .generated;
+  const uploadLabel = (n: number) =>
+    analysis.mode === 'photo'
+      ? n === 0
+        ? 'Your photo'
+        : `Your photo ${n + 1}`
+      : analysis.mode === 'fabric'
+        ? 'Your fabric'
+        : n === 0
+          ? 'Sketch'
+          : `View ${n + 1}`;
+  const figures = [
+    ...(made?.sketchAssetId
+      ? [
+          {
+            assetId: made.sketchAssetId,
+            label: 'Line sketch made by AI (this was read)',
+            testId: 'generated-sketch',
+          },
+        ]
+      : []),
+    ...(made?.designAssetId
+      ? [
+          {
+            assetId: made.designAssetId,
+            label: 'Design in your fabric (reference)',
+            testId: 'generated-design',
+          },
+        ]
+      : []),
+    ...analysis.inputs.map((i, n) => ({
+      assetId: i.assetId,
+      label: uploadLabel(n),
+      testId: 'upload',
+    })),
+  ];
   return (
     <div className="flex flex-col">
       <PageHeader
@@ -94,17 +132,15 @@ export function SketchReview({
       />
       <div className="mx-auto grid w-full max-w-7xl gap-6 p-6 lg:grid-cols-[300px_1fr]">
         <aside className="flex flex-col gap-3" aria-label="Your sketch">
-          {analysis.inputs.map((i, n) => (
-            <figure key={i.assetId} className="flex flex-col gap-1">
+          {figures.map((f) => (
+            <figure key={f.assetId} className="flex flex-col gap-1" data-testid={f.testId}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={assetContentUrl(active.id, i.assetId, 'preview_1024')}
-                alt={n === 0 ? 'Your sketch' : `View ${n + 1}`}
+                src={assetContentUrl(active.id, f.assetId, 'preview_1024')}
+                alt={f.label}
                 className="w-full rounded-md border bg-white object-contain"
               />
-              <figcaption className="text-[11px] text-muted-foreground">
-                {n === 0 ? 'Sketch' : `View ${n + 1}`}
-              </figcaption>
+              <figcaption className="text-[11px] text-muted-foreground">{f.label}</figcaption>
             </figure>
           ))}
           <section className="flex flex-col gap-1.5 text-[13px]" data-testid="sketch-reading">

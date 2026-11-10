@@ -1,16 +1,18 @@
 import {
   type Analysis,
+  type chooseFabricSuggestionRequestSchema,
   type createAnalysisRequestSchema,
   type createDesignFromAnalysisRequestSchema,
   DisplayIdPrefixes,
   JobKinds,
 } from '@ai-designer/contracts';
-import { newId, nextDisplayId, type Prisma } from '@ai-designer/db';
+import { newId, nextDisplayId, Prisma } from '@ai-designer/db';
 import {
   type AnalysisResult,
   buildDesignState,
   type ComponentDecision,
   type FabricChoice,
+  type FabricSuggestions,
   type InputRole,
   libraryCategoryOf,
   normalizedAttributes,
@@ -146,18 +148,24 @@ export class AnalysisService implements OnModuleInit {
         );
       inputs.push({ assetId: asset.id, role: input.role, fileName: asset.fileName });
     }
-    const sketch = body.mode === 'sketch';
-    if (sketch && body.inputs.length > 4)
-      throw new AppError('VALIDATION_FAILED', 'Upload one sketch (and up to 3 more views of it)', {
-        issues: [{ path: 'inputs', message: 'Too many images for a sketch', code: 'too_many' }],
-      });
-    const provider = await this.ai.preflight(
-      ctx,
-      body.provider,
-      // Sketches: two reading passes (classify, then the per-garment checklist — ADR-061).
-      2,
-      sketch ? ['image_analysis'] : ['garment_reconstruction'],
-    );
+    const max = { sketch: 4, photo: 4, fabric: 3, images: 10 }[body.mode];
+    if (body.inputs.length > max)
+      throw new AppError(
+        'VALIDATION_FAILED',
+        body.mode === 'fabric'
+          ? 'Upload one fabric (and up to 2 more photos of it)'
+          : `Upload one ${body.mode === 'photo' ? 'photo' : 'sketch'} (and up to 3 more views of it)`,
+        { issues: [{ path: 'inputs', message: 'Too many images', code: 'too_many' }] },
+      );
+    // AI calls: sketch = two reading passes (classify, checklist — ADR-061); photo = the line
+    // sketch + the two passes; fabric = the reading and suggestions (the design is a later step).
+    const [calls, operations] = {
+      sketch: [2, ['image_analysis']] as const,
+      photo: [3, ['image_generation', 'image_analysis']] as const,
+      fabric: [1, ['image_analysis']] as const,
+      images: [2, ['garment_reconstruction']] as const,
+    }[body.mode];
+    const provider = await this.ai.preflight(ctx, body.provider, calls, operations);
     const row = await this.prisma.$transaction(async (tx) => {
       const id = newId();
       const created = await tx.designAnalysis.create({
@@ -189,7 +197,7 @@ export class AnalysisService implements OnModuleInit {
           outcome: 'success',
           resourceType: 'analysis',
           resourceId: id,
-          metadata: { projectId, provider, inputs: inputs.length },
+          metadata: { projectId, provider, inputs: inputs.length, mode: body.mode },
         },
         tx,
       );
@@ -212,7 +220,11 @@ export class AnalysisService implements OnModuleInit {
       throw new AppError('INVALID_STATE_TRANSITION', 'The analysis has not finished', {
         status: row.status,
       });
-    if (row.mode === 'sketch') return this.createPatternDesign(ctx, row, body);
+    if (row.mode === 'sketch' || row.mode === 'photo' || row.mode === 'fabric') {
+      if ((row.result as { mode?: string }).mode !== 'sketch')
+        throw new AppError('INVALID_STATE_TRANSITION', 'Choose a garment for the fabric first');
+      return this.createPatternDesign(ctx, row, body);
+    }
     const result = row.result as unknown as AnalysisResult;
     const inputs = row.inputs as unknown as {
       assetId: string;
@@ -415,14 +427,26 @@ export class AnalysisService implements OnModuleInit {
       });
     const inputs = row.inputs as unknown as { assetId: string; fileName: string | null }[];
     const draft = draftPattern(parsed.data);
-    const state = patternDesignState(draft, {
-      createdFrom: 'ai',
-      sources: inputs.map((i, n) => ({
+    // ADR-066: the line sketch made from a photo / fabric design comes first (it is what was read),
+    // then the uploads (photo → reference, fabric → fabric) and the fabric design picture.
+    const made = (result as { generated?: { sketchAssetId?: string; designAssetId?: string } })
+      .generated;
+    const uploadRole = { photo: 'reference', fabric: 'fabric' }[row.mode] ?? 'sketch';
+    const sources = [
+      ...(made?.sketchAssetId
+        ? [{ assetId: made.sketchAssetId, role: 'sketch' as const, label: 'Line sketch (AI)' }]
+        : []),
+      ...(made?.designAssetId
+        ? [{ assetId: made.designAssetId, role: 'reference' as const, label: 'Design (AI)' }]
+        : []),
+      ...inputs.map((i, n) => ({
         assetId: i.assetId,
-        role: 'sketch' as const,
-        label: i.fileName ?? (n === 0 ? 'Sketch' : `View ${n + 1}`),
+        role: uploadRole as 'sketch' | 'reference' | 'fabric',
+        label:
+          i.fileName ?? (uploadRole === 'fabric' ? 'Fabric' : n === 0 ? 'Sketch' : `View ${n + 1}`),
       })),
-    });
+    ];
+    const state = patternDesignState(draft, { createdFrom: 'ai', sources });
     state.metadata = {
       garmentLabel: result.reading?.label ?? draft.rootName,
       analysisId: row.id,
@@ -442,7 +466,7 @@ export class AnalysisService implements OnModuleInit {
     const design = await this.designs.createFromState(ctx, row.projectId, {
       name: body.name,
       state,
-      summary: `Patterns drafted from a sketch (${row.displayId}, ${result.provider})`,
+      summary: `Patterns drafted from ${{ photo: 'a garment photo', fabric: 'a fabric' }[row.mode] ?? 'a sketch'} (${row.displayId}, ${result.provider})`,
     });
     await this.prisma.designAnalysis.update({
       where: { id: row.id },
@@ -454,6 +478,80 @@ export class AnalysisService implements OnModuleInit {
       fabricsCreated: 0,
       notes: [...(result.notes ?? [])].slice(0, 30),
     };
+  }
+
+  /**
+   * From a fabric (ADR-066), step 2: the user picked one of the suggested garments. The same
+   * analysis runs again in the worker: the design is drawn in the fabric (a reference picture), then
+   * its line sketch, which is read like any sketch. A failed attempt keeps the suggestions, so the
+   * user can pick again.
+   */
+  async chooseFabricSuggestion(
+    ctx: AuthzContext,
+    analysisId: string,
+    body: z.output<typeof chooseFabricSuggestionRequestSchema>,
+  ): Promise<Analysis> {
+    const row = await this.find(ctx, analysisId);
+    const result = row.result as unknown as (FabricSuggestions & { chosen?: number }) | null;
+    if (
+      row.mode !== 'fabric' ||
+      row.designId ||
+      !result?.suggestions?.length ||
+      (row.status !== 'succeeded' && row.status !== 'failed') ||
+      (row.status === 'succeeded' && (result as { mode?: string }).mode !== 'fabric_suggestions')
+    )
+      throw new AppError('INVALID_STATE_TRANSITION', 'There are no garment suggestions to choose');
+    const suggestion = result.suggestions[body.suggestion];
+    if (!suggestion)
+      throw new AppError('VALIDATION_FAILED', 'Choose one of the suggested garments', {
+        issues: [{ path: 'suggestion', message: 'No such suggestion', code: 'out_of_range' }],
+      });
+    await this.projects.requireWorkable(ctx.organizationId, row.projectId);
+    // Design picture + line sketch + the two sketch reading passes.
+    const provider = await this.ai.preflight(ctx, body.provider ?? (row.provider as never), 4, [
+      'image_generation',
+      'image_analysis',
+    ]);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const job = await this.jobs.create(
+        { kind: JobKinds.designAnalysis, payload: { analysisId: row.id }, maxAttempts: 2 },
+        tx,
+      );
+      await this.audit.record(
+        {
+          eventType: 'analysis.fabric_choice',
+          action: 'design.generate',
+          outcome: 'success',
+          resourceType: 'analysis',
+          resourceId: row.id,
+          metadata: { suggestion: body.suggestion, title: suggestion.title, provider },
+        },
+        tx,
+      );
+      return tx.designAnalysis.update({
+        where: { id: row.id },
+        data: {
+          status: 'queued',
+          stage: 'Waiting for the designer',
+          provider,
+          audience: suggestion.audience,
+          garmentHint: suggestion.title.slice(0, 120),
+          size: body.size ?? null,
+          error: Prisma.DbNull,
+          completedAt: null,
+          jobId: job.id,
+          result: {
+            mode: 'fabric_suggestions',
+            fabric: result.fabric,
+            bestFor: result.bestFor,
+            suggestions: result.suggestions,
+            provider: result.provider,
+            chosen: body.suggestion,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+    });
+    return this.view(updated);
   }
 
   private async find(ctx: AuthzContext, id: string): Promise<AnalysisRow> {
@@ -476,7 +574,9 @@ export class AnalysisService implements OnModuleInit {
       notes: row.notes,
       garmentHint: row.garmentHint,
       audience: row.audience,
-      mode: row.mode === 'sketch' ? 'sketch' : 'images',
+      mode: (['sketch', 'photo', 'fabric'].includes(row.mode)
+        ? row.mode
+        : 'images') as Analysis['mode'],
       size: row.size,
       provider: row.provider as Analysis['provider'],
       result: (row.result as Record<string, unknown> | null) ?? null,

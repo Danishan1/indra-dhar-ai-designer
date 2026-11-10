@@ -56,6 +56,9 @@ export const TASK_OPERATION: Record<AiTask, AiOperation> = {
   image_model: 'image_generation',
   image_component: 'image_generation',
   image_look_view: 'image_generation',
+  image_line_sketch: 'image_generation',
+  image_fabric_design: 'image_generation',
+  fabric_suggest: 'image_analysis',
 };
 
 export interface DiscoveredModel {

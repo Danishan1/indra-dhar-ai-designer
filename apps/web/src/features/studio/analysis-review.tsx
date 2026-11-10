@@ -30,6 +30,7 @@ import { queryKeys } from '@/lib/query/keys';
 import { cn } from '@/lib/utils';
 
 import { studioApi } from './api';
+import { FabricSuggestionsReview } from './fabric-suggestions';
 import { ROLE_OPTIONS } from './new-analysis';
 import { SketchReview } from './sketch-review';
 
@@ -124,21 +125,33 @@ export function AnalysisReviewPage({
   if (a.status === 'queued' || a.status === 'running')
     return (
       <div className="flex flex-col">
-        <PageHeader title={`Analyzing · ${a.displayId}`} actions={back} />
+        <PageHeader
+          title={`${a.mode === 'fabric' ? 'Designing' : a.mode === 'images' ? 'Analyzing' : 'Reading'} · ${a.displayId}`}
+          actions={back}
+        />
         <div className="mx-auto flex max-w-xl flex-col items-center gap-4 p-10 text-center">
           <Loader2Icon className="size-8 animate-spin text-primary" aria-hidden />
           <p className="text-sm font-medium" role="status" data-testid="analysis-stage">
             {a.stage ?? 'Working…'}
           </p>
           <p className="text-[13px] text-muted-foreground">
-            The analyzer looks at all images together, compares each component with your library and
-            only asks AI for details of components it does not know yet.
+            {a.mode === 'photo'
+              ? 'AI redraws the garment in your photo as a black-and-white line sketch, then reads the sketch to draft the patterns.'
+              : a.mode === 'fabric'
+                ? 'AI reads the fabric and suggests garments that suit it; for the one you pick it draws the design and its line sketch.'
+                : a.mode === 'sketch'
+                  ? 'AI reads the sketch: who it is for, each garment, then a checklist of its details.'
+                  : 'The analyzer looks at all images together, compares each component with your library and only asks AI for details of components it does not know yet.'}
           </p>
           <InputStrip orgId={active.id} analysis={a} />
         </div>
       </div>
     );
 
+  const kind = (a.result as { mode?: string } | null)?.mode;
+  // From a fabric: a failed design attempt keeps the suggestions — pick again.
+  if (a.status === 'failed' && a.mode === 'fabric' && kind === 'fabric_suggestions')
+    return <FabricSuggestionsReview analysis={a} back={back} failed={a.error?.message ?? null} />;
   if (a.status === 'failed')
     return (
       <div className="flex flex-col">
@@ -158,7 +171,10 @@ export function AnalysisReviewPage({
       </div>
     );
 
-  if (a.mode === 'sketch') return <SketchReview projectId={projectId} analysis={a} back={back} />;
+  if (a.mode === 'fabric' && kind === 'fabric_suggestions')
+    return <FabricSuggestionsReview analysis={a} back={back} />;
+  if (a.mode === 'sketch' || a.mode === 'photo' || a.mode === 'fabric')
+    return <SketchReview projectId={projectId} analysis={a} back={back} />;
   return <Review projectId={projectId} analysis={a} back={back} />;
 }
 

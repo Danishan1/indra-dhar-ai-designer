@@ -49,10 +49,20 @@ sequenceDiagram
 ## Step 1 — Choose how to start
 
 **Screen:** _New design with AI_ (`apps/web/src/features/studio/new-analysis.tsx`).
-Start modes are shown as cards: **From a sketch** (available), _From a photo_ and _From pattern
-pieces_ (announced, not available yet), **Blank or template**.
+Start modes are shown as cards: **From a sketch**, **From a garment photo**, **From a fabric**,
+_From pattern pieces_ (announced, not available yet) and **Blank or template**. Every AI start ends
+in a **line sketch**, which is then read and drafted the same way (ADR-066):
 
-## Step 2 — Upload the sketch and give optional context
+| Start                | What happens before the sketch reading                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| From a sketch        | Nothing — the uploaded sketch is read.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| From a garment photo | A photo or design (worn by a model, a product photo, a colourful design; up to 4 views). The AI redraws the garment as a black-and-white **line sketch** (front, garment only — no person, colour or print; separate garments drawn separately), stored as an asset. The sketch is read; the photo goes along for small details only. 3 AI requests.                                                                                                                                                                                                                                         |
+| From a fabric        | 1–3 fabric photos and **who it is for**: Women, Men, Girls, Boys or **Let AI decide**. The AI reads the fabric (colours, print, texture, weight, drape, stretch, likely material — a guess, season) and suggests **4 garments** with details and why they suit it; with "Let AI decide" it also says who the fabric suits best and why (1 request, text only). The user picks one (and optionally a size): the AI draws the **design in the fabric** (a reference picture) and its **line sketch**, then reads the sketch (4 requests). A failed attempt keeps the suggestions — pick again. |
+
+The review page shows the line sketch the AI made first ("this was read"), then the design picture
+(fabric) and the uploads. From there the flow is identical: patterns, editor, looks, tech pack.
+
+## Step 2 — Upload the sketch (or photo) and give optional context
 
 The user drops 1 sketch (plus up to 3 more views of the same outfit). Each file is stored in the
 **file storage** (S3-compatible) as an **asset**; a background **asset.process** job makes preview

@@ -23,7 +23,13 @@ export type AiTask =
   | 'image_model'
   | 'image_component'
   /** Look preview: the garment drawn from its pattern pieces (ADR-064). */
-  | 'image_look_view';
+  | 'image_look_view'
+  /** Photo or design → black-and-white technical line sketch (ADR-066). */
+  | 'image_line_sketch'
+  /** A suggested garment drawn in the uploaded fabric (ADR-066). */
+  | 'image_fabric_design'
+  /** Fabric reading and garment suggestions (ADR-066). */
+  | 'fabric_suggest';
 
 export interface AiImageInput {
   /** image/png · image/jpeg · image/webp */

@@ -1,6 +1,7 @@
 import {
   analysisParamsSchema,
   analysisSchema,
+  chooseFabricSuggestionRequestSchema,
   createAnalysisRequestSchema,
   createDesignFromAnalysisRequestSchema,
   createDesignFromAnalysisResponseSchema,
@@ -88,5 +89,33 @@ export class AnalysesController {
     @Body() body: z.output<typeof createDesignFromAnalysisRequestSchema>,
   ) {
     return this.analyses.createDesign(authzContext(req), analysisId, body);
+  }
+
+  @Post('fabric-choice')
+  @Idempotent()
+  @RequirePermission('design.generate', { resource: ANALYSIS })
+  @Endpoint({
+    summary:
+      'From a fabric (ADR-066): design the chosen suggestion — the AI draws it in the fabric, makes its line sketch and reads it',
+    tags: ['ai-studio'],
+    params: analysisParamsSchema,
+    body: chooseFabricSuggestionRequestSchema,
+    response: analysisSchema,
+    successStatus: 201,
+    errors: [
+      'NOT_FOUND',
+      'PERMISSION_DENIED',
+      'VALIDATION_FAILED',
+      'INVALID_STATE_TRANSITION',
+      'UNSUPPORTED_CAPABILITY',
+      'QUOTA_EXCEEDED',
+    ],
+  })
+  chooseFabricSuggestion(
+    @Req() req: Request,
+    @Param('analysisId') analysisId: string,
+    @Body() body: z.output<typeof chooseFabricSuggestionRequestSchema>,
+  ) {
+    return this.analyses.chooseFabricSuggestion(authzContext(req), analysisId, body);
   }
 }

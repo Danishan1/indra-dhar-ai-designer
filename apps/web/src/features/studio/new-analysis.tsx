@@ -53,8 +53,14 @@ const START_MODES = [
   {
     key: 'photo',
     title: 'From a garment photo',
-    text: 'A photo of an existing garment.',
-    ready: false,
+    text: 'A photo or design — worn by a model or on its own. AI turns it into a line sketch first.',
+    ready: true,
+  },
+  {
+    key: 'fabric',
+    title: 'From a fabric',
+    text: 'Upload a fabric. AI suggests garments that suit it, then designs and sketches the one you pick.',
+    ready: true,
   },
   {
     key: 'pattern',
@@ -86,13 +92,57 @@ const SKETCH_AUDIENCES = [
   { value: 'boys', label: 'Boys' },
 ];
 
+type StartMode = 'sketch' | 'photo' | 'fabric';
+
+/** What each starting point asks for (ADR-058, ADR-066). */
+const MODE_TEXT: Record<
+  StartMode,
+  {
+    upload: string;
+    hint: string;
+    max: number;
+    first: string;
+    button: string;
+    role: 'sketch' | 'reference' | 'fabric';
+  }
+> = {
+  sketch: {
+    upload: '1. Your sketch',
+    hint: 'PNG, JPEG or WebP · the front view, plus up to 3 more views',
+    max: 4,
+    first: 'Main sketch',
+    button: 'Read the sketch',
+    role: 'sketch',
+  },
+  photo: {
+    upload: '1. Your garment photo or design',
+    hint: 'PNG, JPEG or WebP · a model wearing it, a product photo or a design; up to 3 more views',
+    max: 4,
+    first: 'Main photo',
+    button: 'Make the line sketch and read it',
+    role: 'reference',
+  },
+  fabric: {
+    upload: '1. Your fabric',
+    hint: 'PNG, JPEG or WebP · a flat, well-lit photo of the fabric; up to 2 more photos',
+    max: 3,
+    first: 'Fabric',
+    button: 'Suggest garments',
+    role: 'fabric',
+  },
+};
+
 /**
- * "New design with AI" (ADR-058): the user first chooses how to start. Sketch → AI reads the
- * garment → the pattern engine drafts editable flat patterns (review, then the pattern editor).
+ * "New design with AI" (ADR-058, ADR-066): the user first chooses how to start. Every start ends in
+ * a line sketch → AI reads the garment → the pattern engine drafts editable flat patterns. A photo
+ * is first redrawn as a line sketch; a fabric first gets garment suggestions (picked on the next
+ * page), whose design and line sketch are then drawn.
  */
 export function NewAnalysisPage({ projectId }: { projectId: string }) {
   const { active, can } = useOrganization();
   const router = useRouter();
+  const [mode, setMode] = useState<StartMode>('sketch');
+  const text = MODE_TEXT[mode];
   const [sketches, setSketches] = useState<Asset[]>([]);
   const [garment, setGarment] = useState('auto');
   const [audience, setAudience] = useState('auto');
@@ -116,11 +166,11 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
         active.id,
         projectId,
         {
-          mode: 'sketch',
-          inputs: sketches.map((a) => ({ assetId: a.id, role: 'sketch' as const })),
-          ...(garment !== 'auto' ? { garmentHint: garment } : {}),
+          mode,
+          inputs: sketches.map((a) => ({ assetId: a.id, role: text.role })),
+          ...(garment !== 'auto' && mode !== 'fabric' ? { garmentHint: garment } : {}),
           ...(audience !== 'auto' ? { audience: audience as 'women' } : {}),
-          ...(size !== 'auto' && audience !== 'auto' ? { size } : {}),
+          ...(size !== 'auto' && audience !== 'auto' && mode !== 'fabric' ? { size } : {}),
           ...(notes.trim() ? { notes: notes.trim() } : {}),
           ...(chosen ? { provider: chosen as 'gemini' | 'openai' | 'fake' } : {}),
         },
@@ -137,7 +187,7 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
     <div className="flex flex-col">
       <PageHeader
         title="New design with AI"
-        description="Choose how to start. From a sketch, AI reads the garment and we draft its flat patterns — every piece has real dimensions you can edit."
+        description="Choose how to start. Every way ends in a line sketch: AI reads the garment and we draft its flat patterns — every piece has real dimensions you can edit."
         actions={
           <Button variant="ghost" size="sm" asChild>
             <Link href={`/projects/${projectId}`}>
@@ -149,7 +199,7 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
         <section
           aria-label="How do you want to start?"
-          className="grid gap-3 sm:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-5"
           data-testid="start-modes"
         >
           {START_MODES.map((m) => (
@@ -157,11 +207,17 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
               key={m.key}
               type="button"
               disabled={!m.ready}
-              onClick={() => (m.key === 'blank' ? setBlankOpen(true) : undefined)}
-              aria-pressed={m.key === 'sketch'}
+              onClick={() => {
+                if (m.key === 'blank') return setBlankOpen(true);
+                if (m.key === 'sketch' || m.key === 'photo' || m.key === 'fabric') {
+                  if (m.key !== mode) setSketches([]);
+                  setMode(m.key);
+                }
+              }}
+              aria-pressed={m.key === mode}
               className={cn(
                 'flex flex-col gap-1 rounded-lg border p-3 text-left',
-                m.key === 'sketch' && 'border-primary ring-2 ring-primary/30',
+                m.key === mode && 'border-primary ring-2 ring-primary/30',
                 !m.ready && 'cursor-not-allowed opacity-50',
               )}
               data-testid={`start-${m.key}`}
@@ -173,13 +229,13 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
           ))}
         </section>
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <section className="flex flex-col gap-4" aria-label="Sketch">
-            <h2 className="text-sm font-semibold">1. Your sketch</h2>
+          <section className="flex flex-col gap-4" aria-label="Upload">
+            <h2 className="text-sm font-semibold">{text.upload}</h2>
             <UploadDropzone
               orgId={active.id}
               assetType="source_image"
-              hint="PNG, JPEG or WebP · the front view, plus up to 3 more views"
-              disabled={sketches.length >= 4}
+              hint={text.hint}
+              disabled={sketches.length >= text.max}
               onSettled={(asset) => {
                 if (asset.status !== 'ready') return;
                 setSketches((list) =>
@@ -188,7 +244,7 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
               }}
             />
             {sketches.length ? (
-              <ul className="grid gap-3 sm:grid-cols-2" aria-label="Sketches">
+              <ul className="grid gap-3 sm:grid-cols-2" aria-label="Uploads">
                 {sketches.map((a, i) => (
                   <li
                     key={a.id}
@@ -201,7 +257,11 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
                         {a.fileName ?? a.displayId}
                       </span>
                       <span className="text-[12px] text-muted-foreground">
-                        {i === 0 ? 'Main sketch' : `View ${i + 1}`}
+                        {i === 0
+                          ? text.first
+                          : mode === 'fabric'
+                            ? `Photo ${i + 1}`
+                            : `View ${i + 1}`}
                       </span>
                     </div>
                     <Button
@@ -218,8 +278,39 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
             ) : null}
           </section>
           <section className="flex flex-col gap-4" aria-label="About the garment">
-            <h2 className="text-sm font-semibold">2. A little context (optional)</h2>
-            <div className="flex flex-col gap-1.5">
+            <h2 className="text-sm font-semibold">
+              {mode === 'fabric' ? '2. Who is it for?' : '2. A little context (optional)'}
+            </h2>
+            {mode === 'fabric' ? (
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="radiogroup"
+                aria-label="Who is it for"
+                data-testid="fabric-audience"
+              >
+                {SKETCH_AUDIENCES.map((o) => (
+                  <Button
+                    key={o.value}
+                    type="button"
+                    size="sm"
+                    role="radio"
+                    aria-checked={audience === o.value}
+                    variant={audience === o.value ? 'default' : 'outline'}
+                    className="h-8 text-xs"
+                    onClick={() => setAudience(o.value)}
+                    data-testid={`fabric-for-${o.value}`}
+                  >
+                    {o.value === 'auto' ? 'Let AI decide' : o.label}
+                  </Button>
+                ))}
+                <p className="w-full text-[12px] text-muted-foreground">
+                  {audience === 'auto'
+                    ? 'AI decides who this fabric suits best and suggests garments for them.'
+                    : `AI suggests garments for ${SKETCH_AUDIENCES.find((o) => o.value === audience)?.label.toLowerCase()} that suit this fabric.`}
+                </p>
+              </div>
+            ) : null}
+            <div className={cn('flex flex-col gap-1.5', mode === 'fabric' && 'hidden')}>
               <Label htmlFor="garment-hint">Garment</Label>
               <SimpleSelect
                 id="garment-hint"
@@ -228,7 +319,7 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
                 options={SKETCH_GARMENTS}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={cn('grid grid-cols-2 gap-2', mode === 'fabric' && 'hidden')}>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="audience">For</Label>
                 <SimpleSelect
@@ -265,7 +356,11 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value.slice(0, 1000))}
                 rows={3}
-                placeholder="e.g. back zip, lined bodice, knee length"
+                placeholder={
+                  mode === 'fabric'
+                    ? 'e.g. summer party, school uniform, relaxed fit'
+                    : 'e.g. back zip, lined bodice, knee length'
+                }
                 className="rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
@@ -295,7 +390,7 @@ export function NewAnalysisPage({ projectId }: { projectId: string }) {
               disabled={!canRun || !sketches.length || !chosen || analyze.isPending}
               data-testid="analyze-button"
             >
-              <SparklesIcon /> {analyze.isPending ? 'Starting…' : 'Read the sketch'}
+              <SparklesIcon /> {analyze.isPending ? 'Starting…' : text.button}
             </Button>
             {analyze.isError ? (
               <p role="alert" className="text-[13px] text-destructive">

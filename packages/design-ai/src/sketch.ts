@@ -558,6 +558,8 @@ export async function readSketch(
     audience?: PatternAudience | null;
     size?: string | null;
     notes?: string | null;
+    /** Labels per image (default: sketch, view 2…) — e.g. a photo given for details only. */
+    labels?: readonly string[];
   },
   deps: {
     provider: AiProvider;
@@ -567,7 +569,7 @@ export async function readSketch(
 ): Promise<SketchAnalysis> {
   const images = input.images.map((i, n) => ({
     ...i,
-    label: n === 0 ? 'sketch' : `view ${n + 1}`,
+    label: input.labels?.[n] ?? (n === 0 ? 'sketch' : `view ${n + 1}`),
   }));
   await deps.progress?.('Identifying the garments');
   const c = await deps.provider.generateStructured({

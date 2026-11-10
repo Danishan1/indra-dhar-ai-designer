@@ -52,6 +52,15 @@ Size charts are approximations to start from — every measurement is editable. 
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
 the seam allowance is drawn outside.
 
+### Other starts: photo and fabric → line sketch (ADR-066)
+
+| Piece                                                                                                                                                                                                                                                                                                                                      | Where                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Modes `photo` and `fabric` on `design_analyses` (no migration — `mode` is text); preflight 3 calls (photo: image_generation + image_analysis) / 1 call (fabric); fabric step 2 `POST /analyses/:id/fabric-choice {suggestion, size?}` (4 calls) re-queues the same analysis                                                                | `apps/api/src/modules/analysis`                                                                              |
+| Worker: photo → `image_line_sketch` → stored asset → `readSketch([sketch, photo…], labels)`; fabric step 1 `suggestFromFabric` (task `fabric_suggest`) → `result.mode = fabric_suggestions`; step 2 `image_fabric_design` (design in the fabric) → `image_line_sketch` → `readSketch`; `result.generated = {sketchAssetId, designAssetId}` | `apps/worker/src/jobs/ai-studio.ts`                                                                          |
+| Prompts, fabric reading + suggestion schemas, fake responder                                                                                                                                                                                                                                                                               | `packages/design-ai/src/starts.ts`, `fake-responders.ts`                                                     |
+| Start page modes, fabric suggestions page, review shows the generated images; design sources: line sketch (sketch), design (reference), uploads (reference / fabric)                                                                                                                                                                       | `web/features/studio/new-analysis.tsx`, `fabric-suggestions.tsx`, `sketch-review.tsx`, `analysis.service.ts` |
+
 ### Reading a sketch: classify, then a checklist per garment (ADR-061)
 
 1. **Classify** (`sketch_classify`, `design-ai/src/sketch.ts`): who (male/female, adult/child, age),

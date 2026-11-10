@@ -38,7 +38,7 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await page.getByRole('tab', { name: 'Designs' }).click();
   await page.getByRole('link', { name: 'New design with AI' }).first().click();
   await expect(page.getByTestId('start-sketch')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('start-photo')).toBeDisabled();
+  await expect(page.getByTestId('start-pattern')).toBeDisabled();
   await page
     .getByTestId('upload-dropzone')
     .locator('input[type=file]')

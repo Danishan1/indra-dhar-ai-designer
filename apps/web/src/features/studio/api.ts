@@ -3,6 +3,8 @@ import {
   aiSettingsSchema,
   aiStatusSchema,
   analysisSchema,
+  type ChooseFabricSuggestionRequest,
+  chooseFabricSuggestionRequestSchema,
   type CreateAnalysisRequest,
   createAnalysisRequestSchema,
   type CreateDesignFromAnalysisRequest,
@@ -84,6 +86,18 @@ export const studioApi = {
     apiRequest(`${org(orgId)}/analyses/${encodeURIComponent(analysisId)}`, {
       schema: analysisSchema,
       ...withSignal(signal),
+    }),
+  chooseFabricSuggestion: (
+    orgId: string,
+    analysisId: string,
+    body: ChooseFabricSuggestionRequest,
+    idempotencyKey: string,
+  ) =>
+    apiRequest(`${org(orgId)}/analyses/${encodeURIComponent(analysisId)}/fabric-choice`, {
+      method: 'POST',
+      body: chooseFabricSuggestionRequestSchema.parse(body),
+      schema: analysisSchema,
+      idempotencyKey,
     }),
   createDesign: (
     orgId: string,
