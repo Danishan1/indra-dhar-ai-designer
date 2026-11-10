@@ -8,7 +8,8 @@ import {
 import {
   BODY_LABELS,
   garmentName,
-  measurementsFor,
+  sizeLabel,
+  specMeasurements,
   measurementsForSpec,
   pieceDimensions,
   resolve,
@@ -136,7 +137,7 @@ export function patternSection(state: GarmentDesignState): PatternSection | null
   if (!raw) return null;
   const spec = patternSpecSchema.parse(raw);
   const pieces = state.patternPieces ?? [];
-  const chart = measurementsFor(spec.audience, spec.size);
+  const chart = specMeasurements(spec);
   const set = spec.garments.length > 0;
   const garments = garmentsOf(spec).map((g) => ({
     key: g.key,
@@ -163,6 +164,17 @@ export function patternSection(state: GarmentDesignState): PatternSection | null
       const p = byTemplate(t);
       return p ? pieceDimensions(p).height : null;
     };
+    /** Length of a named seam edge of a piece (seam line, mm). */
+    const edge = (t: string, name: string) => {
+      const p = byTemplate(t);
+      return p ? (pieceDimensions(p).edges.find((e) => e.name === name)?.length ?? null) : null;
+    };
+    /** Front + back hem, both halves (fold pieces and pairs make two of each half). */
+    const hemAround = (front: string, back: string) => {
+      const f = edge(front, 'hem');
+      const b = edge(back, 'hem');
+      return f && b ? 2 * (f + b) : null;
+    };
     const ctx = resolve(gs);
     const add = (l: string, v: number | null | undefined) => {
       if (v && v > 0) finished.push({ label: label(l), valueMm: Math.round(v) });
@@ -178,16 +190,30 @@ export function patternSection(state: GarmentDesignState): PatternSection | null
             (height('skirt_back') ?? 0),
       );
       add('Sleeve length (cap to hem)', height('sleeve'));
+      if (fam === 'top' || fam === 'jacket')
+        add(
+          'Hem width (all round)',
+          hemAround('front', 'back') ?? hemAround('bodice_front', 'bodice_back'),
+        );
+      add('Sleeve opening', edge('sleeve', 'hem'));
     }
-    if (fam === 'dress' && byTemplate('skirt_front')) add('Skirt length', height('skirt_front'));
+    if (fam === 'dress' && byTemplate('skirt_front')) {
+      add('Skirt length', height('skirt_front'));
+      add('Hem width (all round)', hemAround('skirt_front', 'skirt_back'));
+    }
     if (fam === 'skirt') {
       add('Waist (finished)', ctx.m.waist + Math.min(ctx.ease.waist, 20));
       add('Hip (finished)', ctx.m.hip + ctx.ease.hip);
       add('Skirt length', height('skirt_front'));
+      add('Hem width (all round)', hemAround('skirt_front', 'skirt_back'));
     }
     if (fam === 'trousers' || fam === 'jumpsuit' || fam === 'dungarees') {
       add('Hip (finished)', ctx.m.hip + ctx.ease.hip);
       add('Outseam', height('trouser_front'));
+      add('Inseam', edge('trouser_front', 'inseam'));
+      const fh = edge('trouser_front', 'hem');
+      const bh = edge('trouser_back', 'hem');
+      add('Leg opening', fh && bh ? fh + bh : null);
     }
   }
   const body = measurementsForSpec(spec).map((k) => ({
@@ -198,7 +224,7 @@ export function patternSection(state: GarmentDesignState): PatternSection | null
   return {
     family: set ? 'set' : spec.family,
     audience: spec.audience,
-    size: spec.size,
+    size: sizeLabel(spec),
     garments,
     style,
     body,

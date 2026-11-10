@@ -7,7 +7,7 @@ import {
   type PatternStyleInput,
 } from '@ai-designer/garment-model';
 
-import { measurementsFor } from './sizes.js';
+import { specMeasurements } from './sizes.js';
 
 /** Everything the blocks need, resolved once: measurements (chart + overrides), ease, lengths. */
 export interface Ctx {
@@ -30,7 +30,7 @@ const EASE: Record<PatternStyle['fit'], { bust: number; waist: number; hip: numb
 
 export function resolve(input: PatternSpec | PatternSpecInput): Ctx {
   const spec = patternSpecSchema.parse(input);
-  const chart = measurementsFor(spec.audience, spec.size);
+  const chart = specMeasurements(spec);
   const m = { ...chart, ...spec.body } as Record<BodyMeasurementKey, number>;
   const style = spec.style;
   const knit =

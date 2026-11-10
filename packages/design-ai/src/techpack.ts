@@ -20,6 +20,7 @@ import {
 import type { TechPackText } from './analysis-schema.js';
 import { ATTRIBUTE_PROPERTY } from './library-match.js';
 import { type PatternSection, patternSection } from './techpack-pattern.js';
+import { type SizeChartSection, sizeChartSection, type TechPackSizing } from './techpack-sizes.js';
 import { componentShapeSvg, pieceDetailSvg } from './techpack-vector.js';
 
 /**
@@ -138,6 +139,8 @@ export interface TechPackDocument {
   missing: { area: string; item: string }[];
   /** Pattern-first designs (ADR-058): drafting spec, measurements, fit checks. */
   pattern?: PatternSection | null;
+  /** Size chart across the chosen sizes (ADR-067). */
+  sizing?: SizeChartSection | null;
 }
 
 export interface ArtifactName {
@@ -155,6 +158,8 @@ export interface TechPackInput {
   views: TechPackImage[];
   componentImages: Readonly<Record<string, TechPackImage>>;
   references?: TechPackImage[];
+  /** Standard, base size and size range of the size chart (ADR-067); default: the design's size. */
+  sizing?: TechPackSizing | null;
 }
 
 const human = (s: string) => s.replaceAll('_', ' ');
@@ -547,9 +552,28 @@ export function buildTechPack(input: TechPackInput): TechPackDocument {
     : [];
   for (const m of missingInfo) missing.push({ area: 'From the analysis', item: m });
 
+  const spec = state.patternSpec as
+    | {
+        size?: string;
+        sizeSystem?: TechPackSizing['system'];
+        customChart?: TechPackSizing['customChart'];
+      }
+    | undefined;
+  const sizing = state.patternSpec
+    ? sizeChartSection(
+        state,
+        input.sizing ?? {
+          system: spec?.sizeSystem ?? 'intl',
+          customChart: spec?.customChart ?? null,
+          baseSize: spec?.size ?? '',
+          sizes: [spec?.size ?? ''],
+        },
+      )
+    : null;
   return {
     version: 1,
     pattern,
+    sizing,
     header: {
       ...input.header,
       garmentLabel,

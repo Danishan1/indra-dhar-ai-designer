@@ -91,3 +91,5 @@ Schemas and inferred types · `templates.create` · registries and `extendCatalo
 ## Not in this package
 
 Persistence (I12), operations (I14), geometry/SVG (I16), versioned business constraint sets (I20), the production specification (I38).
+
+**Sizes (ADR-067):** `patternSpec.sizeSystem` (`intl` · `uk` · `us` · `eu` · `custom`, default `intl`) says which standard `size` belongs to; `customChart` is a copy of an organization size chart when it is `custom`. The size tables live in `pattern-model` (`sizes.ts`).

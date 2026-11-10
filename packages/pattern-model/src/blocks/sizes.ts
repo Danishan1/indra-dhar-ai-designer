@@ -1,7 +1,10 @@
 import type {
   BodyMeasurementKey,
   BodyMeasurements,
+  CustomSizeChart,
   PatternAudience,
+  PatternSpec,
+  SizeSystem,
 } from '@ai-designer/garment-model';
 
 /**
@@ -114,18 +117,233 @@ export const DEFAULT_SIZE: Record<PatternAudience, string> = {
   boys: '6y',
 };
 
-export function sizesFor(audience: PatternAudience): readonly string[] {
-  return CHARTS[audience].sizes;
+// ── size standards (ADR-067) ───────────────────────────────────────────────
+//
+// One body chart per audience (above) carries every measurement. A standard only says what its
+// sizes are and their defining measurements — bust/chest, waist and hip for adults, height for
+// children; the other measurements follow the body chart (interpolated on bust or height).
+// Approximations of common national charts, a starting point to edit — never a brand's sizing.
+
+/** Defining measurements of a size (mm). */
+interface StdSize {
+  label: string;
+  bust?: number;
+  waist?: number;
+  hip?: number;
+  height?: number;
 }
 
-/** Every chart measurement for a size (unknown size → the audience's default size). */
-export function measurementsFor(audience: PatternAudience, size: string): BodyMeasurements {
+const cm = (v: number) => Math.round(v * 10);
+const women = (label: string, b: number, w: number, h: number): StdSize => ({
+  label,
+  bust: cm(b),
+  waist: cm(w),
+  hip: cm(h),
+});
+// UK women 4–22; US = UK − 4; EU = UK + 28 (same bodies, different labels).
+const UK_WOMEN: [number, number, number, number][] = [
+  [4, 76, 58, 82],
+  [6, 78, 60, 84],
+  [8, 82, 64, 88],
+  [10, 86, 68, 92],
+  [12, 91, 73, 97],
+  [14, 96, 78, 102],
+  [16, 101, 83, 107],
+  [18, 108, 90, 114],
+  [20, 115, 97, 121],
+  [22, 122, 104, 128],
+];
+// Men: UK and US label by chest in inches (34–48); EU by half the chest in cm (44–58).
+const menByChestMm = (label: string, chest: number): StdSize => ({
+  label,
+  bust: Math.round(chest),
+  waist: Math.round(chest - 140),
+  hip: Math.round(chest + 20),
+});
+const MEN_INCH = [34, 36, 38, 40, 42, 44, 46, 48].map((i) => menByChestMm(String(i), i * 25.4));
+// Children: UK by age range, EU by height (cm), US toddler + numeric — all anchored on height.
+const KID_HEIGHTS = [92, 98, 104, 110, 116, 122, 128, 134, 140, 146, 152, 158, 164];
+const kid = (label: string, h: number): StdSize => ({ label, height: cm(h) });
+
+const STANDARDS: Record<
+  Exclude<SizeSystem, 'intl' | 'custom'>,
+  Record<PatternAudience, StdSize[]>
+> = {
+  uk: {
+    women: UK_WOMEN.map(([n, b, w, h]) => women(String(n), b, w, h)),
+    men: MEN_INCH,
+    girls: KID_HEIGHTS.slice(1).map((h, i) => kid(`${i + 2}-${i + 3}y`, h)),
+    boys: KID_HEIGHTS.slice(1).map((h, i) => kid(`${i + 2}-${i + 3}y`, h)),
+  },
+  us: {
+    women: UK_WOMEN.map(([n, b, w, h]) => women(String(n - 4), b, w, h)),
+    men: MEN_INCH,
+    girls: usKids(),
+    boys: usKids(),
+  },
+  eu: {
+    women: UK_WOMEN.map(([n, b, w, h]) => women(String(n + 28), b, w, h)),
+    men: [44, 46, 48, 50, 52, 54, 56, 58].map((n) => menByChestMm(String(n), n * 20)),
+    girls: KID_HEIGHTS.map((h) => kid(String(h), h)),
+    boys: KID_HEIGHTS.map((h) => kid(String(h), h)),
+  },
+};
+
+function usKids(): StdSize[] {
+  return [
+    kid('2T', 92),
+    kid('3T', 98),
+    kid('4T', 104),
+    kid('5', 110),
+    kid('6', 116),
+    kid('7', 122),
+    kid('8', 128),
+    kid('10', 140),
+    kid('12', 152),
+    kid('14', 158),
+    kid('16', 164),
+  ];
+}
+
+export const SIZE_SYSTEM_LABELS: Record<SizeSystem, string> = {
+  intl: 'International',
+  uk: 'UK',
+  us: 'US',
+  eu: 'EU',
+  custom: 'Custom',
+};
+
+const DEFAULTS: Record<Exclude<SizeSystem, 'custom'>, Record<PatternAudience, string>> = {
+  intl: DEFAULT_SIZE,
+  uk: { women: '12', men: '40', girls: '6-7y', boys: '6-7y' },
+  us: { women: '8', men: '40', girls: '6', boys: '6' },
+  eu: { women: '40', men: '50', girls: '122', boys: '122' },
+};
+
+const kids = (a: PatternAudience) => a === 'girls' || a === 'boys';
+
+/** Size labels of a standard for an audience (a custom chart lists its own). */
+export function sizesFor(
+  audience: PatternAudience,
+  system: SizeSystem = 'intl',
+  custom?: CustomSizeChart | null,
+): readonly string[] {
+  if (system === 'custom') return custom?.sizes.map((s) => s.label) ?? CHARTS[audience].sizes;
+  if (system === 'intl') return CHARTS[audience].sizes;
+  return STANDARDS[system][audience].map((s) => s.label);
+}
+
+/** The default size of a standard (the first of a custom chart's middle sizes). */
+export function defaultSizeFor(
+  audience: PatternAudience,
+  system: SizeSystem = 'intl',
+  custom?: CustomSizeChart | null,
+): string {
+  if (system === 'custom') {
+    const s = custom?.sizes ?? [];
+    return s[Math.floor((s.length - 1) / 2)]?.label ?? DEFAULT_SIZE[audience];
+  }
+  return DEFAULTS[system][audience];
+}
+
+/** Every body chart measurement at a given bust (adults) or height (children), interpolated. */
+function chartAt(audience: PatternAudience, anchor: number): BodyMeasurements {
   const chart = CHARTS[audience];
-  let i = chart.sizes.indexOf(size);
-  if (i < 0) i = chart.sizes.indexOf(DEFAULT_SIZE[audience]);
+  const key: BodyMeasurementKey = kids(audience) ? 'height' : 'bust';
+  const axis = chart.rows[key]!;
+  let i = 0;
+  while (i < axis.length - 2 && anchor > axis[i + 1]!) i++;
+  const t = (anchor - axis[i]!) / (axis[i + 1]! - axis[i]!);
   const out: BodyMeasurements = {};
-  for (const [k, row] of Object.entries(chart.rows)) out[k as BodyMeasurementKey] = row[i]!;
+  for (const [k, row] of Object.entries(chart.rows))
+    out[k as BodyMeasurementKey] = Math.round(row[i]! + t * (row[i + 1]! - row[i]!));
   return out;
+}
+
+/**
+ * Every body measurement of a size (mm). Unknown sizes fall back to the standard's default size.
+ * `intl` sizes are the body chart's own columns; national sizes set their defining measurements
+ * and take the rest from the chart; custom sizes use the chart's values over the same base.
+ */
+export function measurementsFor(
+  audience: PatternAudience,
+  size: string,
+  system: SizeSystem = 'intl',
+  custom?: CustomSizeChart | null,
+): BodyMeasurements {
+  if (system === 'intl' || (system === 'custom' && !custom)) {
+    const chart = CHARTS[audience];
+    let i = chart.sizes.indexOf(size);
+    if (i < 0) i = chart.sizes.indexOf(DEFAULT_SIZE[audience]);
+    const out: BodyMeasurements = {};
+    for (const [k, row] of Object.entries(chart.rows)) out[k as BodyMeasurementKey] = row[i]!;
+    return out;
+  }
+  if (system === 'custom') {
+    const row =
+      custom!.sizes.find((s) => s.label === size) ??
+      custom!.sizes[Math.floor((custom!.sizes.length - 1) / 2)]!;
+    const anchorKey: BodyMeasurementKey = kids(audience) ? 'height' : 'bust';
+    const base =
+      row.body[anchorKey] !== undefined
+        ? chartAt(audience, row.body[anchorKey]!)
+        : measurementsFor(audience, DEFAULT_SIZE[audience]);
+    return { ...base, ...row.body };
+  }
+  const table = STANDARDS[system][audience];
+  const std =
+    table.find((s) => s.label === size) ??
+    table.find((s) => s.label === DEFAULTS[system][audience])!;
+  const anchor = kids(audience) ? std.height! : std.bust!;
+  const out = chartAt(audience, anchor);
+  for (const k of ['bust', 'waist', 'hip', 'height'] as const)
+    if (std[k] !== undefined) out[k] = std[k];
+  return out;
+}
+
+/** Body measurements of a spec's size (its standard and custom chart). */
+export function specMeasurements(spec: {
+  audience: PatternAudience;
+  size: string;
+  sizeSystem?: SizeSystem;
+  customChart?: CustomSizeChart | undefined;
+}): BodyMeasurements {
+  return measurementsFor(spec.audience, spec.size, spec.sizeSystem ?? 'intl', spec.customChart);
+}
+
+/**
+ * The nearest size in another standard (by bust for adults, height for children) — used when the
+ * user switches the standard so the garment keeps about the same size.
+ */
+export function convertSize(
+  audience: PatternAudience,
+  from: { system: SizeSystem; size: string; custom?: CustomSizeChart | null },
+  to: { system: SizeSystem; custom?: CustomSizeChart | null },
+): string {
+  const key: BodyMeasurementKey = kids(audience) ? 'height' : 'bust';
+  const target = measurementsFor(audience, from.size, from.system, from.custom)[key] ?? 0;
+  let best = defaultSizeFor(audience, to.system, to.custom);
+  let bd = Infinity;
+  for (const s of sizesFor(audience, to.system, to.custom)) {
+    const v = measurementsFor(audience, s, to.system, to.custom)[key] ?? 0;
+    if (Math.abs(v - target) < bd) {
+      bd = Math.abs(v - target);
+      best = s;
+    }
+  }
+  return best;
+}
+
+/** "UK 12", "US 6", "EU 40", "M", "Brand boys · 8". */
+export function sizeLabel(spec: {
+  size: string;
+  sizeSystem?: SizeSystem;
+  customChart?: { name: string } | undefined;
+}): string {
+  const system = spec.sizeSystem ?? 'intl';
+  if (system === 'intl') return spec.size;
+  if (system === 'custom') return `${spec.customChart?.name ?? 'Custom'} · ${spec.size}`;
+  return `${SIZE_SYSTEM_LABELS[system]} ${spec.size}`;
 }
 
 /** Human labels for the measurement table. */
@@ -233,4 +451,18 @@ export function kidsSizeForAge(age: number): string {
       best = s;
     }
   return best;
+}
+
+/**
+ * The same design in another size of its standard (grading for the tech pack size chart): the
+ * chart values change and every measurement the designer changed keeps its difference from the
+ * chart (a 2 cm longer back stays 2 cm longer in every size).
+ */
+export function specForSize(spec: PatternSpec, size: string): PatternSpec {
+  const base = specMeasurements(spec);
+  const next = specMeasurements({ ...spec, size });
+  const body: BodyMeasurements = {};
+  for (const [k, v] of Object.entries(spec.body) as [BodyMeasurementKey, number][])
+    body[k] = Math.max(1, Math.round(v + (next[k] ?? 0) - (base[k] ?? 0)));
+  return { ...spec, size, body };
 }

@@ -392,6 +392,65 @@ describe('AI studio: analyzer and tech packs (integration)', () => {
     expect((await viewer.get(`${org()}/looks/${look.id}`)).status).toBe(200);
     expect((await viewer.post(`${org()}/designs/${out.design.id}/looks`, {})).status).toBe(403);
     expect((await other.owner.client.get(`/v1/orgs/${orgId}/looks/${look.id}`)).status).toBe(404);
+    // Tech pack size range (ADR-067): checked against the standard, ordered, custom charts copied.
+    const tpBase = `${org()}/designs/${out.design.id}/techpacks`;
+    const badSize = await designer.post(tpBase, {
+      provider: 'fake',
+      sizing: { system: 'uk', baseSize: '7-8y', sizes: ['M'] },
+    });
+    expect(badSize.status).toBe(400);
+    const graded = await designer.post(tpBase, {
+      provider: 'fake',
+      sizing: { system: 'uk', baseSize: '7-8y', sizes: ['9-10y', '5-6y', '7-8y'] },
+    });
+    expect(graded.status, await graded.clone().text()).toBe(201);
+    const gradedRow = await prisma.techPack.findUnique({
+      where: { id: (await json<{ id: string }>(graded)).id },
+    });
+    expect((gradedRow!.options as { sizing: unknown }).sizing).toEqual({
+      system: 'uk',
+      baseSize: '7-8y',
+      sizes: ['5-6y', '7-8y', '9-10y'],
+    });
+    const boysChart = await json<{ id: string }>(
+      await designer.post(`${org()}/size-charts`, {
+        name: 'Boys house',
+        audience: 'boys',
+        sizes: [{ label: 'B1', body: { height: 1200 } }],
+      }),
+    );
+    expect(
+      (
+        await designer.post(tpBase, {
+          provider: 'fake',
+          sizing: { system: 'custom', chartId: boysChart.id, baseSize: 'B1', sizes: ['B1'] },
+        })
+      ).status,
+    ).toBe(400);
+    const girlsChart = await json<{ id: string }>(
+      await designer.post(`${org()}/size-charts`, {
+        name: 'Girls house',
+        audience: 'girls',
+        sizes: [
+          { label: 'G1', body: { height: 1160 } },
+          { label: 'G2', body: { height: 1280 } },
+        ],
+      }),
+    );
+    const custom = await designer.post(tpBase, {
+      provider: 'fake',
+      sizing: { system: 'custom', chartId: girlsChart.id, baseSize: 'G1', sizes: ['G2'] },
+    });
+    expect(custom.status, await custom.clone().text()).toBe(201);
+    const customRow = await prisma.techPack.findUnique({
+      where: { id: (await json<{ id: string }>(custom)).id },
+    });
+    expect((customRow!.options as { sizing: unknown }).sizing).toMatchObject({
+      system: 'custom',
+      customChart: { name: 'Girls house', audience: 'girls' },
+      sizes: ['G1', 'G2'],
+    });
+
     // A stored view is protected from deletion while the look references it.
     const view = await uploadImage('front.png', '#dddddd');
     await prisma.designLook.update({

@@ -53,6 +53,7 @@ export const queryKeys = {
       editorState: (designId: string) => [...all, 'design', designId, 'editor-state'] as const,
       aiStatus: () => [...all, 'ai-status'] as const,
       aiSettings: () => [...all, 'ai-settings'] as const,
+      sizeCharts: () => [...all, 'size-charts'] as const,
       analysis: (analysisId: string) => [...all, 'analysis', analysisId] as const,
       techPacks: (designId: string) => [...all, 'design', designId, 'techpacks'] as const,
       techPack: (techPackId: string) => [...all, 'techpack', techPackId] as const,

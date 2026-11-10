@@ -2,19 +2,26 @@
 
 import {
   type BodyMeasurementKey,
+  type CustomSizeChart,
   type PatternAudience,
   type PatternFamily,
   type PatternSpec,
+  type SizeSystem,
 } from '@ai-designer/garment-model';
 import {
   BODY_LABELS,
+  convertSize,
+  defaultSizeFor,
   defaultStyle,
-  measurementsFor,
   measurementsForSpec,
   resolve,
   type SeamCheck,
+  SIZE_SYSTEM_LABELS,
+  sizeLabel,
   sizesFor,
+  specMeasurements,
 } from '@ai-designer/pattern-model';
+import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, CircleAlertIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -22,11 +29,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SimpleSelect } from '@/components/ui/select';
+import { useOrganization } from '@/features/organizations/organization-provider';
+import { sizeChartsApi } from '@/features/sizes/api';
+import { queryKeys } from '@/lib/query/keys';
 import { cn } from '@/lib/utils';
 
 import { AUDIENCE_LABEL, FAMILY_LABEL, fieldsFor, fmt, parseLength, type Unit } from './options';
 
-/** Garment type, who it is for, size — changing the family resets the style to its defaults. */
+/** The organization's size charts for an audience, as spec snapshots (ADR-067). */
+export function useCustomCharts(audience: PatternAudience): CustomSizeChart[] {
+  const { active } = useOrganization();
+  const charts = useQuery({
+    queryKey: queryKeys.org(active.id).sizeCharts(),
+    queryFn: ({ signal }) => sizeChartsApi.list(active.id, signal),
+    staleTime: 60_000,
+  });
+  return (charts.data?.items ?? [])
+    .filter((c) => c.audience === audience)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      audience: c.audience,
+      sizes: c.sizes.map((x) => ({ label: x.label, body: x.body })),
+    }));
+}
+
+const STANDARD_SYSTEMS: Exclude<SizeSystem, 'custom'>[] = ['intl', 'uk', 'us', 'eu'];
+
+/**
+ * Garment type, who it is for, size standard and size (ADR-067) — changing the family resets the
+ * style to its defaults; changing the standard keeps about the same size; a custom chart is copied
+ * into the spec.
+ */
 export function GarmentBasics({
   spec,
   onChange,
@@ -36,8 +70,36 @@ export function GarmentBasics({
   onChange: (next: PatternSpec, label: string) => void;
   disabled?: boolean;
 }) {
+  const custom = useCustomCharts(spec.audience);
+  const system = spec.sizeSystem ?? 'intl';
+  const systemValue = system === 'custom' ? `custom:${spec.customChart?.id ?? ''}` : system;
+  const systemOptions = [
+    ...STANDARD_SYSTEMS.map((s) => ({ value: s, label: SIZE_SYSTEM_LABELS[s] })),
+    ...custom.map((c) => ({ value: `custom:${c.id}`, label: c.name })),
+    // A chart copied earlier that was since deleted or renamed stays selectable.
+    ...(system === 'custom' &&
+    spec.customChart &&
+    !custom.some((c) => c.id === spec.customChart!.id)
+      ? [{ value: systemValue, label: `${spec.customChart.name} (copy)` }]
+      : []),
+  ];
+  const setSystem = (value: string) => {
+    const nextChart = value.startsWith('custom:')
+      ? (custom.find((c) => `custom:${c.id}` === value) ?? spec.customChart ?? null)
+      : null;
+    const to: SizeSystem = nextChart ? 'custom' : (value as SizeSystem);
+    const size = convertSize(
+      spec.audience,
+      { system, size: spec.size, custom: spec.customChart ?? null },
+      { system: to, custom: nextChart },
+    );
+    const next: PatternSpec = { ...spec, sizeSystem: to, size };
+    if (nextChart) next.customChart = nextChart;
+    else delete next.customChart;
+    onChange(next, `Sizes: ${nextChart?.name ?? SIZE_SYSTEM_LABELS[to]} ${size}`);
+  };
   return (
-    <div className="grid grid-cols-3 gap-2" data-testid="garment-basics">
+    <div className="grid grid-cols-2 gap-2" data-testid="garment-basics">
       <div className="flex flex-col gap-1">
         <Label className="text-[12px]">Garment</Label>
         <SimpleSelect
@@ -69,18 +131,30 @@ export function GarmentBasics({
           disabled={disabled}
           onValueChange={(v) => {
             const audience = v as PatternAudience;
-            const sizes = sizesFor(audience);
-            onChange(
-              {
-                ...spec,
-                audience,
-                size: sizes.includes(spec.size) ? spec.size : sizes[Math.floor(sizes.length / 2)]!,
-                body: {},
-              },
-              `For: ${AUDIENCE_LABEL[audience]}`,
-            );
+            // A custom chart belongs to one audience: fall back to International for another.
+            const sys: SizeSystem = system === 'custom' ? 'intl' : system;
+            const sizes = sizesFor(audience, sys);
+            const next: PatternSpec = {
+              ...spec,
+              audience,
+              sizeSystem: sys,
+              size: sizes.includes(spec.size) ? spec.size : defaultSizeFor(audience, sys),
+              body: {},
+            };
+            delete next.customChart;
+            onChange(next, `For: ${AUDIENCE_LABEL[audience]}`);
           }}
           options={Object.entries(AUDIENCE_LABEL).map(([value, label]) => ({ value, label }))}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <Label className="text-[12px]">Size standard</Label>
+        <SimpleSelect
+          aria-label="Size standard"
+          value={systemValue}
+          disabled={disabled}
+          onValueChange={setSystem}
+          options={systemOptions}
         />
       </div>
       <div className="flex flex-col gap-1">
@@ -89,8 +163,13 @@ export function GarmentBasics({
           aria-label="Size"
           value={spec.size}
           disabled={disabled}
-          onValueChange={(size) => onChange({ ...spec, size, body: {} }, `Size ${size}`)}
-          options={sizesFor(spec.audience).map((s) => ({ value: s, label: s }))}
+          onValueChange={(size) =>
+            onChange({ ...spec, size, body: {} }, `Size ${sizeLabel({ ...spec, size })}`)
+          }
+          options={sizesFor(spec.audience, system, spec.customChart ?? null).map((s) => ({
+            value: s,
+            label: s,
+          }))}
         />
       </div>
     </div>
@@ -295,7 +374,7 @@ export function MeasurementsForm({
   unit: Unit;
   disabled?: boolean;
 }) {
-  const chart = measurementsFor(spec.audience, spec.size);
+  const chart = specMeasurements(spec);
   const ctx = resolve(spec);
   const keys = measurementsForSpec(spec);
   const setBody = (key: BodyMeasurementKey, mm: number | null) => {
@@ -311,7 +390,7 @@ export function MeasurementsForm({
     <div className="flex flex-col gap-3" data-testid="measurements-form">
       <section className="flex flex-col gap-1.5">
         <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-          Body ({unit}) — size {spec.size}
+          Body ({unit}) — size {sizeLabel(spec)}
         </h3>
         {keys.map((key) => (
           <LengthInput

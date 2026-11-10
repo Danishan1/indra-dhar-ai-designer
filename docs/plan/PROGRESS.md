@@ -135,6 +135,14 @@ _(date — iteration — what changed — why — ADR link)_
 
 _Newest first. One entry per session. Keep entries short but sufficient for another machine to resume._
 
+### 2026-11-10 — Size standards + premium tech pack (owner request) — DONE
+
+- Request: UK/US/EU/International and custom sizes; choose standard and sizes when generating the tech pack; remove clutter and make the PDF premium.
+- Built (ADR-067): standards and conversion/grading in `pattern-model/src/blocks/sizes.ts`; `patternSpec.sizeSystem` + `customChart`; organization size charts (table `size_charts`, module `size-charts`, Settings → Size charts); Sizes tab "Size standard" picker; tech pack dialog sizing (standard, base size, size chips) → `sizeChartSection` (graded POMs + body); premium `techpack-html.ts` (cover, numbered sections, header/footer, grouped open items, no ids/AI record/component dumps); more POMs.
+- Tests: pattern-model sizes (5), design-ai graded chart + HTML, integration size charts (CRUD, validation, permissions, tenants) + tech pack sizing validation, e2e `sizes.spec.ts`; full suites green (verify, integration 154, e2e 36).
+- **Owner actions:** **`pnpm db:migrate`** (migration `20261110100000_size_charts`), restart `pnpm dev`.
+- **Next step:** owner reviews the new tech pack; then "Start pattern flats" (flats will fill the cover/views with exact drawings).
+
 ### 2026-11-10 — Start from a garment photo or a fabric (owner request) — DONE
 
 - Request: complete the three starting points. Photo/design (worn or not) → line sketch → sketch flow. Fabric → wearer (or AI decides) → garment suggestions → design (reference) + line sketch → sketch flow.

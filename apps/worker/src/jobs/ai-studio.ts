@@ -43,6 +43,7 @@ import {
   techPackTextSchema,
   technicalFlats,
   type TechPackDocument,
+  type TechPackSizing,
   reconstructionSvg,
   DEFAULT_PRESENTATION,
   type Presentation,
@@ -711,6 +712,8 @@ interface TechPackOptions {
   designName?: string;
   designDisplayId?: string;
   projectName?: string;
+  /** Size chart request, checked by the API (ADR-067). */
+  sizing?: TechPackSizing;
 }
 
 async function artifactNames(
@@ -986,6 +989,7 @@ export function techPackHandler(deps: AiStudioDeps): JobHandler {
         views: [...reconstructed, ...flats, ...aiViews],
         componentImages,
         references,
+        sizing: options.sizing ?? null,
       });
 
       const finalDocument = {
@@ -1067,8 +1071,9 @@ async function printPdf(
     const html = techPackHtml(doc, (img) =>
       img.assetId ? (dataUris.get(img.assetId) ?? null) : null,
     );
-    const footer = `${options.designName ?? 'Design'} · ${options.designDisplayId ?? ''} · ${options.revisionLabel ?? ''}`;
-    const pdf = await renderPdf(html, deps.pdfChromiumPath, footer);
+    const footer = `${options.designDisplayId ?? ''} · ${options.revisionLabel ?? ''} · ${options.projectName ?? ''}`;
+    const header = `${options.designName ?? 'Design'} — technical package`;
+    const pdf = await renderPdf(html, deps.pdfChromiumPath, footer, header);
     const design = await deps.assets.prisma.design.findFirst({
       where: { id: row.designId },
       select: { projectId: true },
@@ -1135,6 +1140,7 @@ export async function renderPdf(
   html: string,
   executablePath?: string,
   footer = '',
+  header = '',
 ): Promise<Buffer> {
   const { chromium } = await import('playwright-core');
   const { existsSync } = await import('node:fs');
@@ -1165,8 +1171,10 @@ export async function renderPdf(
         printBackground: true,
         preferCSSPageSize: true,
         displayHeaderFooter: true,
-        headerTemplate: '<div></div>',
-        footerTemplate: `<div style="font-family:Helvetica,Arial,sans-serif;font-size:8px;color:#6b7280;width:100%;padding:0 14mm;display:flex;justify-content:space-between"><span>${esc(footer)}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+        headerTemplate: header
+          ? `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:7.5px;letter-spacing:.12em;text-transform:uppercase;color:#64748b;width:100%;padding:0 14mm;display:flex;justify-content:space-between"><span>${esc(header)}</span><span style="color:#1e3a5f;font-weight:600">${esc(footer.split(' · ')[0] ?? '')}</span></div>`
+          : '<div></div>',
+        footerTemplate: `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:7.5px;color:#64748b;width:100%;padding:0 14mm;display:flex;justify-content:space-between;padding-top:2mm"><span>${esc(footer)}</span><span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
       }),
     );
   } finally {

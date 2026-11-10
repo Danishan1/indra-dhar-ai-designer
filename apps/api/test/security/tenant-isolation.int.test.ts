@@ -43,6 +43,16 @@ const BODIES: Record<string, unknown> = {
   'POST /v1/orgs/:orgId/analyses/:analysisId/fabric-choice': { suggestion: 0 },
   'POST /v1/orgs/:orgId/designs/:designId/techpacks': {},
   'POST /v1/orgs/:orgId/designs/:designId/looks': {},
+  'POST /v1/orgs/:orgId/size-charts': {
+    name: 'Probe chart',
+    audience: 'boys',
+    sizes: [{ label: 'S', body: { height: 1160 } }],
+  },
+  'PUT /v1/orgs/:orgId/size-charts/:chartId': {
+    name: 'Probe chart',
+    audience: 'boys',
+    sizes: [{ label: 'S', body: { height: 1160 } }],
+  },
   'PUT /v1/orgs/:orgId/ai/providers/key': { provider: 'gemini', apiKey: 'AIza-isolation-probe' },
   'POST /v1/orgs/:orgId/ai/providers/key/remove': { provider: 'gemini' },
   'POST /v1/orgs/:orgId/ai/providers/refresh': { provider: 'gemini' },
@@ -110,6 +120,7 @@ describe('cross-tenant isolation', () => {
   const analysisIds = new Map<string, string>();
   const techPackIds = new Map<string, string>();
   const lookIds = new Map<string, string>();
+  const chartIds = new Map<string, string>();
 
   const paramsFor = (t: TenantFixture) => ({
     orgId: t.orgId,
@@ -126,6 +137,7 @@ describe('cross-tenant isolation', () => {
     analysisId: analysisIds.get(t.orgId) ?? '',
     techPackId: techPackIds.get(t.orgId) ?? '',
     lookId: lookIds.get(t.orgId) ?? '',
+    chartId: chartIds.get(t.orgId) ?? '',
   });
 
   /** AI studio rows are inserted directly (creating them needs processed images / the worker). */
@@ -172,6 +184,16 @@ describe('cross-tenant isolation', () => {
       },
     });
     lookIds.set(t.orgId, lookId);
+    const chartId = newId();
+    await prisma.sizeChart.create({
+      data: {
+        id: chartId,
+        organizationId: t.orgId,
+        name: `Chart ${chartId.slice(-6)}`,
+        audience: 'boys',
+      },
+    });
+    chartIds.set(t.orgId, chartId);
   }
 
   async function startArtifact(t: TenantFixture): Promise<void> {
@@ -275,7 +297,7 @@ describe('cross-tenant isolation', () => {
   it("mixing ids (own org, other tenant's member/invitation/asset/project/design/revision) is also 404", async () => {
     const failures = await checkTenantIsolation({
       routes: routes.filter((r) =>
-        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId|:analysisId|:techPackId|:lookId/.test(
+        /:membershipId|:invitationId|:assetId|:projectId|:designId|:revisionId|:artifactId|:artifactRevisionId|:operationId|:runId|:analysisId|:techPackId|:lookId|:chartId/.test(
           r.path,
         ),
       ),

@@ -52,6 +52,16 @@ Size charts are approximations to start from — every measurement is editable. 
 hand are kept when sizes or style change (banner: _Redraft them_). Seam lines are the outline;
 the seam allowance is drawn outside.
 
+### Size standards and the tech pack size chart (ADR-067)
+
+| Piece                                                                                                                                                                                            | Where                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `patternSpec.sizeSystem` (`intl` default, `uk`, `us`, `eu`, `custom`) + `customChart` snapshot                                                                                                   | `garment-model/src/schema/pattern-spec.ts`                                                        |
+| Standards, `sizesFor`, `measurementsFor(audience, size, system, chart)`, `specMeasurements`, `convertSize`, `sizeLabel`, `specForSize` (grading)                                                 | `pattern-model/src/blocks/sizes.ts`                                                               |
+| Organization size charts: `size_charts` table, `GET/POST /size-charts`, `GET/PUT/DELETE /size-charts/:chartId` (view: `design.view`; edit: `artifact.create` / `artifact.edit`)                  | `apps/api/src/modules/size-charts`                                                                |
+| Settings → Size charts page; Sizes tab standard picker (`GarmentBasics`, `useCustomCharts`)                                                                                                      | `web/features/sizes/`, `web/features/patterns/pattern-forms.tsx`                                  |
+| Tech pack `sizing {system, chartId?, baseSize, sizes}` → options (checked, ordered, custom chart copied); `sizeChartSection` (POM + body per size, graded); premium HTML + running header/footer | `techpacks.service.ts`, `design-ai/src/techpack-sizes.ts`, `techpack-html.ts`, worker `renderPdf` |
+
 ### Other starts: photo and fabric → line sketch (ADR-066)
 
 | Piece                                                                                                                                                                                                                                                                                                                                      | Where                                                                                                        |

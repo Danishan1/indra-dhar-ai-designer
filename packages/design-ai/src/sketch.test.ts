@@ -59,8 +59,38 @@ describe('sketch → pattern (ADR-058)', () => {
     expect(doc.measurements.some((m) => m.source.startsWith('Size chart'))).toBe(true);
     expect(doc.patterns.pieces.length).toBe(state.patternPieces!.length);
     const html = techPackHtml(doc, () => null);
-    expect(html).toContain('Pattern specification');
+    expect(html).toContain('Specification');
     expect(html).toContain('Seam fit checks');
+    // ADR-067: a size chart (one size by default); no ids, sources or AI processing record.
+    expect(doc.sizing).toMatchObject({ standard: 'International', baseSize: '8y', sizes: ['8y'] });
+    expect(html).toContain('Size chart — International');
+    expect(html.replace(/<svg[\s\S]*?<\/svg>/g, '')).not.toContain('pat_');
+    expect(html).not.toContain('AI processing record');
+    // Graded size range in UK sizes for the same girl's dress.
+    const graded = buildTechPack({
+      state,
+      header: {
+        designName: 'Party dress',
+        designDisplayId: 'DSN-1',
+        revisionLabel: 'R001',
+        revisionId: 'r',
+        projectName: 'P',
+        generatedAt: '2026-11-04T10:00:00Z',
+        provider: 'fake',
+      },
+      artifacts: new Map(),
+      text: null,
+      views: [],
+      componentImages: {},
+      sizing: { system: 'uk', baseSize: '7-8y', sizes: ['5-6y', '7-8y', '9-10y'] },
+    }).sizing!;
+    expect(graded.sizes).toEqual(['5-6y', '7-8y', '9-10y']);
+    const chest = graded.pom.find((p) => p.label.startsWith('Bust / chest'))!;
+    expect(chest.values[0]!).toBeLessThan(chest.values[1]!);
+    expect(chest.values[1]!).toBeLessThan(chest.values[2]!);
+    const height = graded.body.find((b) => b.label === 'Height');
+    expect(height?.values).toEqual([1160, 1280, 1400]);
+    expect(graded.pom.map((p) => p.label)).toContain('Hem width (all round)');
     // ADR-060: cutting layout drives the yardage; sewing order comes from the parts.
     expect(doc.patterns.markers[0]).toMatchObject({ fabricRole: 'main', fabricWidthMm: 1500 });
     expect(doc.patterns.markers[0]!.lengthMm).toBeGreaterThan(400);

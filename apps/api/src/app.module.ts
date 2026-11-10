@@ -13,6 +13,7 @@ import { LooksModule } from './modules/looks/looks.module.js';
 import { OperationsModule } from './modules/operations/operations.module.js';
 import { OrganizationsModule } from './modules/organizations/organizations.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
+import { SizeChartsModule } from './modules/size-charts/size-charts.module.js';
 import { TechPacksModule } from './modules/techpacks/techpacks.module.js';
 import { ValidationModule } from './modules/validation/validation.module.js';
 import { type AppConfig } from './platform/config/app-config.js';
@@ -44,6 +45,7 @@ const FEATURE_MODULES: DynamicModule['imports'] = [
   AnalysisModule,
   TechPacksModule,
   LooksModule,
+  SizeChartsModule,
   OrganizationsModule,
 ];
 

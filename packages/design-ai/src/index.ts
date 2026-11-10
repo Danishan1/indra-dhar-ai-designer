@@ -17,3 +17,4 @@ export * from './sketch.js';
 export * from './techpack-pattern.js';
 export * from './look.js';
 export * from './starts.js';
+export * from './techpack-sizes.js';

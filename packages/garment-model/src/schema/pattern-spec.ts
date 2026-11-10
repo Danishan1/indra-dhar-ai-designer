@@ -203,12 +203,44 @@ export const setGarmentSchema = z.object({
 });
 export type SetGarment = z.infer<typeof setGarmentSchema>;
 
+/**
+ * Size standards (ADR-067). `intl` = letter sizes (XS–3XL) and ages for kids; `uk`, `us`, `eu` =
+ * the national size labels; `custom` = an organization size chart, copied into the spec so a
+ * revision never changes when the chart is edited later.
+ */
+export const SizeSystems = ['intl', 'uk', 'us', 'eu', 'custom'] as const;
+export const sizeSystemSchema = z.enum(SizeSystems);
+export type SizeSystem = z.infer<typeof sizeSystemSchema>;
+
+export const customSizeChartSchema = z.object({
+  /** Id of the organization chart it was copied from. */
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(120),
+  audience: z.enum(PatternAudiences),
+  sizes: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(20),
+        /** Body measurements of the size (mm); missing ones follow the standard body chart. */
+        body: bodyMeasurementsSchema.default({}),
+      }),
+    )
+    .min(1)
+    .max(40)
+    .refine((s) => new Set(s.map((x) => x.label)).size === s.length, 'size labels must be unique'),
+});
+export type CustomSizeChart = z.infer<typeof customSizeChartSchema>;
+
 export const patternSpecSchema = z.object({
   version: z.literal(1).default(1),
   family: z.enum(PatternFamilies),
   audience: z.enum(PatternAudiences),
-  /** Size chart entry the measurements started from, e.g. `M` or `6y`. */
+  /** Size chart entry the measurements started from, e.g. `M`, `UK 12` → `12`, `6y`. */
   size: z.string().trim().min(1).max(20),
+  /** The standard `size` belongs to (ADR-067); specs before it are `intl`. */
+  sizeSystem: sizeSystemSchema.default('intl'),
+  /** The organization size chart, when `sizeSystem` is `custom`. */
+  customChart: customSizeChartSchema.optional(),
   body: bodyMeasurementsSchema.default({}),
   style: patternStyleSchema.default(patternStyleSchema.parse({})),
   /** Extra ease added to the body (mm, full circumference); null = from the fit. */

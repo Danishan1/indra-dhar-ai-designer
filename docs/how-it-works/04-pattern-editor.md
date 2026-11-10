@@ -88,12 +88,12 @@ sequenceDiagram
 
 ## Side panels
 
-| Tab       | Contents                                                                                                                                        |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Piece** | name, source, size, seam allowance, cut quantity, transforms, lengthen/widen, point editing, **seam table** (length, intake, SA per seam, fold) |
-| **Sizes** | garment / for / size; body measurements of every garment of the set (chart value or yours, reset); ease; seam and hem allowance                 |
-| **Style** | one section per garment with all its options; add/remove set garments                                                                           |
-| **Fit**   | the seam checks (fits / check / does not fit), per garment in a set                                                                             |
+| Tab       | Contents                                                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Piece** | name, source, size, seam allowance, cut quantity, transforms, lengthen/widen, point editing, **seam table** (length, intake, SA per seam, fold)                                                               |
+| **Sizes** | garment / for / **size standard** (International, UK, US, EU or an organization size chart) / size; body measurements of every garment of the set (chart value or yours, reset); ease; seam and hem allowance |
+| **Style** | one section per garment with all its options; add/remove set garments                                                                                                                                         |
+| **Fit**   | the seam checks (fits / check / does not fit), per garment in a set                                                                                                                                           |
 
 The right panel's other tabs: **Looks** (look previews, below), **History** (revisions — compare,
 inspect, restore), **Changes** (this session's operations; undo/redo), **Checks** (validation

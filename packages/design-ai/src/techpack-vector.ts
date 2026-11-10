@@ -148,7 +148,7 @@ export function pieceDetailSvg(piece: PatternPiece): string {
     // scale bar 100 mm
     `<g transform="translate(${f(x0 + 20)} ${f(y0 + H - 24)})"><rect width="100" height="${f(sw * 4)}" fill="#111827"/><rect width="50" height="${f(sw * 4)}" fill="#fff" stroke="#111827" stroke-width="${f(sw / 2)}"/><text x="105" y="${f(sw * 4)}" font-size="${f(fs * 0.8)}" font-family="Helvetica, Arial, sans-serif">100 mm</text></g>`,
     `<text x="${f(b.x + b.width / 2)}" y="${f(b.y + b.height / 2)}" font-size="${f(fs)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif">${esc(piece.name)}</text>`,
-    `<text x="${f(b.x + b.width / 2)}" y="${f(b.y + b.height / 2 + fs * 1.3)}" font-size="${f(fs * 0.75)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#374151">Cut ${piece.cutQuantity}${piece.foldLine ? ' on fold' : ''}${piece.mirrored ? ' (pair)' : ''} · SA ${sa} mm · ${esc(piece.pieceId)}</text>`,
+    `<text x="${f(b.x + b.width / 2)}" y="${f(b.y + b.height / 2 + fs * 1.3)}" font-size="${f(fs * 0.75)}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#374151">Cut ${piece.cutQuantity}${piece.foldLine ? ' on fold' : ''}${piece.mirrored ? ' (pair)' : ''} · SA ${sa} mm</text>`,
   ];
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${f(x0)} ${f(y0)} ${f(W)} ${f(H)}" data-width-mm="${f(W)}" data-height-mm="${f(H)}">${parts.join('')}</svg>`;
 }

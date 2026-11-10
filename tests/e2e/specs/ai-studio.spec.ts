@@ -183,11 +183,13 @@ test('AI studio: sketch → patterns → pattern editor → tech pack (ADR-058)'
   await expect(page.getByRole('heading', { level: 1, name: /^Tech pack/ })).toBeVisible();
   await expect(page.getByTestId('techpack-document')).toBeVisible({ timeout: 120_000 });
   const frame = page.frameLocator('[data-testid="techpack-document"]');
-  await expect(frame.getByRole('heading', { name: 'Pattern specification' })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Specification', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: /^Size chart — / })).toBeVisible();
+  await expect(frame.getByText('AI processing record')).toHaveCount(0);
   await expect(frame.getByRole('heading', { name: 'Seam fit checks' })).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Flat patterns' })).toBeVisible();
-  await expect(frame.getByRole('heading', { name: /Pattern piece — Bodice front/ })).toBeVisible();
-  await expect(frame.getByRole('heading', { name: 'Original reference' })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Bodice front', exact: true })).toBeVisible();
+  await expect(frame.getByRole('heading', { name: 'Reference', exact: true })).toBeVisible();
   await expect(frame.getByText('Sleeve band', { exact: false }).first()).toBeVisible();
   await expect(frame.getByRole('heading', { name: 'Cutting layout — main' })).toBeVisible();
   await expect(frame.getByText('hem 40 mm').first()).toBeVisible();

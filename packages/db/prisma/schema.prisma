@@ -317,6 +317,7 @@ model Organization {
   designAnalyses    DesignAnalysis[]
   techPacks         TechPack[]
   looks             DesignLook[]
+  sizeCharts        SizeChart[]
   aiUsageRecords    AiUsageRecord[]
   aiProviderConnections AiProviderConnection[]
   aiSettings        AiSettings?
@@ -1002,6 +1003,26 @@ model DesignLook {
   @@index([designId])
   @@index([revisionId])
   @@map("design_looks")
+}
+
+/// Organization size charts (ADR-067): named custom charts (sizes with body measurements) that
+/// designs and tech packs can use. Designs keep a copy of the chart they use.
+model SizeChart {
+  id             String       @id @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String
+  /// women | men | girls | boys
+  audience       String
+  /// [{ label, body: { bust: mm, … } }]
+  sizes          Json         @default("[]")
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, name])
+  @@index([organizationId, audience])
+  @@map("size_charts")
 }
 
 /// One AI provider call (ADR-056): simple usage log and daily preflight until metering (I24).

@@ -4,7 +4,7 @@
 (`techPackHandler`); document `packages/design-ai/src/techpack.ts` (`buildTechPack`),
 `techpack-pattern.ts`, `techpack-vector.ts`, `techpack-html.ts`, prompts in `prompts.ts`; pattern
 helpers from `packages/pattern-model` (cut lines, markers, sewing order). Decisions: ADR-056,
-ADR-057, ADR-058, ADR-060.
+ADR-057, ADR-058, ADR-060, ADR-067.
 
 ## The rule
 
@@ -16,7 +16,7 @@ anything unknown is listed as _missing_ rather than invented.
 
 ```mermaid
 flowchart TB
-  A[POST /designs/:id/techpacks<br/>revision, provider, presentation options] --> B[TechPack row + techpack.generate job]
+  A[POST /designs/:id/techpacks<br/>revision, provider, presentation, sizing] --> B[TechPack row + techpack.generate job]
   B --> C[Read the revision<br/>check content hash]
   C --> D[Load the sketch as reference]
   D --> E[AI text: construction notes<br/>context = pattern description,<br/>pattern section, proposed sewing order]
@@ -36,22 +36,51 @@ flowchart TB
 | Assembling the tech pack     | `buildTechPack` (below)                                                                                                                                                                                                                                                                                                                      |
 | Printing the PDF             | HTML rendered by headless Chromium (needs Chrome/Chromium on the server or `PDF_CHROMIUM_PATH`)                                                                                                                                                                                                                                              |
 
+## Sizes (ADR-067)
+
+The dialog asks for the **size standard** (International, UK, US, EU or one of the organization's
+size charts), the **base size** — the design's size converted to that standard; the patterns are
+drawn in it — and the **sizes to produce** (chips, "All sizes" / "Base only"). The API checks every
+size belongs to the standard for the design's wearer, orders them small to large, and copies a
+custom chart into the tech pack so it never changes later.
+
+The **size chart** (`design-ai/src/techpack-sizes.ts`) has two tables, sizes as columns, base size
+highlighted:
+
+- **Finished garment** — chest, waist, hip, centre back length, sleeve length, sleeve opening, skirt
+  length, hem width, outseam, inseam, leg opening (whatever the garment has). The base column is
+  read off the drawn patterns (hand edits included); every other size is **graded** by drafting that
+  size (`specForSize`: chart values of the size + every measurement change the designer made) and
+  adding the difference to the base.
+- **Body measurements** — height first, then everything the garment is drafted from.
+
+Notes under the tables say what is graded and flag hand-edited pieces (drawn in the base size only).
+
 ## What the document contains (pattern-first designs)
 
-| Section                                     | Source                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cover                                       | design name, garment label, category, audience, design id, revision, project, date, AI provider/models, description, disclaimer, two pictures                                                                                                                                                       |
-| Original reference                          | the uploaded sketch(es)                                                                                                                                                                                                                                                                             |
-| Garment views / on model                    | AI images                                                                                                                                                                                                                                                                                           |
-| **Pattern specification**                   | garment(s) / set, audience, size, seam & hem allowance; style table (per garment in a set); **body measurements** (chart or entered); **finished garment** measurements (bust/chest + ease, waist, CB length, sleeve length, skirt length, hip, outseam — read off the pieces); **seam fit checks** |
-| **Bill of materials**                       | main fabric (and lining / interfacing / rib) **length from the cutting layout** + 5 %; zips from zip marks; buttons from button marks; interfacing; thread; labels — each with status _estimate_ / _missing_                                                                                        |
-| Measurement specification                   | the same measurements as points of measure with source and status                                                                                                                                                                                                                                   |
-| Flat patterns                               | pattern sheet of all pieces + table (cut, size, seam allowance, per-seam allowances such as "hem 30 mm", fold edges, source, status)                                                                                                                                                                |
-| **Pattern piece — …** (one page each)       | dimensioned vector drawing: seam line, cutting line, fold, grain, notches, markings, every seam with its length (and "SA 30" / "FOLD" where it differs), overall width/height, 100 mm scale bar                                                                                                     |
-| **Cutting layout — main** (+ other fabrics) | marker drawing: every piece to cut on 150 cm fabric, grain along the length, marker length and % used (a planning estimate, not a production marker)                                                                                                                                                |
-| **Construction**                            | AI-drafted steps (marked _review before production_) or the deterministic sewing order (marked _proposed_); stitching table; finishing; quality checkpoints; care                                                                                                                                   |
-| Missing or unconfirmed information          | e.g. fabric composition, provisional patterns to verify, hand-edited pieces to check, seams that do not fit                                                                                                                                                                                         |
-| AI processing record                        | which models were tried for each AI part, retries and fallbacks                                                                                                                                                                                                                                     |
+Layout (ADR-067): A4, a **cover** (accent band, style no., revision, size range, base size, project,
+issue date, a hero drawing), then **numbered sections**; running header (design name — technical
+package · style no.) and footer (style no. · revision · project · page x / y) on every page. Tables
+have no technical ids or source columns; statuses appear only where they matter (_estimate_,
+_missing_).
+
+| Section                                     | Source                                                                                                                                                            |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cover                                       | design name, garment, wearer, style no., revision, size range, base size, project, date, hero picture, one-line disclaimer                                        |
+| 01 Overview                                 | description; garment, wearer, size standard, base size, size range, allowances; the original sketch as a small reference                                          |
+| 02 Specification                            | style options (per garment in a set) as a compact grid; **seam fit checks**                                                                                       |
+| Garment views / presentation                | drawings and AI pictures, when there are any (AI pictures are labelled)                                                                                           |
+| **03 Size chart — UK** (…)                  | finished garment and body measurements per size (above)                                                                                                           |
+| **Bill of materials**                       | main fabric (and lining / interfacing / rib) **length from the cutting layout** + 5 %; zips; buttons; interfacing; thread; labels — _estimate_ / _missing_ marked |
+| Flat patterns                               | pattern sheet + table (cut, size in cm, seam allowance with per-seam notes, fabric)                                                                               |
+| One page per piece                          | dimensioned vector drawing (seam line, cutting line, fold, grain, notches, markings, seam lengths, 100 mm scale bar)                                              |
+| **Cutting layout — main** (+ other fabrics) | marker drawing, length and % used (planning estimate)                                                                                                             |
+| **Construction**                            | AI-drafted steps (marked) or the deterministic sewing order; stitching; finishing; quality checkpoints; care                                                      |
+| Open items                                  | what is not specified yet, **grouped** — one line per item with every piece or part it applies to                                                                 |
+
+Removed in ADR-067: the AI processing record, technical ids (piece ids), source and status columns
+on every row, and long attribute lists per component (component designs get a short table:
+component, fabric, key details).
 
 ## The deterministic sewing order (`pattern-model/src/sewing-order.ts`)
 

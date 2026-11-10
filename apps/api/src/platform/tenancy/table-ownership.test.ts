@@ -41,6 +41,7 @@ const OWNERS: Record<string, string | string[]> = {
   designAnalysis: 'modules/analysis',
   techPack: 'modules/techpacks',
   designLook: 'modules/looks',
+  sizeChart: 'modules/size-charts',
   aiUsageRecord: 'modules/ai',
   aiProviderConnection: 'modules/ai',
   aiSettings: 'modules/ai',

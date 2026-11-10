@@ -1,10 +1,12 @@
 'use client';
 
+import { type PatternSpec, patternSpecSchema, type SizeSystem } from '@ai-designer/garment-model';
+import { convertSize, SIZE_SYSTEM_LABELS, sizesFor } from '@ai-designer/pattern-model';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileTextIcon } from 'lucide-react';
+import { CheckIcon, FileTextIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,9 +21,11 @@ import { Label } from '@/components/ui/label';
 import { SimpleSelect } from '@/components/ui/select';
 import { newIdempotencyKey } from '@/features/designs/api';
 import { useOrganization } from '@/features/organizations/organization-provider';
+import { useCustomCharts } from '@/features/patterns/pattern-forms';
 import { studioApi } from '@/features/studio/api';
 import { toApiError } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/query/keys';
+import { cn } from '@/lib/utils';
 
 import { useRevisionsApi } from '../revisions/use-revisions';
 import { selectHasUnsavedWork } from '../store';
@@ -77,6 +81,9 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
     view: 'front' as 'front' | 'back',
   });
   const [provider, setProvider] = useState('');
+  const rawSpec = useEditor((s) => s.display.patternSpec);
+  const spec = useMemo(() => (rawSpec ? patternSpecSchema.parse(rawSpec) : null), [rawSpec]);
+  const sizing = useSizing(spec);
   const key = useRef(newIdempotencyKey());
 
   const status = useQuery({
@@ -116,6 +123,7 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
         designId,
         {
           modelImages,
+          ...(sizing.request ? { sizing: sizing.request } : {}),
           presentation,
           ...(chosen ? { provider: chosen as 'gemini' | 'openai' | 'fake' } : {}),
         },
@@ -161,6 +169,7 @@ function TechPackDialog({ onClose }: { onClose: () => void }) {
           </div>
         ) : null}
         <div className="flex flex-col gap-3">
+          {spec ? <SizingPicker sizing={sizing} /> : null}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="tp-provider">AI provider</Label>
             <SimpleSelect
@@ -295,5 +304,139 @@ function Preset({
         options={options.map(([v, l]) => ({ value: v, label: l }))}
       />
     </div>
+  );
+}
+
+const STANDARD_SYSTEMS: Exclude<SizeSystem, 'custom'>[] = ['intl', 'uk', 'us', 'eu'];
+
+/**
+ * Size chart of the tech pack (ADR-067): the standard (or an organization chart), the base size —
+ * the design's size converted to that standard — and the sizes to grade.
+ */
+function useSizing(spec: PatternSpec | null) {
+  const audience = spec?.audience ?? 'women';
+  const custom = useCustomCharts(audience);
+  const designSystem = spec?.sizeSystem ?? 'intl';
+  const [value, setValue] = useState<string>(
+    designSystem === 'custom' ? `custom:${spec?.customChart?.id ?? ''}` : designSystem,
+  );
+  const chart = value.startsWith('custom:')
+    ? (custom.find((c) => `custom:${c.id}` === value) ??
+      (spec?.customChart && `custom:${spec.customChart.id}` === value ? spec.customChart : null))
+    : null;
+  const system: SizeSystem = chart
+    ? 'custom'
+    : value.startsWith('custom:')
+      ? 'intl'
+      : (value as SizeSystem);
+  const all = sizesFor(audience, system, chart);
+  const converted = spec
+    ? convertSize(
+        audience,
+        { system: designSystem, size: spec.size, custom: spec.customChart ?? null },
+        { system, custom: chart },
+      )
+    : '';
+  const [base, setBase] = useState<string | null>(null);
+  const baseSize = base && all.includes(base) ? base : converted;
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const sizes = (picked ?? [baseSize]).filter((s) => all.includes(s));
+  const withBase = all.filter((s) => s === baseSize || sizes.includes(s));
+  return {
+    custom,
+    value,
+    system,
+    all,
+    baseSize,
+    sizes: withBase,
+    setStandard: (v: string) => {
+      setValue(v);
+      setBase(null);
+      setPicked(null);
+    },
+    setBase: (s: string) => setBase(s),
+    toggle: (s: string) =>
+      setPicked(withBase.includes(s) ? withBase.filter((x) => x !== s) : [...withBase, s]),
+    setAll: (on: boolean) => setPicked(on ? [...all] : [baseSize]),
+    request: spec
+      ? {
+          system,
+          ...(chart ? { chartId: chart.id } : {}),
+          baseSize,
+          sizes: withBase,
+        }
+      : null,
+  };
+}
+
+function SizingPicker({ sizing }: { sizing: ReturnType<typeof useSizing> }) {
+  return (
+    <fieldset className="flex flex-col gap-2 rounded-md border p-2.5" data-testid="techpack-sizing">
+      <legend className="px-1 text-[13px] font-medium">Sizes</legend>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="tp-standard" className="text-[12px]">
+            Size standard
+          </Label>
+          <SimpleSelect
+            id="tp-standard"
+            value={sizing.value}
+            onValueChange={sizing.setStandard}
+            options={[
+              ...STANDARD_SYSTEMS.map((s) => ({ value: s, label: SIZE_SYSTEM_LABELS[s] })),
+              ...sizing.custom.map((c) => ({ value: `custom:${c.id}`, label: c.name })),
+            ]}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="tp-base" className="text-[12px]">
+            Base size (patterns)
+          </Label>
+          <SimpleSelect
+            id="tp-base"
+            value={sizing.baseSize}
+            onValueChange={sizing.setBase}
+            options={sizing.all.map((s) => ({ value: s, label: s }))}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Sizes to grade">
+        {sizing.all.map((s) => {
+          const on = sizing.sizes.includes(s);
+          const base = s === sizing.baseSize;
+          return (
+            <Button
+              key={s}
+              type="button"
+              size="sm"
+              variant={on ? 'default' : 'outline'}
+              aria-pressed={on}
+              disabled={base}
+              className={cn('h-7 gap-1 px-2 text-xs', base && 'disabled:opacity-100')}
+              onClick={() => sizing.toggle(s)}
+              data-testid={`tp-size-${s}`}
+            >
+              {on ? <CheckIcon aria-hidden /> : null}
+              {s}
+            </Button>
+          );
+        })}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs"
+          onClick={() => sizing.setAll(sizing.sizes.length < sizing.all.length)}
+          data-testid="tp-size-all"
+        >
+          {sizing.sizes.length < sizing.all.length ? 'All sizes' : 'Base only'}
+        </Button>
+      </div>
+      <p className="text-[12px] text-muted-foreground" data-testid="tp-size-summary">
+        {sizing.sizes.length === 1
+          ? `Size chart for ${sizing.baseSize} only.`
+          : `Size chart for ${sizing.sizes.length} sizes (${sizing.sizes[0]}–${sizing.sizes[sizing.sizes.length - 1]}), graded from the base size ${sizing.baseSize}.`}
+      </p>
+    </fieldset>
   );
 }

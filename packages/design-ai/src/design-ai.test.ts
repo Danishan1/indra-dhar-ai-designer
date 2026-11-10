@@ -238,7 +238,7 @@ describe('tech pack document', () => {
     const html = techPackHtml(doc, () => null);
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('Bill of materials');
-    expect(html).toContain('Missing or unconfirmed information');
+    expect(html).toContain('Open items');
     expect(html).not.toContain('<script');
   });
 });

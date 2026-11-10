@@ -24,11 +24,15 @@ flowchart LR
 
 ## 1. Measurements: size chart + your changes + ease
 
-- **Size charts** (`sizes.ts`): women XS–XXL, men S–3XL, children 2y–14y (girls and boys share the
-  kids' chart). 22 body measurements: height, bust/chest, waist, hip, neck, shoulder, across back,
-  back length, front length, bust depth/span, armhole depth, arm length, upper arm, wrist, waist to
-  hip/knee/floor, crotch depth (rise), thigh, knee, ankle. They are approximations of common European
-  charts — a starting point.
+- **Size charts** (`sizes.ts`): one body chart per audience — women XS–XXL, men S–3XL, children
+  2y–14y (girls and boys share it) — with every body measurement. **Size standards** (ADR-067) only
+  say what their sizes are: **UK** (women 4–22, men chest 34–48", kids by age 2-3y…13-14y), **US**
+  (women 0–18 = UK − 4, men by chest, kids 2T–4T and 5–16), **EU** (women 32–50 = UK + 28, men 44–58,
+  kids by height 92–164), **International** (the chart's own letter sizes and ages) and **custom**
+  organization charts (Settings → Size charts; copied into the spec). A national size sets its
+  defining measurements (bust/chest, waist, hip for adults; height for children) and takes the rest
+  from the body chart, interpolated. `convertSize` keeps about the same body when the standard
+  changes; `specForSize` grades a design to another size, keeping the designer's changes.
 - **Your measurements** (`spec.body`) override chart values one by one (Sizes tab).
 - **Ease** — extra room added to the body, by fit (`resolve.ts`):
 

@@ -10,7 +10,7 @@ import { pieceBounds } from '../cad/path.js';
 
 import { draftPattern } from './draft-pattern.js';
 import { garmentName, lengthFor, resolve } from './resolve.js';
-import { BODY_LABELS, measurementsFor, measurementsForSpec } from './sizes.js';
+import { BODY_LABELS, specMeasurements, measurementsForSpec } from './sizes.js';
 
 /**
  * "Size by measurement" (ADR-062): make a piece a given width or length by changing the
@@ -46,7 +46,7 @@ const lengthKind = (family: string): 'top' | 'skirt' | 'trousers' =>
 /** Every lever of a spec with its current value. */
 export function measurementLevers(input: PatternSpec): Lever[] {
   const spec = patternSpecSchema.parse(input);
-  const chart = measurementsFor(spec.audience, spec.size);
+  const chart = specMeasurements(spec);
   const out: Lever[] = [];
   for (const k of measurementsForSpec(spec)) {
     const v = spec.body[k] ?? chart[k] ?? 0;

@@ -137,6 +137,19 @@ export const createTechPackRequestSchema = z.object({
       background: 'studio_white',
       view: 'front',
     }),
+  /**
+   * Size chart of the tech pack (ADR-067): the standard, the base size (the drawn patterns) and the
+   * sizes to grade. Default: the design's own standard and size only.
+   */
+  sizing: z
+    .object({
+      system: z.enum(['intl', 'uk', 'us', 'eu', 'custom']),
+      /** An organization size chart, when `system` is `custom`. */
+      chartId: z.uuid().optional(),
+      baseSize: z.string().trim().min(1).max(20),
+      sizes: z.array(z.string().trim().min(1).max(20)).min(1).max(24),
+    })
+    .optional(),
 });
 export type CreateTechPackRequest = z.input<typeof createTechPackRequestSchema>;
 
@@ -352,3 +365,40 @@ export const testModelResponseSchema = z.object({
   latencyMs: z.number().int(),
 });
 export type TestModelResponse = z.infer<typeof testModelResponseSchema>;
+
+// ── organization size charts (ADR-067) ───────────────────────────────────────
+
+export const SizeChartAudiences = ['women', 'men', 'girls', 'boys'] as const;
+
+const sizeChartBodySchema = z.record(
+  z.string().regex(/^[a-z_]{2,30}$/),
+  z.number().finite().min(1).max(3000),
+);
+
+export const sizeChartInputSchema = z.object({
+  name: z.string().trim().min(1, { message: 'Enter a name' }).max(120),
+  audience: z.enum(SizeChartAudiences),
+  /** Sizes in order (small to large), each with the body measurements that define it (mm). */
+  sizes: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1, { message: 'Enter a size label' }).max(20),
+        body: sizeChartBodySchema.default({}),
+      }),
+    )
+    .min(1, { message: 'Add at least one size' })
+    .max(40)
+    .refine((s) => new Set(s.map((x) => x.label)).size === s.length, {
+      message: 'Size labels must be unique',
+    }),
+});
+export type SizeChartInput = z.input<typeof sizeChartInputSchema>;
+
+export const sizeChartSchema = sizeChartInputSchema.extend({
+  id: z.uuid(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+export type SizeChart = z.infer<typeof sizeChartSchema>;
+export const sizeChartListResponseSchema = z.object({ items: z.array(sizeChartSchema) });
+export const sizeChartParamsSchema = z.object({ orgId: z.uuid(), chartId: z.uuid() });
